@@ -1,0 +1,30 @@
+name: connected-in-climate
+region: nyc
+domains:
+  - domain: connected.climateactionforge.com
+    type: PRIMARY
+services:
+  - name: web
+    github:
+      repo: krzheng3150/connected-in-climate
+      branch: main
+      deploy_on_push: false # deploys are driven by .github/workflows/deploy.yml
+    build_command: npm run build
+    run_command: npm start
+    http_port: 8080
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    health_check:
+      http_path: /api/health
+      initial_delay_seconds: 10
+    envs:
+      - key: NODE_ENV
+        scope: RUN_TIME
+        value: production
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    production: false # dev database; switch to a managed cluster before real traffic
