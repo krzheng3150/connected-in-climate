@@ -1,0 +1,235 @@
+/* ── Tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg: #fafaf9;
+  --fg: #1c1917;
+  --muted: #78716c;
+  --border: #d6d3d1;
+  --surface: #ffffff;
+  --accent: #0e7490;
+  --accent-hover: #0c6478;
+  --accent-light: #e0f2fe;
+  --error: #dc2626;
+  --error-light: #fef2f2;
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171717;
+    --fg: #e7e5e4;
+    --muted: #a8a29e;
+    --border: #3f3f3f;
+    --surface: #262626;
+    --accent: #22d3ee;
+    --accent-hover: #67e8f9;
+    --accent-light: #0e374a;
+    --error: #f87171;
+    --error-light: #3b1616;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #171717;
+  --fg: #e7e5e4;
+  --muted: #a8a29e;
+  --border: #3f3f3f;
+  --surface: #262626;
+  --accent: #22d3ee;
+  --accent-hover: #67e8f9;
+  --accent-light: #0e374a;
+  --error: #f87171;
+  --error-light: #3b1616;
+  color-scheme: dark;
+}
+
+/* ── Reset & base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Landing page ──────────────────────────────────────────────── */
+.landing {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 4rem 1rem 2rem;
+  text-align: center;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.landing-hero h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.login-form {
+  text-align: left;
+}
+
+.login-form label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-row input {
+  flex: 1;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  background: var(--surface);
+  color: var(--fg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-row input:focus {
+  border-color: var(--accent);
+}
+
+.input-row button,
+.btn-primary {
+  padding: 0.625rem 1.25rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.input-row button:hover,
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.input-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-error {
+  color: var(--error);
+  background: var(--error-light);
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  margin-top: 0.5rem;
+}
+
+.help-text {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+/* ── Page layout (dashboard + detail pages) ────────────────────── */
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  min-height: 100dvh;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-header h1 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-link:hover {
+  color: var(--accent-hover);
+}
+
+.page-body {
+  padding: 2rem 0;
+}
+
+.page-body h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.role-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  margin-bottom: 1rem;
+}
+
+.placeholder-text {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.back-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.back-link:hover {
+  color: var(--accent-hover);
+}

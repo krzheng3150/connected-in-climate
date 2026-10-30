@@ -18,6 +18,37 @@ app.get('/api/health', async (_req, res) => {
   res.json({ ok: true })
 })
 
+function getAdminEmails() {
+  return new Set(
+    (process.env.ADMIN_EMAILS || '').split(',').map(e => e.toLowerCase().trim()).filter(Boolean),
+  )
+}
+
+app.get('/api/profiles/me', async (req, res, next) => {
+  try {
+    const { email } = req.query
+    if (!email) return res.status(400).json({ error: 'email query param is required' })
+    const normalEmail = email.toLowerCase().trim()
+    const result = await pool.query(
+      'SELECT email, name, role, payload FROM user_profiles WHERE email = $1',
+      [normalEmail],
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'profile not found' })
+    }
+    const row = result.rows[0]
+    res.json({
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      preferred_name: row.payload?.preferred_name || null,
+      is_admin: getAdminEmails().has(normalEmail),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 app.use('/api/matches', matchRouter)
 app.use('/api/actions', actionRouter)
 app.use('/api/feedback', feedbackRouter)

@@ -26,6 +26,9 @@ services:
       - key: OPENAI_API_KEY
         scope: RUN_TIME
         type: SECRET
+      - key: ADMIN_EMAILS
+        scope: RUN_TIME
+        value: krzheng3150@gmail.com,cohenca3@gmail.com
 databases:
   - name: db
     engine: PG
