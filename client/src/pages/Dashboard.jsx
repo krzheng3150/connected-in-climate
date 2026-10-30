@@ -41,7 +41,11 @@ export default function Dashboard() {
           </div>
         )}
 
-        {!user.is_mentee && !user.is_mentor && (
+        {!user.is_mentee && !user.is_mentor && user.is_admin && (
+          <p className="placeholder-text">You're signed in as an admin. Use the Admin link above to manage the platform.</p>
+        )}
+
+        {!user.is_mentee && !user.is_mentor && !user.is_admin && (
           <p className="placeholder-text">Your role is not yet configured.</p>
         )}
 

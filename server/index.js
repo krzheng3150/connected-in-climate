@@ -34,8 +34,18 @@ app.get('/api/profiles/me', async (req, res, next) => {
       'SELECT email, name, role, payload FROM user_profiles WHERE email = $1',
       [normalEmail],
     )
+    const isAdmin = getAdminEmails().has(normalEmail)
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'profile not found' })
+      if (!isAdmin) return res.status(404).json({ error: 'profile not found' })
+      return res.json({
+        email: normalEmail,
+        name: normalEmail.split('@')[0],
+        role: null,
+        is_mentor: false,
+        is_mentee: false,
+        preferred_name: null,
+        is_admin: true,
+      })
     }
     const row = result.rows[0]
     res.json({
@@ -45,7 +55,7 @@ app.get('/api/profiles/me', async (req, res, next) => {
       is_mentor: isMentor(row.role),
       is_mentee: isMentee(row.role),
       preferred_name: row.payload?.preferred_name || null,
-      is_admin: getAdminEmails().has(normalEmail),
+      is_admin: isAdmin,
     })
   } catch (err) {
     next(err)
