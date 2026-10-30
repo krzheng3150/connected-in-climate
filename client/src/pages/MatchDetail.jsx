@@ -211,12 +211,29 @@ export default function MatchDetail() {
 function ContactLink({ type, value, onClick }) {
   const label = type.charAt(0).toUpperCase() + type.slice(1)
   const isUrl = value.startsWith('http')
+
+  // Phone numbers are shown as copyable text, not a tel: link
+  if (type === 'phone') {
+    return (
+      <span
+        className="contact-link contact-link-text"
+        onClick={() => {
+          navigator.clipboard.writeText(value).catch(() => {})
+          onClick(type, value)
+        }}
+        title="Click to copy"
+        style={{ cursor: 'pointer' }}
+      >
+        {label}: {value}
+      </span>
+    )
+  }
+
   const href = isUrl ? value
-    : type === 'phone' ? `tel:${value}`
     : type === 'email' ? `mailto:${value}`
     : value
 
-  if (isUrl || type === 'phone' || type === 'email') {
+  if (isUrl || type === 'email') {
     return (
       <a
         className="contact-link"
