@@ -2,9 +2,7 @@ import { readFileSync } from 'node:fs'
 import { parse } from 'node:path'
 import pg from 'pg'
 
-const EMBEDDING_MODEL = 'text-embedding-3-small'
 const EMBEDDING_DIMENSIONS = 1536
-const BATCH_SIZE = 100
 
 const STABLE_COLUMNS = new Set(['email', 'name', 'role'])
 
@@ -165,30 +163,52 @@ function parseRow(raw) {
   return { email, name, role, payload, embeddingText, errors }
 }
 
-// ── OpenAI embeddings ───────────────────────────────────────────────
+// ── Local TF-IDF embeddings (no external API) ─────────────────────
 
-async function computeEmbeddings(texts) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY environment variable is required')
+function tokenize(text) {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1)
+}
 
-  const all = new Array(texts.length)
-  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-    const batch = texts.slice(i, i + BATCH_SIZE)
-    const res = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: EMBEDDING_MODEL, input: batch }),
-    })
-    const data = await res.json()
-    if (data.error) throw new Error(`OpenAI API error: ${data.error.message}`)
-    for (const item of data.data) {
-      all[i + item.index] = item.embedding
-    }
-    if (i + BATCH_SIZE < texts.length) {
-      console.log(`  Embedded ${i + batch.length}/${texts.length} profiles...`)
-    }
+// FNV-1a hash → bucket index in [0, EMBEDDING_DIMENSIONS)
+function hashBucket(str) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = (h * 0x01000193) >>> 0
   }
-  return all
+  return h % EMBEDDING_DIMENSIONS
+}
+
+function computeEmbeddings(texts) {
+  const docFreq = new Map()
+  const tokenized = texts.map(text => {
+    const tokens = tokenize(text || '')
+    const unique = new Set(tokens)
+    for (const t of unique) docFreq.set(t, (docFreq.get(t) || 0) + 1)
+    return tokens
+  })
+
+  const N = texts.length
+  return tokenized.map(tokens => {
+    if (tokens.length === 0) return null
+
+    const tf = new Map()
+    for (const t of tokens) tf.set(t, (tf.get(t) || 0) + 1)
+
+    const vec = new Float64Array(EMBEDDING_DIMENSIONS)
+    for (const [term, count] of tf) {
+      const tfidf = (count / tokens.length) * Math.log(N / (docFreq.get(term) || 1))
+      vec[hashBucket(term)] += tfidf
+    }
+
+    // L2 normalize
+    let mag = 0
+    for (let i = 0; i < vec.length; i++) mag += vec[i] ** 2
+    mag = Math.sqrt(mag)
+    if (mag > 0) for (let i = 0; i < vec.length; i++) vec[i] /= mag
+
+    return Array.from(vec)
+  })
 }
 
 // ── DB upsert ───────────────────────────────────────────────────────
@@ -272,13 +292,14 @@ if (dryRun) {
   process.exit(0)
 }
 
-console.log('\nComputing embeddings...')
+console.log('\nComputing TF-IDF embeddings locally...')
 const texts = valid.map(p => p.embeddingText)
-const embeddings = await computeEmbeddings(texts)
+const embeddings = computeEmbeddings(texts)
 for (let i = 0; i < valid.length; i++) {
   valid[i].embedding = embeddings[i]
 }
-console.log(`Computed ${embeddings.length} embeddings (${EMBEDDING_DIMENSIONS} dimensions each)`)
+const nonNull = embeddings.filter(Boolean).length
+console.log(`Computed ${nonNull} embeddings (${EMBEDDING_DIMENSIONS} dimensions each, ${embeddings.length - nonNull} skipped)`)
 
 console.log('\nUpserting into database...')
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
