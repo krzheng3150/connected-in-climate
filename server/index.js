@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { migrate, pool } from './db.js'
+import matchRouter from './match-api.js'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -13,6 +14,8 @@ app.get('/api/health', async (_req, res) => {
   await pool.query('SELECT 1')
   res.json({ ok: true })
 })
+
+app.use('/api/matches', matchRouter)
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }))
 
