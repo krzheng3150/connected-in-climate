@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 import { Router } from 'express'
 import { pool } from './db.js'
 import { rankMentors, computeMatch } from './matching.js'
+import { isMentee } from './roles.js'
 
 const router = Router()
 
@@ -48,7 +49,7 @@ router.post('/run', async (req, res, next) => {
       return res.status(404).json({ error: 'profile not found' })
     }
     const menteeProfile = menteeRow.rows[0]
-    if (menteeProfile.role !== 'mentee' && menteeProfile.role !== 'both') {
+    if (!isMentee(menteeProfile.role)) {
       return res.status(400).json({ error: 'user is not a mentee' })
     }
     const mentee = profileFromRow(menteeProfile)

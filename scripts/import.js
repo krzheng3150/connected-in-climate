@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { parse } from 'node:path'
+import { isMentor, isMentee } from '../server/roles.js'
 import pg from 'pg'
 
 const EMBEDDING_DIMENSIONS = 1536
@@ -152,13 +153,10 @@ function parseRow(raw) {
 
   if (Object.keys(links).length) payload.links = links
 
-  const isMentee = role === 'mentee' || role === 'both'
-  const isMentor = role === 'mentor' || role === 'both'
+  if (isMentee(role) && !payload.statement_of_intent) errors.push('mentee missing statement_of_intent')
+  if (isMentor(role) && !payload.motivation) errors.push('mentor missing motivation')
 
-  if (isMentee && !payload.statement_of_intent) errors.push('mentee missing statement_of_intent')
-  if (isMentor && !payload.motivation) errors.push('mentor missing motivation')
-
-  const embeddingText = isMentee ? payload.statement_of_intent : payload.motivation
+  const embeddingText = isMentee(role) ? payload.statement_of_intent : payload.motivation
 
   return { email, name, role, payload, embeddingText, errors }
 }
@@ -273,8 +271,8 @@ if (invalid.length) {
 
 console.log(`\n${valid.length} valid profiles (${invalid.length} skipped)`)
 
-const mentors = valid.filter(p => p.role === 'mentor' || p.role === 'both')
-const mentees = valid.filter(p => p.role === 'mentee' || p.role === 'both')
+const mentors = valid.filter(p => isMentor(p.role))
+const mentees = valid.filter(p => isMentee(p.role))
 console.log(`  Mentors: ${mentors.length}  |  Mentees: ${mentees.length}`)
 
 if (dryRun) {

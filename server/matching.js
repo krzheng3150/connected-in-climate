@@ -2,6 +2,8 @@
 // Pure functions: no DB, no side effects. Takes profile data in,
 // returns scores and computation payloads out.
 
+import { isMentor } from './roles.js'
+
 // ── Phase 1: Eligibility Filter ────────────────────────────────────
 
 export function filterEligible(mentee, mentors, activeMatches, blockList) {
@@ -23,7 +25,7 @@ export function filterEligible(mentee, mentors, activeMatches, blockList) {
   for (const mentor of mentors) {
     const reasons = []
     if (mentor.email === menteeEmail) reasons.push('self_match')
-    if (mentor.role !== 'mentor' && mentor.role !== 'both') reasons.push('not_mentor')
+    if (!isMentor(mentor.role)) reasons.push('not_mentor')
     if (activePartners.has(mentor.email)) reasons.push('active_match_exists')
     if (blocked.has(mentor.email)) reasons.push('blocked')
 

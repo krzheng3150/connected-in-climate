@@ -6,6 +6,7 @@ import matchRouter from './match-api.js'
 import actionRouter from './action-api.js'
 import feedbackRouter from './feedback-api.js'
 import adminRouter from './admin-api.js'
+import { isMentor, isMentee } from './roles.js'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -41,6 +42,8 @@ app.get('/api/profiles/me', async (req, res, next) => {
       email: row.email,
       name: row.name,
       role: row.role,
+      is_mentor: isMentor(row.role),
+      is_mentee: isMentee(row.role),
       preferred_name: row.payload?.preferred_name || null,
       is_admin: getAdminEmails().has(normalEmail),
     })

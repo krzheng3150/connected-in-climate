@@ -233,3 +233,118 @@ body {
 .back-link:hover {
   color: var(--accent-hover);
 }
+
+/* ── Role tabs (both users) ────────────────────────────────────── */
+.role-tabs {
+  display: flex;
+  gap: 0;
+  margin: 1rem 0 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.role-tab {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.role-tab + .role-tab {
+  border-left: 1px solid var(--border);
+}
+
+.role-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Dashboard ─────────────────────────────────────────────────── */
+.dashboard-actions {
+  margin: 1.5rem 0 1rem;
+}
+
+.dashboard-message {
+  font-size: 0.875rem;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--muted);
+}
+
+.empty-state p {
+  margin-bottom: 0.5rem;
+}
+
+/* ── Match list ────────────────────────────────────────────────── */
+.match-list h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.match-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  color: var(--fg);
+}
+
+.match-card:hover {
+  border-color: var(--accent);
+}
+
+.match-card-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.match-card-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.match-card-role {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.match-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.match-card-score {
+  font-weight: 500;
+}
