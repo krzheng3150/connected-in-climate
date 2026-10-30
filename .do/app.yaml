@@ -23,6 +23,9 @@ services:
       - key: DATABASE_URL
         scope: RUN_TIME
         value: ${db.DATABASE_URL}
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
 databases:
   - name: db
     engine: PG

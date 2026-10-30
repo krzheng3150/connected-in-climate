@@ -1,3 +1,7 @@
 node_modules
 client/dist
 .env
+
+# Real profile data (sample is tracked, real imports are not)
+scripts/profiles*.csv
+scripts/profiles*.json
