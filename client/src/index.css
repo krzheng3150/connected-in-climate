@@ -596,3 +596,184 @@ body {
   font-size: 0.9375rem;
   line-height: 1.5;
 }
+
+/* ── Admin panel ─────────────────────────────────────────────────── */
+.admin-search-form {
+  margin-bottom: 1rem;
+}
+
+.admin-section {
+  margin-top: 1.5rem;
+}
+
+.admin-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.admin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.admin-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-card-header strong {
+  font-size: 0.9375rem;
+}
+
+.admin-arrow {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.admin-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.admin-card-meta span + span::before {
+  content: '·';
+  margin-right: 0.5rem;
+}
+
+.admin-commit {
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.admin-card-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.admin-scores {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.admin-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.admin-score-row span:first-child {
+  font-weight: 500;
+  min-width: 90px;
+}
+
+.admin-score-row span:nth-child(2) {
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.admin-weight {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.admin-score-final {
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.admin-score-detail {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 0.125rem 0 0.375rem 1rem;
+  line-height: 1.6;
+}
+
+.admin-reject-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.admin-reject-form input[type="text"] {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  background: var(--surface);
+  color: var(--fg);
+  outline: none;
+}
+
+.admin-reject-form input[type="text"]:focus {
+  border-color: var(--accent);
+}
+
+.admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.admin-checkbox input {
+  accent-color: var(--accent);
+}
+
+.admin-block-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-block-form input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  background: var(--surface);
+  color: var(--fg);
+  outline: none;
+}
+
+.admin-block-form input:focus {
+  border-color: var(--accent);
+}
+
+.admin-block-form .btn-primary {
+  align-self: flex-start;
+}
+
+.admin-json {
+  font-family: monospace;
+  font-size: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow-y: auto;
+}

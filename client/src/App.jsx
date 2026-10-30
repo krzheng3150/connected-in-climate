@@ -5,6 +5,7 @@ import RequireAdmin from './components/RequireAdmin.jsx'
 import Landing from './pages/Landing.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import MatchDetail from './pages/MatchDetail.jsx'
+import AdminPanel from './pages/AdminPanel.jsx'
 import NotFound from './pages/NotFound.jsx'
 
 export default function App() {
@@ -15,19 +16,8 @@ export default function App() {
       <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
       <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
       <Route path="/matches/:matchId" element={<RequireAuth><MatchDetail /></RequireAuth>} />
-      <Route path="/admin" element={<RequireAuth><RequireAdmin><Placeholder title="Admin Panel" /></RequireAdmin></RequireAuth>} />
+      <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminPanel /></RequireAdmin></RequireAuth>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
-  )
-}
-
-function Placeholder({ title }) {
-  return (
-    <div className="page">
-      <main className="page-body">
-        <h2>{title}</h2>
-        <p className="placeholder-text">Coming soon.</p>
-      </main>
-    </div>
   )
 }
