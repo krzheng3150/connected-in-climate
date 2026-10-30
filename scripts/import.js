@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { parse } from 'node:path'
 import { isMentor, isMentee } from '../server/roles.js'
+import { FIELDS, normalize, normalizeArray } from '../server/field-registry.js'
 import pg from 'pg'
 
 const EMBEDDING_DIMENSIONS = 1536
@@ -11,6 +12,23 @@ const ARRAY_FIELDS = new Set([
   'career_areas', 'climate_areas', 'sectors',
   'top_strengths', 'general_topics', 'top_topics',
   'certifications', 'interests_hobbies', 'locations_open_to',
+])
+
+const ENUM_ARRAY_FIELDS = new Set([
+  'career_areas', 'climate_areas', 'sectors',
+  'top_strengths', 'general_topics', 'top_topics',
+])
+
+const ENUM_FIELD_MAP = {
+  top_strengths: 'topics',
+  general_topics: 'topics',
+  top_topics: 'topics',
+}
+
+const ENUM_SINGLE_FIELDS = new Set([
+  'education_level', 'career_level', 'years_experience', 'years_climate_experience',
+  'employment_situation', 'management_experience', 'business_experience',
+  'international_experience', 'nonprofit_board_experience',
 ])
 
 const INT_FIELDS = new Set([
@@ -137,7 +155,22 @@ function parseRow(raw) {
 
     if (ARRAY_FIELDS.has(key)) {
       const items = Array.isArray(val) ? val : String(val).split('|').map(s => s.trim()).filter(Boolean)
-      if (items.length) payload[key] = items
+      if (!items.length) continue
+      const registryField = ENUM_FIELD_MAP[key] || key
+      if (ENUM_ARRAY_FIELDS.has(key) && FIELDS[registryField]) {
+        const { values, warnings } = normalizeArray(registryField, items)
+        for (const w of warnings) errors.push(`${key}: unknown value "${w.value}"`)
+        if (values.length) payload[key] = values
+      } else {
+        payload[key] = items
+      }
+    } else if (ENUM_SINGLE_FIELDS.has(key)) {
+      const result = normalize(key, val)
+      if (result && typeof result === 'object' && result.unknown) {
+        errors.push(`${key}: unknown value "${result.value}"`)
+      } else if (result) {
+        payload[key] = result
+      }
     } else if (INT_FIELDS.has(key)) {
       const n = Number(val)
       if (Number.isNaN(n)) { errors.push(`${key} must be a number, got "${val}"`); continue }
@@ -302,6 +335,8 @@ console.log(`Computed ${nonNull} embeddings (${EMBEDDING_DIMENSIONS} dimensions 
 console.log('\nUpserting into database...')
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 try {
+  const schemaSql = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8')
+  await pool.query(schemaSql)
   await upsertProfiles(pool, valid)
   console.log(`Done! ${valid.length} profiles upserted.`)
 } finally {

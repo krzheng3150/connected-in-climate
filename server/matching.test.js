@@ -6,6 +6,7 @@ import {
   scoreTopic,
   scoreSemantic,
   scoreGeo,
+  scoreExperienceSignals,
   computeMatch,
   rankMentors,
 } from './matching.js'
@@ -547,25 +548,143 @@ describe('Phase 4b: scoreGeo', () => {
   })
 })
 
-// ── Phase 5: Final Score Synthesis ─────────────────────────────────
+// ── Phase 5: Experience Signals ───────────────────────────────────
 
-describe('Phase 5: computeMatch', () => {
+describe('Phase 5: scoreExperienceSignals', () => {
+  it('returns 0 when mentee has no mapped topics', () => {
+    const mentee = makeMentee({ payload: { top_topics: ['resume_interview', 'networking'] } })
+    const mentor = makeMentor({ payload: { management_experience: 'managed_5plus' } })
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 0)
+    assert.equal(result.matched, 0)
+    assert.equal(result.score, 0)
+    assert.equal(result.details.length, 0)
+  })
+
+  it('scores 1.0 when all relevant topics match mentor experience', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['international_work', 'leadership_skills'],
+    }})
+    const mentor = makeMentor({ payload: {
+      international_experience: 'lived_abroad',
+      management_experience: 'managed_5plus',
+    }})
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 2)
+    assert.equal(result.matched, 2)
+    approxEqual(result.score, 1.0)
+  })
+
+  it('scores 0.5 when half of relevant topics match', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['international_work', 'leadership_skills'],
+    }})
+    const mentor = makeMentor({ payload: {
+      international_experience: 'lived_abroad',
+      management_experience: 'none',
+    }})
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 2)
+    assert.equal(result.matched, 1)
+    approxEqual(result.score, 0.5)
+  })
+
+  it('scores 0 when mentor has no relevant experience', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['international_work', 'start_business'],
+    }})
+    const mentor = makeMentor({ payload: {
+      international_experience: 'none',
+      business_experience: 'none',
+    }})
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 2)
+    assert.equal(result.matched, 0)
+    approxEqual(result.score, 0)
+  })
+
+  it('handles missing mentor experience fields gracefully', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['international_work'],
+    }})
+    const mentor = makeMentor({ payload: {} })
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 1)
+    assert.equal(result.matched, 0)
+    assert.equal(result.details[0].mentor_value, null)
+  })
+
+  it('maps both start_business and business_ideas to business_experience', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['start_business', 'business_ideas'],
+    }})
+    const mentor = makeMentor({ payload: {
+      business_experience: 'started_own',
+    }})
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 2)
+    assert.equal(result.matched, 2)
+    assert.equal(result.details[0].field, 'business_experience')
+    assert.equal(result.details[1].field, 'business_experience')
+  })
+
+  it('maps nonprofit_board topic to nonprofit_board_experience', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['nonprofit_board'],
+    }})
+    const mentor = makeMentor({ payload: {
+      nonprofit_board_experience: 'yes',
+    }})
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.checked, 1)
+    assert.equal(result.matched, 1)
+    approxEqual(result.score, 1.0)
+  })
+
+  it('returns 0 when mentee has no topics at all', () => {
+    const mentee = makeMentee({ payload: { top_topics: [] } })
+    const mentor = makeMentor({ payload: { management_experience: 'managed_5plus' } })
+    const result = scoreExperienceSignals(mentee, mentor)
+    assert.equal(result.score, 0)
+  })
+
+  it('includes detail audit trail', () => {
+    const mentee = makeMentee({ payload: {
+      top_topics: ['leadership_skills'],
+    }})
+    const mentor = makeMentor({ payload: {
+      management_experience: 'managed_few',
+    }})
+    const result = scoreExperienceSignals(mentee, mentor)
+    const d = result.details[0]
+    assert.equal(d.topic, 'leadership_skills')
+    assert.equal(d.field, 'management_experience')
+    assert.equal(d.mentor_value, 'managed_few')
+    assert.equal(d.matched, true)
+  })
+})
+
+// ── Phase 6: Final Score Synthesis ─────────────────────────────────
+
+describe('Phase 6: computeMatch', () => {
   it('uses geo weights when geo enabled', () => {
     const mentee = makeMentee({ payload: { geo_match_preference: true, location: 'SF, CA' } })
     const mentor = makeMentor({ payload: { location: 'SF, CA' } })
     const result = computeMatch(mentee, mentor)
-    assert.equal(result.scores.weights_used.categorical, 0.40)
-    assert.equal(result.scores.weights_used.topic, 0.30)
+    assert.equal(result.scores.weights_used.categorical, 0.35)
+    assert.equal(result.scores.weights_used.topic, 0.25)
     assert.equal(result.scores.weights_used.geo, 0.15)
+    assert.equal(result.scores.weights_used.experience, 0.10)
   })
 
   it('uses non-geo weights when geo disabled', () => {
     const mentee = makeMentee({ payload: { geo_match_preference: false } })
     const mentor = makeMentor()
     const result = computeMatch(mentee, mentor)
-    assert.equal(result.scores.weights_used.categorical, 0.45)
-    assert.equal(result.scores.weights_used.topic, 0.35)
+    assert.equal(result.scores.weights_used.categorical, 0.40)
+    assert.equal(result.scores.weights_used.topic, 0.30)
     assert.equal(result.scores.weights_used.geo, null)
+    assert.equal(result.scores.weights_used.experience, 0.15)
   })
 
   it('final score is weighted sum', () => {
@@ -579,10 +698,10 @@ describe('Phase 5: computeMatch', () => {
       career_areas: ['A'], climate_areas: ['X'], sectors: ['S'],
       top_strengths: ['T1'], general_topics: [],
     }})
-    // categorical = 1.0, topic = 1.0, semantic = 0 (null)
-    // 0.45 * 1.0 + 0.35 * 1.0 + 0.20 * 0 = 0.80
+    // categorical = 1.0, topic = 1.0, semantic = 0 (null), experience = 0 (no mapped topics)
+    // 0.40 * 1.0 + 0.30 * 1.0 + 0.15 * 0 + 0.15 * 0 = 0.70
     const result = computeMatch(mentee, mentor)
-    approxEqual(result.scores.final, 0.80)
+    approxEqual(result.scores.final, 0.70)
   })
 
   it('includes snapshots with all profile data', () => {
@@ -649,9 +768,9 @@ describe('Phase 5: computeMatch', () => {
       menteeEmbedding: [1, 0, 0],
       mentorEmbedding: [1, 0, 0],
     })
-    // semantic = 1.0 with weight 0.20 → should add 0.20 to score
+    // semantic = 1.0 with weight 0.15 → should add 0.15 to score
     assert.ok(withEmb.scores.final > withoutEmb.scores.final)
-    approxEqual(withEmb.scores.final - withoutEmb.scores.final, 0.20)
+    approxEqual(withEmb.scores.final - withoutEmb.scores.final, 0.15)
     assert.equal(withEmb.scores.semantic.cosine_similarity, 1.0)
   })
 })

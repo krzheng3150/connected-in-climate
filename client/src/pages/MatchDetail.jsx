@@ -107,6 +107,18 @@ export default function MatchDetail() {
     month: 'long', day: 'numeric', year: 'numeric',
   })
 
+  const LABELS = {
+    career_level: { entry: 'Associate / Entry', lead: 'Lead', managerial: 'Managerial', director: 'Director / Executive', c_suite: 'C-Suite' },
+    education_level: { high_school: 'High school', associates: 'Associates', bachelors: "Bachelor's", masters: "Master's", doctorate: 'Doctorate' },
+    years_experience: { '0_5': '0–5 years', '5_10': '5–10 years', '10_15': '10–15 years', '15_plus': '15+ years' },
+    years_climate_experience: { '0_5': '0–5 years', '5_10': '5–10 years', '10_15': '10–15 years', '15_plus': '15+ years' },
+    climate_areas: { ai_climate: 'AI in Climate', adaptation: 'Adaptation & Resilience', built_environment: 'Built Environment', circular_economy: 'Circular Economy', climate_finance: 'Climate Finance', climate_justice: 'Climate Justice', climate_policy: 'Climate Policy', climate_tech: 'Climate Tech', corporate_sustainability: 'Corporate Sustainability', decarbonization: 'Decarbonization', energy: 'Energy', food_agriculture: 'Food & Agriculture', nature_carbon: 'Nature & Carbon Removal', ocean_water: 'Ocean & Water', transportation: 'Transportation', urban_planning: 'Urban Planning' },
+    career_areas: { biz_dev: 'Business Dev', consulting: 'Consulting', operations: 'Operations', engineering: 'Engineering', finance: 'Finance', fundraising: 'Fundraising', it: 'IT', marketing: 'Marketing', nonprofit_mgmt: 'Nonprofit Mgmt', program_mgmt: 'Program Mgmt', project_mgmt: 'Project Mgmt', research: 'R&D', strategy: 'Strategy', data_science: 'Data Science' },
+    sectors: { private: 'Private Sector', nonprofit: 'Nonprofit / INGO', project_based: 'Project-based', education: 'Education', government: 'Government' },
+    topics: { climate_literacy: 'Climate literacy & translating non-climate experience', career_exploration: 'Career exploration in climate', day_to_day: 'Day-to-day in the job', narrowing_options: 'Narrowing career options', job_search: 'Job search strategy', resume_interview: 'Resume & interview skills', networking: 'Networking', schooling_credentials: 'Schooling & credentials', skills_needed: 'Skills needed in climate', long_term_plan: 'Long-term career planning', career_transition: 'Career transition', international_work: 'International work', professional_challenges: 'Professional challenges', career_advancement: 'Career advancement', leadership_skills: 'Leadership & management skills', work_life_balance: 'Work/life balance', start_business: 'Starting or expanding a business', business_ideas: 'Sounding board for business ideas', nonprofit_board: 'Nonprofit board service' },
+  }
+  const lbl = (field, id) => LABELS[field]?.[id] ?? id
+
   return (
     <div className="page">
       <header className="page-header">
@@ -122,21 +134,97 @@ export default function MatchDetail() {
 
         <div className="partner-meta">
           {p.location && <span>{p.location}</span>}
-          {p.career_level && <span>{p.career_level}</span>}
+          {p.career_level && <span>{lbl('career_level', p.career_level)}</span>}
+          {p.education_level && <span>{lbl('education_level', p.education_level)}</span>}
+          {p.years_experience && <span>{lbl('years_experience', p.years_experience)} exp.</span>}
           <span>Matched {date}</span>
         </div>
 
         {(p.career_areas?.length > 0 || p.climate_areas?.length > 0) && (
           <div className="partner-tags">
-            {p.career_areas?.map(a => <span key={a} className="tag">{a}</span>)}
-            {p.climate_areas?.map(a => <span key={a} className="tag tag-climate">{a}</span>)}
+            {p.career_areas?.map(a => <span key={a} className="tag">{lbl('career_areas', a)}</span>)}
+            {p.climate_areas?.map(a => <span key={a} className="tag tag-climate">{lbl('climate_areas', a)}</span>)}
+          </div>
+        )}
+
+        {(() => {
+          const exp = []
+          if (p.international_experience && p.international_experience !== 'none')
+            exp.push('International experience')
+          if (p.management_experience && p.management_experience !== 'none')
+            exp.push('Management experience')
+          if (p.business_experience && p.business_experience !== 'none')
+            exp.push('Business experience')
+          if (p.nonprofit_board_experience && p.nonprofit_board_experience !== 'none')
+            exp.push('Nonprofit board')
+          return exp.length > 0 ? (
+            <div className="partner-tags">
+              {exp.map(e => <span key={e} className="tag tag-experience">{e}</span>)}
+            </div>
+          ) : null
+        })()}
+
+        {p.sectors?.length > 0 && (
+          <div className="partner-section">
+            <h3>Sectors</h3>
+            <div className="partner-tags">
+              {p.sectors.map(s => <span key={s} className="tag">{lbl('sectors', s)}</span>)}
+            </div>
+          </div>
+        )}
+
+        {p.top_strengths?.length > 0 && (
+          <div className="partner-section">
+            <h3>Top Strengths</h3>
+            <div className="partner-tags">
+              {p.top_strengths.map(t => <span key={t} className="tag tag-topic">{lbl('topics', t)}</span>)}
+            </div>
+          </div>
+        )}
+
+        {p.general_topics?.length > 0 && (
+          <div className="partner-section">
+            <h3>Also Comfortable With</h3>
+            <div className="partner-tags">
+              {p.general_topics.map(t => <span key={t} className="tag tag-topic">{lbl('topics', t)}</span>)}
+            </div>
+          </div>
+        )}
+
+        {p.top_topics?.length > 0 && (
+          <div className="partner-section">
+            <h3>Topics of Interest</h3>
+            <div className="partner-tags">
+              {p.top_topics.map(t => <span key={t} className="tag tag-topic">{lbl('topics', t)}</span>)}
+            </div>
+          </div>
+        )}
+
+        {p.years_climate_experience && (
+          <div className="partner-section">
+            <h3>Climate Experience</h3>
+            <p>{lbl('years_climate_experience', p.years_climate_experience)}</p>
+          </div>
+        )}
+
+        {p.certifications?.length > 0 && (
+          <div className="partner-section">
+            <h3>Certifications</h3>
+            <p>{p.certifications.join(', ')}</p>
           </div>
         )}
 
         {(p.motivation || p.statement_of_intent) && (
           <div className="partner-section">
-            <h3>{match.your_role === 'mentee' ? 'Motivation' : 'Statement of Intent'}</h3>
+            <h3>About</h3>
             <p>{p.motivation || p.statement_of_intent}</p>
+          </div>
+        )}
+
+        {p.interests_hobbies?.length > 0 && (
+          <div className="partner-section">
+            <h3>Interests & Hobbies</h3>
+            <p>{p.interests_hobbies.join(', ')}</p>
           </div>
         )}
 

@@ -3,6 +3,15 @@
 // returns scores and computation payloads out.
 
 import { isMentor } from './roles.js'
+import { hasExperience } from './field-registry.js'
+
+const TOPIC_EXPERIENCE_MAP = [
+  ['international_work', 'international_experience'],
+  ['leadership_skills', 'management_experience'],
+  ['start_business', 'business_experience'],
+  ['business_ideas', 'business_experience'],
+  ['nonprofit_board', 'nonprofit_board_experience'],
+]
 
 // ── Phase 1: Eligibility Filter ────────────────────────────────────
 
@@ -222,10 +231,34 @@ export function scoreGeo(mentee, mentor) {
   }
 }
 
-// ── Phase 5: Final Score Synthesis ─────────────────────────────────
+// ── Phase 5: Experience Signals ───────────────────────────────────
 
-const WEIGHTS_GEO = { categorical: 0.40, topic: 0.30, semantic: 0.15, geo: 0.15 }
-const WEIGHTS_NO_GEO = { categorical: 0.45, topic: 0.35, semantic: 0.20, geo: 0 }
+export function scoreExperienceSignals(mentee, mentor) {
+  const topics = mentee.payload?.top_topics ?? []
+  const mentorPayload = mentor.payload ?? {}
+
+  const details = []
+  for (const [topicId, expField] of TOPIC_EXPERIENCE_MAP) {
+    if (!topics.includes(topicId)) continue
+    const mentorVal = mentorPayload[expField]
+    const matched = hasExperience(mentorVal)
+    details.push({ topic: topicId, field: expField, mentor_value: mentorVal ?? null, matched })
+  }
+
+  if (details.length === 0) {
+    return { details: [], checked: 0, matched: 0, score: 0 }
+  }
+
+  const matched = details.filter(d => d.matched).length
+  const score = matched / details.length
+
+  return { details, checked: details.length, matched, score: round(score) }
+}
+
+// ── Phase 6: Final Score Synthesis ─────────────────────────────────
+
+const WEIGHTS_GEO = { categorical: 0.35, topic: 0.25, semantic: 0.15, geo: 0.15, experience: 0.10 }
+const WEIGHTS_NO_GEO = { categorical: 0.40, topic: 0.30, semantic: 0.15, geo: 0, experience: 0.15 }
 
 function buildSnapshot(profile) {
   return { email: profile.email, name: profile.name, role: profile.role, ...profile.payload }
@@ -239,12 +272,14 @@ export function computeMatch(mentee, mentor, opts = {}) {
     opts.mentorEmbedding ?? mentor.embedding,
   )
   const geo = scoreGeo(mentee, mentor)
+  const experience = scoreExperienceSignals(mentee, mentor)
 
   const geoEnabled = geo.enabled
   const w = geoEnabled ? { ...WEIGHTS_GEO } : { ...WEIGHTS_NO_GEO }
 
   const semanticVal = semantic.cosine_similarity ?? 0
   const geoVal = geo.score ?? 0
+  const expVal = experience.score ?? 0
 
   const reliability = opts.reliability_multiplier ?? 1.0
 
@@ -252,7 +287,8 @@ export function computeMatch(mentee, mentor, opts = {}) {
     w.categorical * categorical.combined +
     w.topic * topic.combined +
     w.semantic * semanticVal +
-    w.geo * geoVal
+    w.geo * geoVal +
+    w.experience * expVal
   )
 
   return {
@@ -264,11 +300,13 @@ export function computeMatch(mentee, mentor, opts = {}) {
       topic,
       semantic,
       geo,
+      experience,
       weights_used: {
         categorical: w.categorical,
         topic: w.topic,
         semantic: semantic.cosine_similarity === null ? `${w.semantic} (no data, scored as 0)` : w.semantic,
         geo: geoEnabled ? w.geo : null,
+        experience: w.experience,
       },
       reliability_multiplier: reliability,
       final: round(final),
