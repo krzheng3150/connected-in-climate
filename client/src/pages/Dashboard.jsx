@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
 import MenteeDashboard from './MenteeDashboard.jsx'
+import MentorDashboard from './MentorDashboard.jsx'
 
 export default function Dashboard() {
   const { user, logout } = useAuth()
@@ -51,12 +52,7 @@ export default function Dashboard() {
 
         {view === 'mentee' && user.is_mentee && <MenteeDashboard />}
 
-        {view === 'mentor' && user.is_mentor && (
-          <div className="empty-state">
-            <p className="role-badge">mentor</p>
-            <p className="placeholder-text">Mentor dashboard coming soon.</p>
-          </div>
-        )}
+        {view === 'mentor' && user.is_mentor && <MentorDashboard />}
       </main>
     </div>
   )
