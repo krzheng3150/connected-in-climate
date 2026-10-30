@@ -74,8 +74,8 @@ router.get('/', async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT feedback_id, submitter_email, text, rating, payload, created_at
-       FROM feedbacks WHERE match_id = $1 ORDER BY created_at DESC`,
-      [match_id],
+       FROM feedbacks WHERE match_id = $1 AND submitter_email = $2 ORDER BY created_at DESC`,
+      [match_id, normalEmail],
     )
 
     res.json({ feedbacks: result.rows })

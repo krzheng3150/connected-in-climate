@@ -251,13 +251,23 @@ describe('POST /api/feedback', () => {
 // ── GET /api/feedback ──────────────────────────────────────────────
 
 describe('GET /api/feedback', () => {
-  it('lists feedback for a match', async () => {
+  it('returns only the requesting user\'s own feedback', async () => {
     const matchId = await getMatchId()
     const { status, data } = await get(`/api/feedback?match_id=${matchId}&email=mentee@test.com`)
     assert.equal(status, 200)
-    assert.ok(data.feedbacks.length >= 3)
-    assert.ok(data.feedbacks[0].text)
-    assert.ok(data.feedbacks[0].submitter_email)
+    assert.ok(data.feedbacks.length >= 2)
+    for (const fb of data.feedbacks) {
+      assert.equal(fb.submitter_email, 'mentee@test.com')
+    }
+  })
+
+  it('does not show partner feedback to the other user', async () => {
+    const matchId = await getMatchId()
+    const { status, data } = await get(`/api/feedback?match_id=${matchId}&email=mentor@test.com`)
+    assert.equal(status, 200)
+    assert.equal(data.feedbacks.length, 1)
+    assert.equal(data.feedbacks[0].submitter_email, 'mentor@test.com')
+    assert.equal(data.feedbacks[0].text, 'Good mentee.')
   })
 
   it('returns 403 for unauthorized user', async () => {

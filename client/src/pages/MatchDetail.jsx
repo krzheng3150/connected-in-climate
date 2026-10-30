@@ -277,9 +277,7 @@ export default function MatchDetail() {
               {feedbacks.map(fb => (
                 <div key={fb.feedback_id} className="feedback-item">
                   <div className="feedback-item-header">
-                    <span className="feedback-author">
-                      {fb.submitter_email === user.email ? 'You' : 'Partner'}
-                    </span>
+                    <span className="feedback-author">You</span>
                     {fb.rating && <span className="feedback-rating">{'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}</span>}
                     <span className="feedback-date">
                       {new Date(fb.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
