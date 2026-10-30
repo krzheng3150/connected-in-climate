@@ -14,6 +14,7 @@
     "start": "node server/index.js",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
+    "test": "node --test server/matching.test.js",
     "import": "node --env-file=.env scripts/import.js",
     "import:dry": "node --env-file=.env scripts/import.js --dry-run"
   },
