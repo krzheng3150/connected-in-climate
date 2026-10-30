@@ -15,8 +15,8 @@
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "test": "node --test server/matching.test.js",
-    "test:api": "node --env-file=.env --test server/match-api.test.js server/action-feedback-api.test.js",
-    "test:all": "node --test server/matching.test.js && node --env-file=.env --test server/match-api.test.js server/action-feedback-api.test.js",
+    "test:api": "node --env-file=.env --test server/match-api.test.js server/action-feedback-api.test.js server/admin-api.test.js",
+    "test:all": "node --test server/matching.test.js && node --env-file=.env --test server/match-api.test.js server/action-feedback-api.test.js server/admin-api.test.js",
     "import": "node --env-file=.env scripts/import.js",
     "import:dry": "node --env-file=.env scripts/import.js --dry-run"
   },

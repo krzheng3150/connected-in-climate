@@ -5,6 +5,7 @@ import { migrate, pool } from './db.js'
 import matchRouter from './match-api.js'
 import actionRouter from './action-api.js'
 import feedbackRouter from './feedback-api.js'
+import adminRouter from './admin-api.js'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -20,6 +21,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/matches', matchRouter)
 app.use('/api/actions', actionRouter)
 app.use('/api/feedback', feedbackRouter)
+app.use('/api/admin', adminRouter)
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }))
 
