@@ -42,6 +42,7 @@ export function AuthProvider({ children }) {
       }
       const data = await res.json()
       setUser(data)
+      setLoading(false)
       return true
     } catch {
       setError('Could not reach the server.')
