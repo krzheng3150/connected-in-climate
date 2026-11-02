@@ -270,55 +270,72 @@ function AdminMatchCard({ match: m, headers }) {
 
 function ScoreBreakdown({ payload }) {
   const s = payload.scores
+  const [showRaw, setShowRaw] = useState(false)
+
   if (!s) return <pre className="admin-json">{JSON.stringify(payload, null, 2)}</pre>
+
+  const pct = (v) => v != null ? Math.round(v * 100) + '%' : 'N/A'
 
   return (
     <div className="admin-scores">
+      {/* Categorical */}
       <div className="admin-score-row">
         <span>Categorical</span>
-        <span>{Math.round(s.categorical.combined * 100)}%</span>
+        <span>{pct(s.categorical.combined)}</span>
         <span className="admin-weight">w={s.weights_used.categorical}</span>
       </div>
-      <div className="admin-score-detail">
-        Horizontal: {Math.round(s.categorical.horizontal.jaccard * 100)}%
-        {s.categorical.horizontal.intersection.length > 0 && ` (${s.categorical.horizontal.intersection.join(', ')})`}
-        {' · '}Vertical: {Math.round(s.categorical.vertical.jaccard * 100)}%
-        {s.categorical.vertical.intersection.length > 0 && ` (${s.categorical.vertical.intersection.join(', ')})`}
-        {' · '}Sector: {Math.round(s.categorical.sector.jaccard * 100)}%
-      </div>
+      <CategoricalDetail label="Horizontal" data={s.categorical.horizontal} />
+      <CategoricalDetail label="Vertical" data={s.categorical.vertical} />
+      <CategoricalDetail label="Sector" data={s.categorical.sector} />
 
+      {/* Topic */}
       <div className="admin-score-row">
         <span>Topic</span>
-        <span>{Math.round(s.topic.combined * 100)}%</span>
-        <span className="admin-weight">w={s.weights_used.topic}</span>
+        <span>{pct(s.topic.combined)}</span>
+        <span className="admin-weight">w={s.weights_used.topic}{s.topic.harmonic_n ? ` · H(${s.topic.details.length})=${s.topic.harmonic_n}` : ''}</span>
       </div>
       {s.topic.details.length > 0 && (
         <div className="admin-score-detail">
           {s.topic.details.map((d, i) => (
-            <div key={i}>#{d.rank} {d.topic}: {d.matched_in === 'none' ? 'no match' : `${d.matched_in} (${d.score})`}</div>
+            <div key={i}>
+              #{d.rank} {d.topic}: {d.matched_in === 'none'
+                ? 'no match'
+                : `${d.matched_in} → ${d.score}`}
+              {' '}(discounted: {d.discounted})
+            </div>
           ))}
         </div>
       )}
 
+      {/* Semantic */}
       <div className="admin-score-row">
         <span>Semantic</span>
-        <span>{s.semantic.cosine_similarity != null ? Math.round(s.semantic.cosine_similarity * 100) + '%' : 'N/A'}</span>
+        <span>{pct(s.semantic.cosine_similarity)}</span>
         <span className="admin-weight">w={s.weights_used.semantic}</span>
       </div>
-
-      <div className="admin-score-row">
-        <span>Geo</span>
-        <span>{s.geo.enabled ? Math.round(s.geo.score * 100) + '%' : 'off'}</span>
-        <span className="admin-weight">w={s.weights_used.geo ?? '—'}</span>
-      </div>
-      {s.geo.enabled && s.geo.reason && (
-        <div className="admin-score-detail">{s.geo.reason}</div>
+      {s.semantic.reason && (
+        <div className="admin-score-detail">{s.semantic.reason}</div>
       )}
 
+      {/* Geo */}
+      <div className="admin-score-row">
+        <span>Geo</span>
+        <span>{s.geo.enabled ? pct(s.geo.score) : 'off'}</span>
+        <span className="admin-weight">w={s.weights_used.geo ?? '—'}</span>
+      </div>
+      {s.geo.enabled && (
+        <div className="admin-score-detail">
+          {s.geo.reason}
+          {s.geo.mentee_location && ` · Mentee: ${s.geo.mentee_location}`}
+          {s.geo.mentor_location && ` · Mentor: ${s.geo.mentor_location}`}
+        </div>
+      )}
+
+      {/* Experience */}
       <div className="admin-score-row">
         <span>Experience</span>
-        <span>{s.experience ? Math.round(s.experience.score * 100) + '%' : 'N/A'}</span>
-        <span className="admin-weight">w={s.weights_used.experience}</span>
+        <span>{s.experience ? pct(s.experience.score) : 'N/A'}</span>
+        <span className="admin-weight">w={s.weights_used.experience}{s.experience ? ` · ${s.experience.matched}/${s.experience.checked} matched` : ''}</span>
       </div>
       {s.experience?.details.length > 0 && (
         <div className="admin-score-detail">
@@ -328,11 +345,44 @@ function ScoreBreakdown({ payload }) {
         </div>
       )}
 
+      {/* Final */}
       <div className="admin-score-row admin-score-final">
         <span>Final</span>
-        <span>{Math.round(s.final * 100)}%</span>
+        <span>{pct(s.final)}</span>
         <span className="admin-weight">reliability={s.reliability_multiplier}</span>
       </div>
+
+      {/* Prior matches */}
+      {payload.prior_matches?.length > 0 && (
+        <div className="admin-score-detail" style={{ marginTop: '0.5rem' }}>
+          Prior matches: {payload.prior_matches.map((pm, i) => (
+            <span key={i}>{i > 0 && ', '}{pm.status} ({new Date(pm.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</span>
+          ))}
+        </div>
+      )}
+
+      {/* Raw JSON toggle */}
+      <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+        <button className="btn-link" onClick={() => setShowRaw(!showRaw)}>
+          {showRaw ? 'Hide raw payload' : 'Show raw payload'}
+        </button>
+        {showRaw && <pre className="admin-json">{JSON.stringify(payload, null, 2)}</pre>}
+      </div>
+    </div>
+  )
+}
+
+function CategoricalDetail({ label, data }) {
+  if (!data) return null
+  return (
+    <div className="admin-score-detail">
+      {label}: {Math.round(data.jaccard * 100)}% (w={data.weight})
+      {data.intersection?.length > 0 && <> — overlap: {data.intersection.join(', ')}</>}
+      {(data.mentee?.length > 0 || data.mentor?.length > 0) && (
+        <div style={{ marginLeft: '1rem', color: 'var(--muted)' }}>
+          Mentee: [{(data.mentee ?? []).join(', ')}] · Mentor: [{(data.mentor ?? []).join(', ')}]
+        </div>
+      )}
     </div>
   )
 }
