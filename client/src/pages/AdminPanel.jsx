@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { ProfileDetail } from '../components/ProfileFields.jsx'
 
 const TABS = ['Search', 'Feedback', 'Blocks']
 
@@ -116,7 +117,8 @@ function SearchTab({ headers }) {
 }
 
 function ProfileCard({ profile }) {
-  const p = profile.payload || {}
+  const joinDate = new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
   return (
     <div className="admin-card">
       <div className="admin-card-header">
@@ -125,24 +127,37 @@ function ProfileCard({ profile }) {
       </div>
       <div className="admin-card-meta">
         <span>{profile.email}</span>
-        {p.location && <span>{p.location}</span>}
-        {p.career_level && <span>{p.career_level}</span>}
+        <span>Joined {joinDate}</span>
       </div>
-      {p.career_areas?.length > 0 && (
-        <div className="partner-tags" style={{ marginTop: '0.5rem' }}>
-          {p.career_areas.map(a => <span key={a} className="tag">{a}</span>)}
-        </div>
-      )}
+      <ProfileDetail payload={profile.payload} />
     </div>
   )
 }
 
 function AdminMatchCard({ match: m, headers }) {
-  const [expanded, setExpanded] = useState(false)
+  const [showScores, setShowScores] = useState(false)
+  const [showProfiles, setShowProfiles] = useState(false)
+  const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [rejectForm, setRejectForm] = useState({ reason: '', block: false })
   const [status, setStatus] = useState(m.status)
   const [actionMsg, setActionMsg] = useState(null)
+
+  async function fetchDetail() {
+    if (detail) return
+    setDetailLoading(true)
+    try {
+      const res = await fetch(`/api/admin/matches/${m.match_id}`, { headers })
+      if (res.ok) setDetail(await res.json())
+    } catch { /* ignore */ }
+    setDetailLoading(false)
+  }
+
+  async function handleToggleProfiles() {
+    if (!showProfiles) await fetchDetail()
+    setShowProfiles(!showProfiles)
+  }
 
   async function handleReject(e) {
     e.preventDefault()
@@ -167,7 +182,6 @@ function AdminMatchCard({ match: m, headers }) {
     }
   }
 
-  const isMentee = m.mentee_email === m.mentee_email
   const score = Math.round(m.final_score * 100)
   const date = new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
@@ -191,8 +205,11 @@ function AdminMatchCard({ match: m, headers }) {
       </div>
 
       <div className="admin-card-actions">
-        <button className="btn-link" onClick={() => setExpanded(!expanded)}>
-          {expanded ? 'Hide scores' : 'Show scores'}
+        <button className="btn-link" onClick={() => setShowScores(!showScores)}>
+          {showScores ? 'Hide scores' : 'Show scores'}
+        </button>
+        <button className="btn-link" onClick={handleToggleProfiles} disabled={detailLoading}>
+          {detailLoading ? 'Loading...' : showProfiles ? 'Hide profiles' : 'Show profiles'}
         </button>
         {status === 'ACTIVE' && (
           <button className="btn-link" style={{ color: 'var(--error)' }} onClick={() => setRejecting(!rejecting)}>
@@ -201,8 +218,27 @@ function AdminMatchCard({ match: m, headers }) {
         )}
       </div>
 
-      {expanded && m.computation_payload && (
+      {showScores && m.computation_payload && (
         <ScoreBreakdown payload={m.computation_payload} />
+      )}
+
+      {showProfiles && detail && (
+        <div className="admin-match-profiles">
+          <div className="admin-match-profile-pair">
+            <div>
+              <h4>Mentee</h4>
+              <ProfileCard
+                profile={{ email: detail.mentee_email, name: detail.mentee_name, role: 'mentee', payload: detail.mentee_payload || {}, created_at: m.created_at }}
+              />
+            </div>
+            <div>
+              <h4>Mentor</h4>
+              <ProfileCard
+                profile={{ email: detail.mentor_email, name: detail.mentor_name, role: 'mentor', payload: detail.mentor_payload || {}, created_at: m.created_at }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {rejecting && (
