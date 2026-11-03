@@ -82,24 +82,20 @@ export async function adminExpandRawPayload(page) {
   await page.waitForSelector('.admin-json')
 }
 
-export async function adminApprovePendingMatches(page, count = 1) {
-  let approved = 0
-  for (let i = 0; i < count; i++) {
-    const btn = await page.$('button:has-text("Approve")')
-    if (!btn) break
-    await btn.click()
-    await page.waitForTimeout(1000)
-    approved++
+export async function adminSelectCandidates(page, count = 1) {
+  const checkboxes = await page.$$('.admin-card input[type="checkbox"]')
+  let selected = 0
+  for (let i = 0; i < Math.min(count, checkboxes.length); i++) {
+    await checkboxes[i].click()
+    selected++
   }
-  return approved
+  return selected
 }
 
-export async function adminRejectPendingMatch(page) {
-  const btn = await page.$('button:has-text("Reject")')
-  if (btn) {
-    await btn.click()
-    await page.waitForTimeout(500)
-  }
+export async function adminSubmitReview(page) {
+  await page.click('button:has-text("Submit Review")')
+  await page.waitForSelector('.feedback-msg')
+  return page.textContent('.feedback-msg')
 }
 
 export async function selectMentor(page) {

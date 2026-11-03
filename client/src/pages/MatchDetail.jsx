@@ -145,7 +145,7 @@ export default function MatchDetail() {
           </div>
         )}
 
-        {match.status === 'ADMIN_APPROVED' && (
+        {match.status === 'APPROVED' && (
           <p className="placeholder-text" style={{ marginTop: '1rem' }}>
             This match is pending your selection. Return to the dashboard to confirm.
           </p>

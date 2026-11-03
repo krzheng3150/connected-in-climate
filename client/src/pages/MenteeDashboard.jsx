@@ -7,34 +7,25 @@ import MatchCard from '../components/MatchCard.jsx'
 export default function MenteeDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [matches, setMatches] = useState([])
+  const [run, setRun] = useState(undefined)
   const [loading, setLoading] = useState(true)
   const [finding, setFinding] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [message, setMessage] = useState(null)
 
-  const fetchMatches = useCallback(async () => {
+  const fetchRun = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/matches?email=${encodeURIComponent(user.email)}`)
+      const res = await fetch(`/api/matches/run/current?email=${encodeURIComponent(user.email)}`)
       if (res.ok) {
         const data = await res.json()
-        setMatches(data.matches)
+        setRun(data.run)
       }
-    } catch { /* network error — leave matches empty */ }
+    } catch { /* network error */ }
     setLoading(false)
   }, [user.email])
 
-  useEffect(() => { fetchMatches() }, [fetchMatches])
-
-  const pendingMatches = matches.filter(m => m.status === 'PENDING_REVIEW')
-  const approvedMatches = matches.filter(m => m.status === 'ADMIN_APPROVED')
-  const activeMatches = matches.filter(m => m.status === 'ACTIVE')
-
-  const hasPending = pendingMatches.length > 0
-  const hasApproved = approvedMatches.length > 0
-  const hasActive = activeMatches.length > 0
-  const canFindMentor = !hasPending && !hasApproved && !hasActive
+  useEffect(() => { fetchRun() }, [fetchRun])
 
   async function handleFindMentor() {
     setFinding(true)
@@ -48,14 +39,11 @@ export default function MenteeDashboard() {
       const data = await res.json()
       if (!res.ok) {
         setMessage(data.error || 'Something went wrong.')
-      } else if (!data.match && data.pending_count) {
+      } else if (data.run) {
         setMessage(data.message)
-        await fetchMatches()
-      } else if (!data.match) {
-        setMessage(data.message || 'No mentors available right now.')
+        await fetchRun()
       } else {
-        setMessage(`Matched with ${data.match.mentor_name}!`)
-        await fetchMatches()
+        setMessage(data.message || 'No mentors available right now.')
       }
     } catch {
       setMessage('Could not reach the server.')
@@ -74,7 +62,7 @@ export default function MenteeDashboard() {
       })
       if (res.ok) {
         setMessage('Mentor selected!')
-        await fetchMatches()
+        await fetchRun()
       } else {
         const data = await res.json()
         setMessage(data.error || 'Could not select mentor.')
@@ -86,22 +74,35 @@ export default function MenteeDashboard() {
   }
 
   if (loading) {
-    return <p className="placeholder-text">Loading matches...</p>
+    return <p className="placeholder-text">Loading...</p>
   }
+
+  const noRun = !run
+  const isPending = run?.status === 'PENDING_REVIEW'
+  const isAwaiting = run?.status === 'AWAITING_MENTEE'
+  const isActive = run?.status === 'ACTIVE'
 
   return (
     <div className="mentee-dashboard">
-      {canFindMentor && (
-        <div className="dashboard-actions">
-          <button className="btn-primary" onClick={handleFindMentor} disabled={finding}>
-            {finding ? 'Finding...' : 'Find a Mentor'}
-          </button>
-        </div>
+      {noRun && (
+        <>
+          <div className="dashboard-actions">
+            <button className="btn-primary" onClick={handleFindMentor} disabled={finding}>
+              {finding ? 'Finding...' : 'Find a Mentor'}
+            </button>
+          </div>
+          <div className="empty-state">
+            <p>No matches yet.</p>
+            <p className="placeholder-text">
+              Click "Find a Mentor" to get matched with a climate tech mentor.
+            </p>
+          </div>
+        </>
       )}
 
       {message && <p className="dashboard-message">{message}</p>}
 
-      {hasPending && (
+      {isPending && (
         <div className="pending-state">
           <h3>Match Under Review</h3>
           <p className="placeholder-text">
@@ -111,17 +112,17 @@ export default function MenteeDashboard() {
         </div>
       )}
 
-      {hasApproved && (
+      {isAwaiting && (
         <div className="pick-section">
           <h3>Choose Your Mentor</h3>
           <p className="placeholder-text">
-            Your admin has reviewed your candidates and selected {approvedMatches.length} mentor{approvedMatches.length > 1 ? 's' : ''} for you.
-            {approvedMatches.length > 1
+            Your admin has reviewed your candidates and selected {run.matches.length} mentor{run.matches.length > 1 ? 's' : ''} for you.
+            {run.matches.length > 1
               ? ' Compare them and pick the one you\'d like to work with.'
               : ' Review their profile and confirm the match.'}
           </p>
           <div className="match-list">
-            {approvedMatches.map(m => (
+            {run.matches.map(m => (
               <PickCard
                 key={m.match_id}
                 match={m}
@@ -134,21 +135,12 @@ export default function MenteeDashboard() {
         </div>
       )}
 
-      {hasActive && (
+      {isActive && run.matches.length > 0 && (
         <div className="match-list">
           <h3>Your Matches</h3>
-          {activeMatches.map(m => (
+          {run.matches.map(m => (
             <MatchCard key={m.match_id} match={m} userEmail={user.email} />
           ))}
-        </div>
-      )}
-
-      {canFindMentor && matches.length === 0 && (
-        <div className="empty-state">
-          <p>No matches yet.</p>
-          <p className="placeholder-text">
-            Click "Find a Mentor" to get matched with a climate tech mentor.
-          </p>
         </div>
       )}
     </div>

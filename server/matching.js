@@ -15,7 +15,7 @@ const TOPIC_EXPERIENCE_MAP = [
 
 // ── Phase 1: Eligibility Filter ────────────────────────────────────
 
-const IN_PROGRESS_STATUSES = new Set(['ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED'])
+const IN_PROGRESS_STATUSES = new Set(['ACTIVE', 'CANDIDATE', 'APPROVED'])
 
 export function filterEligible(mentee, mentors, activeMatches, blockList) {
   const menteeEmail = mentee.email

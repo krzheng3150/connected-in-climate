@@ -13,11 +13,28 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS match_runs (
+  run_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mentee_email    TEXT NOT NULL REFERENCES user_profiles(email),
+  status          TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
+                  CHECK (status IN ('PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE', 'CANCELLED')),
+  top_candidates  INTEGER NOT NULL,
+  total_scored    INTEGER NOT NULL,
+  code_commit     TEXT NOT NULL,
+  reviewed_by     TEXT,
+  reviewed_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_match_runs_mentee ON match_runs(mentee_email, status);
+
 CREATE TABLE IF NOT EXISTS matches (
   match_id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id                UUID NOT NULL REFERENCES match_runs(run_id),
   mentor_email          TEXT NOT NULL REFERENCES user_profiles(email),
   mentee_email          TEXT NOT NULL REFERENCES user_profiles(email),
-  status                TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'REJECTED', 'FINISHED', 'STORED', 'PENDING_REVIEW', 'ADMIN_APPROVED')),
+  status                TEXT NOT NULL DEFAULT 'CANDIDATE'
+                        CHECK (status IN ('CANDIDATE', 'APPROVED', 'REJECTED', 'ACTIVE', 'STORED', 'FINISHED')),
   final_score           NUMERIC(5,4) NOT NULL,
   rank                  INTEGER NOT NULL,
   computation_payload   JSONB NOT NULL,
@@ -27,6 +44,7 @@ CREATE TABLE IF NOT EXISTS matches (
 
 CREATE INDEX IF NOT EXISTS idx_matches_mentee ON matches(mentee_email, status);
 CREATE INDEX IF NOT EXISTS idx_matches_mentor ON matches(mentor_email, status);
+CREATE INDEX IF NOT EXISTS idx_matches_run ON matches(run_id, status);
 
 CREATE TABLE IF NOT EXISTS match_actions (
   action_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,15 +80,3 @@ CREATE TABLE IF NOT EXISTS rejections (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rejections_pair ON rejections(mentor_email, mentee_email);
-
--- Clean up the scaffold table from initial commit.
-DROP TABLE IF EXISTS greetings;
-
--- Migration: expand CHECK constraints for existing databases.
-ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check;
-ALTER TABLE matches ADD CONSTRAINT matches_status_check
-  CHECK (status IN ('ACTIVE', 'REJECTED', 'FINISHED', 'STORED', 'PENDING_REVIEW', 'ADMIN_APPROVED'));
-
-ALTER TABLE match_actions DROP CONSTRAINT IF EXISTS match_actions_action_type_check;
-ALTER TABLE match_actions ADD CONSTRAINT match_actions_action_type_check
-  CHECK (action_type IN ('VIEW', 'FEEDBACK', 'CONTACT_CLICK', 'REJECT', 'APPROVE', 'SELECT'));

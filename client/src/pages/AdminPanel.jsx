@@ -43,9 +43,10 @@ export default function AdminPanel() {
 // ── Pending Tab ──────────────────────────────────────────────────
 
 function PendingTab({ headers }) {
-  const [groups, setGroups] = useState([])
+  const [runs, setRuns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reviewResult, setReviewResult] = useState(null)
 
   const loadPending = useCallback(async () => {
     setLoading(true)
@@ -54,9 +55,9 @@ function PendingTab({ headers }) {
       const res = await fetch('/api/admin/pending', { headers })
       if (res.ok) {
         const data = await res.json()
-        setGroups(data.pending_groups)
+        setRuns(data.pending_runs)
       } else {
-        setError('Failed to load pending matches.')
+        setError('Failed to load pending runs.')
       }
     } catch {
       setError('Could not reach the server.')
@@ -66,131 +67,144 @@ function PendingTab({ headers }) {
 
   useEffect(() => { loadPending() }, [loadPending])
 
-  if (loading) return <p className="placeholder-text">Loading pending matches...</p>
-  if (error) return <p className="form-error">{error}</p>
-
-  if (groups.length === 0) {
-    return <p className="placeholder-text">No matches pending review.</p>
+  function handleReviewDone(msg) {
+    setReviewResult(msg)
+    loadPending()
   }
+
+  if (loading) return <p className="placeholder-text">Loading pending runs...</p>
+  if (error) return <p className="form-error">{error}</p>
 
   return (
     <div className="admin-section">
-      <h3>Pending Review ({groups.length} mentee{groups.length !== 1 ? 's' : ''})</h3>
-      {groups.map(group => (
-        <PendingGroup key={group.mentee_email} group={group} headers={headers} onUpdate={loadPending} />
+      {reviewResult && <p className="feedback-msg">{reviewResult}</p>}
+      {runs.length === 0 && !reviewResult && (
+        <p className="placeholder-text">No runs pending review.</p>
+      )}
+      {runs.length === 0 && reviewResult && (
+        <p className="placeholder-text" style={{ marginTop: '0.5rem' }}>No more runs pending.</p>
+      )}
+      {runs.length > 0 && (
+        <h3>Pending Review ({runs.length} run{runs.length !== 1 ? 's' : ''})</h3>
+      )}
+      {runs.map(run => (
+        <RunReviewCard key={run.run_id} run={run} headers={headers} onUpdate={handleReviewDone} />
       ))}
     </div>
   )
 }
 
-function PendingGroup({ group, headers, onUpdate }) {
+function RunReviewCard({ run, headers, onUpdate }) {
+  const [selected, setSelected] = useState(new Set())
+  const [submitting, setSubmitting] = useState(false)
+  const [resultMsg, setResultMsg] = useState(null)
+  const [expandedScores, setExpandedScores] = useState(new Set())
+
+  function toggleCandidate(matchId) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(matchId)) next.delete(matchId)
+      else next.add(matchId)
+      return next
+    })
+  }
+
+  function toggleScores(matchId) {
+    setExpandedScores(prev => {
+      const next = new Set(prev)
+      if (next.has(matchId)) next.delete(matchId)
+      else next.add(matchId)
+      return next
+    })
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true)
+    setResultMsg(null)
+    try {
+      const res = await fetch(`/api/admin/runs/${run.run_id}/review`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ approved: [...selected] }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        let msg
+        if (data.run_status === 'CANCELLED') {
+          msg = 'All candidates rejected. Run cancelled.'
+        } else if (data.run_status === 'ACTIVE') {
+          msg = '1 approved — auto-activated!'
+        } else {
+          msg = `${data.approved_count} approved, ${data.rejected_count} rejected. Awaiting mentee selection.`
+        }
+        onUpdate(msg)
+      } else {
+        const data = await res.json()
+        setResultMsg(data.error || 'Review failed.')
+      }
+    } catch {
+      setResultMsg('Could not reach the server.')
+    }
+    setSubmitting(false)
+  }
+
+  const date = new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
   return (
     <div className="admin-card" style={{ padding: '1rem' }}>
       <div className="admin-card-header">
-        <strong>{group.mentee_name}</strong>
-        <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>{group.mentee_email}</span>
+        <strong>{run.mentee_name}</strong>
+        <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
+          {run.mentee_email} &middot; {date} &middot; {run.candidates.length} candidates / {run.total_scored} scored
+        </span>
       </div>
+
       <div style={{ marginTop: '0.75rem' }}>
-        {group.matches.map(m => (
-          <PendingMatchRow key={m.match_id} match={m} headers={headers} onUpdate={onUpdate} />
-        ))}
-      </div>
-    </div>
-  )
-}
+        {run.candidates.map(m => {
+          const score = Math.round(m.final_score * 100)
+          const isSelected = selected.has(m.match_id)
+          const showScores = expandedScores.has(m.match_id)
 
-function PendingMatchRow({ match: m, headers, onUpdate }) {
-  const [showScores, setShowScores] = useState(false)
-  const [actionMsg, setActionMsg] = useState(null)
-  const [acting, setActing] = useState(false)
-
-  async function handleApprove() {
-    setActing(true)
-    setActionMsg(null)
-    try {
-      const res = await fetch(`/api/admin/matches/${m.match_id}/approve`, {
-        method: 'POST',
-        headers,
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setActionMsg(data.auto_activated ? 'Approved & auto-activated (only candidate)' : 'Approved')
-        onUpdate()
-      } else {
-        const data = await res.json()
-        setActionMsg(data.error || 'Failed')
-      }
-    } catch {
-      setActionMsg('Could not reach the server.')
-    }
-    setActing(false)
-  }
-
-  async function handleReject() {
-    setActing(true)
-    setActionMsg(null)
-    try {
-      const res = await fetch(`/api/admin/matches/${m.match_id}/reject`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ reason: 'Admin rejected during review' }),
-      })
-      if (res.ok) {
-        setActionMsg('Rejected')
-        onUpdate()
-      } else {
-        const data = await res.json()
-        setActionMsg(data.error || 'Failed')
-      }
-    } catch {
-      setActionMsg('Could not reach the server.')
-    }
-    setActing(false)
-  }
-
-  const score = Math.round(m.final_score * 100)
-  const isApproved = m.status === 'ADMIN_APPROVED'
-
-  return (
-    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-      <div className="admin-card-header">
-        <span>
-          <strong>{m.mentor_name}</strong>
-          <span style={{ marginLeft: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
-            Rank #{m.rank} &middot; {score}%
-          </span>
-        </span>
-        <span className={`badge badge-${isApproved ? 'done' : 'next'}`}>
-          {m.status.replace('_', ' ')}
-        </span>
+          return (
+            <div key={m.match_id} style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleCandidate(m.match_id)}
+                />
+                <strong>{m.mentor_name}</strong>
+                <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
+                  Rank #{m.rank} &middot; {score}%
+                </span>
+              </label>
+              <div className="admin-card-actions" style={{ marginTop: '0.25rem', marginLeft: '1.5rem' }}>
+                <button className="btn-link" onClick={() => toggleScores(m.match_id)}>
+                  {showScores ? 'Hide scores' : 'Show scores'}
+                </button>
+              </div>
+              {showScores && m.computation_payload && (
+                <div style={{ marginLeft: '1.5rem' }}>
+                  <ScoreBreakdown payload={m.computation_payload} />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>
-        <button className="btn-link" onClick={() => setShowScores(!showScores)}>
-          {showScores ? 'Hide scores' : 'Show scores'}
+      <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button className="btn-primary" onClick={handleSubmit} disabled={submitting}>
+          {submitting ? 'Submitting...' : `Submit Review (${selected.size} approved)`}
         </button>
-        {m.status === 'PENDING_REVIEW' && (
-          <>
-            <button className="btn-link" style={{ color: 'var(--accent)' }} onClick={handleApprove} disabled={acting}>
-              Approve
-            </button>
-            <button className="btn-link" style={{ color: 'var(--error)' }} onClick={handleReject} disabled={acting}>
-              Reject
-            </button>
-          </>
-        )}
-        {isApproved && (
-          <button className="btn-link" style={{ color: 'var(--error)' }} onClick={handleReject} disabled={acting}>
-            Revoke
-          </button>
+        {selected.size === 0 && (
+          <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
+            Submitting with none selected will cancel this run.
+          </span>
         )}
       </div>
 
-      {showScores && m.computation_payload && (
-        <ScoreBreakdown payload={m.computation_payload} />
-      )}
-
-      {actionMsg && <p className="feedback-msg">{actionMsg}</p>}
+      {resultMsg && <p className="feedback-msg" style={{ marginTop: '0.5rem' }}>{resultMsg}</p>}
     </div>
   )
 }
@@ -293,8 +307,8 @@ function ProfileCard({ profile }) {
 function statusBadgeClass(status) {
   switch (status) {
     case 'ACTIVE': return 'badge-done'
-    case 'ADMIN_APPROVED': return 'badge-done'
-    case 'PENDING_REVIEW': return 'badge-next'
+    case 'APPROVED': return 'badge-done'
+    case 'CANDIDATE': return 'badge-next'
     case 'STORED': return 'badge-future'
     default: return 'badge-next'
   }
@@ -350,7 +364,6 @@ function AdminMatchCard({ match: m, headers }) {
 
   const score = Math.round(m.final_score * 100)
   const date = new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const canReject = ['ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED'].includes(status)
 
   return (
     <div className="admin-card">
@@ -361,7 +374,7 @@ function AdminMatchCard({ match: m, headers }) {
           <strong>{m.mentor_name}</strong>
         </span>
         <span className={`badge ${statusBadgeClass(status)}`}>
-          {status.replace(/_/g, ' ')}
+          {status}
         </span>
       </div>
       <div className="admin-card-meta">
@@ -378,7 +391,7 @@ function AdminMatchCard({ match: m, headers }) {
         <button className="btn-link" onClick={handleToggleProfiles} disabled={detailLoading}>
           {detailLoading ? 'Loading...' : showProfiles ? 'Hide profiles' : 'Show profiles'}
         </button>
-        {canReject && (
+        {status === 'ACTIVE' && (
           <button className="btn-link" style={{ color: 'var(--error)' }} onClick={() => setRejecting(!rejecting)}>
             {rejecting ? 'Cancel' : 'Reject'}
           </button>
@@ -445,7 +458,6 @@ function ScoreBreakdown({ payload }) {
 
   return (
     <div className="admin-scores">
-      {/* Categorical */}
       <div className="admin-score-row">
         <span>Categorical</span>
         <span>{pct(s.categorical.combined)}</span>
@@ -455,7 +467,6 @@ function ScoreBreakdown({ payload }) {
       <CategoricalDetail label="Vertical" data={s.categorical.vertical} />
       <CategoricalDetail label="Sector" data={s.categorical.sector} />
 
-      {/* Topic */}
       <div className="admin-score-row">
         <span>Topic</span>
         <span>{pct(s.topic.combined)}</span>
@@ -474,7 +485,6 @@ function ScoreBreakdown({ payload }) {
         </div>
       )}
 
-      {/* Semantic */}
       <div className="admin-score-row">
         <span>Semantic</span>
         <span>{pct(s.semantic.cosine_similarity)}</span>
@@ -484,7 +494,6 @@ function ScoreBreakdown({ payload }) {
         <div className="admin-score-detail">{s.semantic.reason}</div>
       )}
 
-      {/* Geo */}
       <div className="admin-score-row">
         <span>Geo</span>
         <span>{s.geo.enabled ? pct(s.geo.score) : 'off'}</span>
@@ -498,7 +507,6 @@ function ScoreBreakdown({ payload }) {
         </div>
       )}
 
-      {/* Experience */}
       <div className="admin-score-row">
         <span>Experience</span>
         <span>{s.experience ? pct(s.experience.score) : 'N/A'}</span>
@@ -512,14 +520,12 @@ function ScoreBreakdown({ payload }) {
         </div>
       )}
 
-      {/* Final */}
       <div className="admin-score-row admin-score-final">
         <span>Final</span>
         <span>{pct(s.final)}</span>
         <span className="admin-weight">reliability={s.reliability_multiplier}</span>
       </div>
 
-      {/* Prior matches */}
       {payload.prior_matches?.length > 0 && (
         <div className="admin-score-detail" style={{ marginTop: '0.5rem' }}>
           Prior matches: {payload.prior_matches.map((pm, i) => (
@@ -528,7 +534,6 @@ function ScoreBreakdown({ payload }) {
         </div>
       )}
 
-      {/* Raw JSON toggle */}
       <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
         <button className="btn-link" onClick={() => setShowRaw(!showRaw)}>
           {showRaw ? 'Hide raw payload' : 'Show raw payload'}

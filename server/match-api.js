@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process'
 import { Router } from 'express'
 import { pool } from './db.js'
-import { rankMentors, computeMatch } from './matching.js'
+import { rankMentors } from './matching.js'
 import { isMentee } from './roles.js'
 
 const router = Router()
@@ -36,7 +36,7 @@ function parseEmbedding(raw) {
 }
 
 // ── POST /api/matches/run ──────────────────────────────────────────
-// Run matching for a mentee. Top candidates get PENDING_REVIEW for admin.
+// Run matching for a mentee. Creates a match_run + candidate matches.
 
 router.post('/run', async (req, res, next) => {
   try {
@@ -45,12 +45,12 @@ router.post('/run', async (req, res, next) => {
 
     const normalEmail = email.toLowerCase().trim()
 
-    const existing = await pool.query(
-      `SELECT COUNT(*) FROM matches
-       WHERE mentee_email = $1 AND status IN ('PENDING_REVIEW', 'ADMIN_APPROVED', 'ACTIVE')`,
+    const existingRun = await pool.query(
+      `SELECT run_id FROM match_runs
+       WHERE mentee_email = $1 AND status IN ('PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE')`,
       [normalEmail],
     )
-    if (parseInt(existing.rows[0].count) > 0) {
+    if (existingRun.rows.length > 0) {
       return res.status(400).json({ error: 'You already have matches in progress.' })
     }
 
@@ -77,7 +77,7 @@ router.post('/run', async (req, res, next) => {
 
     const inProgressMatches = (await pool.query(
       `SELECT mentor_email, mentee_email, status FROM matches
-       WHERE status IN ('ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED')`,
+       WHERE status IN ('ACTIVE', 'CANDIDATE', 'APPROVED')`,
     )).rows
 
     const blockList = (await pool.query(
@@ -96,18 +96,14 @@ router.post('/run', async (req, res, next) => {
       priorByMentor.set(row.mentor_email, arr)
     }
 
-    const opts = {
+    const { results, filtered } = rankMentors(mentee, mentors, inProgressMatches, blockList, {
       algorithm_version: codeCommit,
       reliability_multiplier: 1.0,
-    }
-
-    const { results, filtered } = rankMentors(mentee, mentors, inProgressMatches, blockList, {
-      ...opts,
       menteeEmbedding: mentee.embedding,
     })
 
     if (results.length === 0) {
-      return res.json({ match: null, message: 'No mentors available right now', filtered })
+      return res.json({ run: null, message: 'No mentors available right now', filtered })
     }
 
     const finalResults = results.map(result => ({
@@ -115,40 +111,109 @@ router.post('/run', async (req, res, next) => {
       prior_matches: priorByMentor.get(result.mentor_snapshot.email) ?? [],
     }))
 
+    const candidateCount = Math.min(TOP_CANDIDATES, finalResults.length)
+
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
+
+      const runResult = await client.query(
+        `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit)
+         VALUES ($1, 'PENDING_REVIEW', $2, $3, $4) RETURNING run_id`,
+        [mentee.email, candidateCount, finalResults.length, codeCommit],
+      )
+      const runId = runResult.rows[0].run_id
+
       for (const result of finalResults) {
-        const status = result.rank <= TOP_CANDIDATES ? 'PENDING_REVIEW' : 'STORED'
+        const status = result.rank <= TOP_CANDIDATES ? 'CANDIDATE' : 'STORED'
         await client.query(
-          `INSERT INTO matches (mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            result.mentor_snapshot.email,
-            mentee.email,
-            status,
-            result.scores.final,
-            result.rank,
-            JSON.stringify(result),
-            codeCommit,
-          ],
+          `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [runId, result.mentor_snapshot.email, mentee.email, status,
+           result.scores.final, result.rank, JSON.stringify(result), codeCommit],
         )
       }
+
       await client.query('COMMIT')
+
+      res.json({
+        run: { run_id: runId, status: 'PENDING_REVIEW' },
+        message: `${candidateCount} mentor candidates are now pending admin review.`,
+        total_scored: finalResults.length,
+        candidate_count: candidateCount,
+      })
     } catch (err) {
       await client.query('ROLLBACK')
       throw err
     } finally {
       client.release()
     }
+  } catch (err) {
+    next(err)
+  }
+})
 
-    const pendingCount = finalResults.filter(r => r.rank <= TOP_CANDIDATES).length
+// ── GET /api/matches/run/current?email= ────────────────────────────
+// Current active run for a mentee, with matches appropriate to the state.
+
+router.get('/run/current', async (req, res, next) => {
+  try {
+    const { email } = req.query
+    if (!email) return res.status(400).json({ error: 'email query param is required' })
+
+    const normalEmail = email.toLowerCase().trim()
+
+    const runResult = await pool.query(
+      `SELECT run_id, status, created_at, reviewed_at
+       FROM match_runs
+       WHERE mentee_email = $1 AND status IN ('PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE')
+       ORDER BY created_at DESC LIMIT 1`,
+      [normalEmail],
+    )
+
+    if (runResult.rows.length === 0) {
+      return res.json({ run: null })
+    }
+
+    const run = runResult.rows[0]
+    let matches = []
+
+    if (run.status === 'AWAITING_MENTEE' || run.status === 'ACTIVE') {
+      const matchStatus = run.status === 'AWAITING_MENTEE' ? 'APPROVED' : 'ACTIVE'
+      const matchResult = await pool.query(
+        `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
+                m.rank, m.created_at,
+                mentor.name AS mentor_name, mentor.payload AS mentor_payload,
+                mentee.name AS mentee_name
+         FROM matches m
+         JOIN user_profiles mentor ON mentor.email = m.mentor_email
+         JOIN user_profiles mentee ON mentee.email = m.mentee_email
+         WHERE m.run_id = $1 AND m.status = $2
+         ORDER BY m.final_score DESC`,
+        [run.run_id, matchStatus],
+      )
+      matches = matchResult.rows.map(row => ({
+        match_id: row.match_id,
+        mentor_email: row.mentor_email,
+        mentor_name: row.mentor_name,
+        mentor_payload: row.mentor_payload,
+        mentee_email: row.mentee_email,
+        mentee_name: row.mentee_name,
+        status: row.status,
+        final_score: parseFloat(row.final_score),
+        rank: row.rank,
+        created_at: row.created_at,
+      }))
+    }
+
     res.json({
-      match: null,
-      message: `${pendingCount} mentor candidates are now pending admin review.`,
-      total_scored: finalResults.length,
-      filtered_count: filtered.length,
-      pending_count: pendingCount,
+      run: {
+        run_id: run.run_id,
+        status: run.status,
+        created_at: run.created_at,
+        reviewed_at: run.reviewed_at,
+        matches,
+      },
     })
   } catch (err) {
     next(err)
@@ -156,8 +221,7 @@ router.post('/run', async (req, res, next) => {
 })
 
 // ── GET /api/matches?email= ────────────────────────────────────────
-// Mentees see ACTIVE + PENDING_REVIEW + ADMIN_APPROVED.
-// Mentors see only ACTIVE matches where they are the mentor.
+// ACTIVE matches for a user (mentor sees mentees, mentee sees mentors).
 
 router.get('/', async (req, res, next) => {
   try {
@@ -174,11 +238,9 @@ router.get('/', async (req, res, next) => {
        FROM matches m
        JOIN user_profiles mentor ON mentor.email = m.mentor_email
        JOIN user_profiles mentee ON mentee.email = m.mentee_email
-       WHERE (
-         (m.mentee_email = $1 AND m.status IN ('ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED'))
-         OR (m.mentor_email = $1 AND m.status = 'ACTIVE')
-       )
-       ORDER BY m.status, m.final_score DESC`,
+       WHERE (m.mentee_email = $1 OR m.mentor_email = $1)
+         AND m.status = 'ACTIVE'
+       ORDER BY m.created_at DESC`,
       [normalEmail],
     )
 
@@ -201,7 +263,6 @@ router.get('/', async (req, res, next) => {
 })
 
 // ── GET /api/matches/:match_id ─────────────────────────────────────
-// Single match detail with partner profile info.
 
 router.get('/:match_id', async (req, res, next) => {
   try {
@@ -233,7 +294,7 @@ router.get('/:match_id', async (req, res, next) => {
     }
 
     const isMenteeViewer = row.mentee_email === normalEmail
-    if (isMenteeViewer && row.status === 'PENDING_REVIEW') {
+    if (isMenteeViewer && row.status === 'CANDIDATE') {
       return res.status(403).json({ error: 'match is still under review' })
     }
 
@@ -280,7 +341,7 @@ router.get('/:match_id', async (req, res, next) => {
 })
 
 // ── POST /api/matches/:match_id/select ─────────────────────────────
-// Mentee picks one ADMIN_APPROVED match. Others become REJECTED.
+// Mentee picks one APPROVED match. Others become REJECTED. Run → ACTIVE.
 
 router.post('/:match_id/select', async (req, res, next) => {
   try {
@@ -291,7 +352,7 @@ router.post('/:match_id/select', async (req, res, next) => {
     const normalEmail = email.toLowerCase().trim()
 
     const match = await pool.query(
-      'SELECT match_id, mentor_email, mentee_email, status FROM matches WHERE match_id = $1',
+      'SELECT match_id, run_id, mentor_email, mentee_email, status FROM matches WHERE match_id = $1',
       [match_id],
     )
     if (match.rows.length === 0) {
@@ -302,8 +363,8 @@ router.post('/:match_id/select', async (req, res, next) => {
     if (row.mentee_email !== normalEmail) {
       return res.status(403).json({ error: 'not authorized' })
     }
-    if (row.status !== 'ADMIN_APPROVED') {
-      return res.status(400).json({ error: `match is ${row.status}, not ADMIN_APPROVED` })
+    if (row.status !== 'APPROVED') {
+      return res.status(400).json({ error: `match is ${row.status}, not APPROVED` })
     }
 
     const client = await pool.connect()
@@ -317,8 +378,13 @@ router.post('/:match_id/select', async (req, res, next) => {
 
       await client.query(
         `UPDATE matches SET status = 'REJECTED'
-         WHERE mentee_email = $1 AND status = 'ADMIN_APPROVED' AND match_id != $2`,
-        [normalEmail, match_id],
+         WHERE run_id = $1 AND status = 'APPROVED' AND match_id != $2`,
+        [row.run_id, match_id],
+      )
+
+      await client.query(
+        `UPDATE match_runs SET status = 'ACTIVE' WHERE run_id = $1`,
+        [row.run_id],
       )
 
       await client.query(

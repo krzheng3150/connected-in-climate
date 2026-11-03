@@ -20,37 +20,6 @@ function requireAdmin(req, res, next) {
 
 router.use(requireAdmin)
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-async function checkAutoActivate(client, menteeEmail, adminEmail) {
-  const pending = await client.query(
-    `SELECT COUNT(*) FROM matches WHERE mentee_email = $1 AND status = 'PENDING_REVIEW'`,
-    [menteeEmail],
-  )
-  if (parseInt(pending.rows[0].count) > 0) return null
-
-  const approved = await client.query(
-    `SELECT match_id FROM matches WHERE mentee_email = $1 AND status = 'ADMIN_APPROVED'`,
-    [menteeEmail],
-  )
-
-  if (approved.rows.length === 1) {
-    const autoId = approved.rows[0].match_id
-    await client.query(
-      `UPDATE matches SET status = 'ACTIVE' WHERE match_id = $1`,
-      [autoId],
-    )
-    await client.query(
-      `INSERT INTO match_actions (match_id, actor_email, action_type, payload)
-       VALUES ($1, $2, 'APPROVE', $3)`,
-      [autoId, adminEmail, JSON.stringify({ auto_activated: true })],
-    )
-    return autoId
-  }
-
-  return null
-}
-
 // ── GET /api/admin/profiles?email= ─────────────────────────────────
 
 router.get('/profiles', async (req, res, next) => {
@@ -72,43 +41,145 @@ router.get('/profiles', async (req, res, next) => {
 })
 
 // ── GET /api/admin/pending ─────────────────────────────────────────
-// All mentees with PENDING_REVIEW or ADMIN_APPROVED matches, grouped.
+// Runs pending admin review, with their candidates.
 
 router.get('/pending', async (_req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status,
-              m.final_score, m.rank, m.computation_payload, m.created_at,
-              mentor.name AS mentor_name, mentee.name AS mentee_name
-       FROM matches m
-       JOIN user_profiles mentor ON mentor.email = m.mentor_email
-       JOIN user_profiles mentee ON mentee.email = m.mentee_email
-       WHERE m.status IN ('PENDING_REVIEW', 'ADMIN_APPROVED')
-       ORDER BY m.mentee_email, m.rank ASC`,
+    const runs = await pool.query(
+      `SELECT r.run_id, r.mentee_email, r.status, r.top_candidates, r.total_scored,
+              r.created_at, p.name AS mentee_name
+       FROM match_runs r
+       JOIN user_profiles p ON p.email = r.mentee_email
+       WHERE r.status = 'PENDING_REVIEW'
+       ORDER BY r.created_at ASC`,
     )
 
-    const groups = new Map()
-    for (const row of result.rows) {
-      if (!groups.has(row.mentee_email)) {
-        groups.set(row.mentee_email, {
-          mentee_email: row.mentee_email,
-          mentee_name: row.mentee_name,
-          matches: [],
-        })
-      }
-      groups.get(row.mentee_email).matches.push({
-        match_id: row.match_id,
-        mentor_email: row.mentor_email,
-        mentor_name: row.mentor_name,
-        status: row.status,
-        final_score: parseFloat(row.final_score),
-        rank: row.rank,
-        computation_payload: row.computation_payload,
-        created_at: row.created_at,
+    const pending = []
+    for (const run of runs.rows) {
+      const matches = await pool.query(
+        `SELECT m.match_id, m.mentor_email, m.status, m.final_score, m.rank,
+                m.computation_payload, m.created_at,
+                mentor.name AS mentor_name
+         FROM matches m
+         JOIN user_profiles mentor ON mentor.email = m.mentor_email
+         WHERE m.run_id = $1 AND m.status = 'CANDIDATE'
+         ORDER BY m.rank ASC`,
+        [run.run_id],
+      )
+
+      pending.push({
+        run_id: run.run_id,
+        mentee_email: run.mentee_email,
+        mentee_name: run.mentee_name,
+        status: run.status,
+        top_candidates: run.top_candidates,
+        total_scored: run.total_scored,
+        created_at: run.created_at,
+        candidates: matches.rows.map(m => ({
+          match_id: m.match_id,
+          mentor_email: m.mentor_email,
+          mentor_name: m.mentor_name,
+          status: m.status,
+          final_score: parseFloat(m.final_score),
+          rank: m.rank,
+          computation_payload: m.computation_payload,
+          created_at: m.created_at,
+        })),
       })
     }
 
-    res.json({ pending_groups: [...groups.values()] })
+    res.json({ pending_runs: pending })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── POST /api/admin/runs/:run_id/review ────────────────────────────
+// Batch review: approve selected candidates, reject the rest.
+// Body: { approved: ["match_id_1", ...] }
+
+router.post('/runs/:run_id/review', async (req, res, next) => {
+  try {
+    const { run_id } = req.params
+    const { approved } = req.body
+
+    if (!Array.isArray(approved)) {
+      return res.status(400).json({ error: 'approved must be an array of match_ids' })
+    }
+
+    const run = await pool.query(
+      'SELECT run_id, mentee_email, status FROM match_runs WHERE run_id = $1',
+      [run_id],
+    )
+    if (run.rows.length === 0) {
+      return res.status(404).json({ error: 'run not found' })
+    }
+    if (run.rows[0].status !== 'PENDING_REVIEW') {
+      return res.status(400).json({ error: `run is ${run.rows[0].status}, not PENDING_REVIEW` })
+    }
+
+    const candidates = await pool.query(
+      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE'`,
+      [run_id],
+    )
+    const candidateIds = new Set(candidates.rows.map(r => r.match_id))
+
+    const approvedSet = new Set(approved)
+    for (const id of approvedSet) {
+      if (!candidateIds.has(id)) {
+        return res.status(400).json({ error: `match ${id} is not a candidate in this run` })
+      }
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      for (const id of candidateIds) {
+        const newStatus = approvedSet.has(id) ? 'APPROVED' : 'REJECTED'
+        await client.query(
+          `UPDATE matches SET status = $1 WHERE match_id = $2`,
+          [newStatus, id],
+        )
+        await client.query(
+          `INSERT INTO match_actions (match_id, actor_email, action_type, payload)
+           VALUES ($1, $2, $3, '{}')`,
+          [id, req.adminEmail, approvedSet.has(id) ? 'APPROVE' : 'REJECT'],
+        )
+      }
+
+      let runStatus
+      if (approvedSet.size === 0) {
+        runStatus = 'CANCELLED'
+      } else if (approvedSet.size === 1) {
+        const activeId = [...approvedSet][0]
+        await client.query(
+          `UPDATE matches SET status = 'ACTIVE' WHERE match_id = $1`,
+          [activeId],
+        )
+        runStatus = 'ACTIVE'
+      } else {
+        runStatus = 'AWAITING_MENTEE'
+      }
+
+      await client.query(
+        `UPDATE match_runs SET status = $1, reviewed_by = $2, reviewed_at = now() WHERE run_id = $3`,
+        [runStatus, req.adminEmail, run_id],
+      )
+
+      await client.query('COMMIT')
+
+      res.json({
+        run_status: runStatus,
+        approved_count: approvedSet.size,
+        rejected_count: candidateIds.size - approvedSet.size,
+      })
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
   } catch (err) {
     next(err)
   }
@@ -123,7 +194,7 @@ router.get('/matches', async (req, res, next) => {
 
     const normalEmail = email.toLowerCase().trim()
     const result = await pool.query(
-      `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status,
+      `SELECT m.match_id, m.run_id, m.mentor_email, m.mentee_email, m.status,
               m.final_score, m.rank, m.computation_payload, m.code_commit, m.created_at,
               mentor.name AS mentor_name, mentee.name AS mentee_name
        FROM matches m
@@ -136,6 +207,7 @@ router.get('/matches', async (req, res, next) => {
 
     const matches = result.rows.map(row => ({
       match_id: row.match_id,
+      run_id: row.run_id,
       mentor_email: row.mentor_email,
       mentor_name: row.mentor_name,
       mentee_email: row.mentee_email,
@@ -174,6 +246,7 @@ router.get('/matches/:match_id', async (req, res, next) => {
     const row = result.rows[0]
     res.json({
       match_id: row.match_id,
+      run_id: row.run_id,
       mentor_email: row.mentor_email,
       mentor_name: row.mentor_name,
       mentor_payload: row.mentor_payload,
@@ -192,61 +265,8 @@ router.get('/matches/:match_id', async (req, res, next) => {
   }
 })
 
-// ── POST /api/admin/matches/:match_id/approve ─────────────────────
-// Approve a PENDING_REVIEW match. If it's the only one left, auto-activate.
-
-router.post('/matches/:match_id/approve', async (req, res, next) => {
-  try {
-    const { match_id } = req.params
-
-    const match = await pool.query(
-      'SELECT match_id, mentor_email, mentee_email, status FROM matches WHERE match_id = $1',
-      [match_id],
-    )
-    if (match.rows.length === 0) {
-      return res.status(404).json({ error: 'match not found' })
-    }
-
-    const row = match.rows[0]
-    if (row.status !== 'PENDING_REVIEW') {
-      return res.status(400).json({ error: `match is ${row.status}, not PENDING_REVIEW` })
-    }
-
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-
-      await client.query(
-        `UPDATE matches SET status = 'ADMIN_APPROVED' WHERE match_id = $1`,
-        [match_id],
-      )
-
-      await client.query(
-        `INSERT INTO match_actions (match_id, actor_email, action_type, payload)
-         VALUES ($1, $2, 'APPROVE', '{}')`,
-        [match_id, req.adminEmail],
-      )
-
-      const autoActivated = await checkAutoActivate(client, row.mentee_email, req.adminEmail)
-
-      await client.query('COMMIT')
-      res.json({
-        status: autoActivated ? 'ACTIVE' : 'ADMIN_APPROVED',
-        auto_activated: autoActivated === match_id,
-      })
-    } catch (err) {
-      await client.query('ROLLBACK')
-      throw err
-    } finally {
-      client.release()
-    }
-  } catch (err) {
-    next(err)
-  }
-})
-
 // ── POST /api/admin/matches/:match_id/reject ───────────────────────
-// Reject a match (ACTIVE, PENDING_REVIEW, or ADMIN_APPROVED). Optionally block the pair.
+// Reject an ACTIVE match. Optionally block the pair.
 
 router.post('/matches/:match_id/reject', async (req, res, next) => {
   try {
@@ -254,7 +274,7 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
     const { match_id } = req.params
 
     const match = await pool.query(
-      'SELECT match_id, mentor_email, mentee_email, status FROM matches WHERE match_id = $1',
+      'SELECT match_id, run_id, mentor_email, mentee_email, status FROM matches WHERE match_id = $1',
       [match_id],
     )
     if (match.rows.length === 0) {
@@ -262,9 +282,8 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
     }
 
     const row = match.rows[0]
-    const rejectableStatuses = new Set(['ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED'])
-    if (!rejectableStatuses.has(row.status)) {
-      return res.status(400).json({ error: `match is already ${row.status}` })
+    if (row.status !== 'ACTIVE') {
+      return res.status(400).json({ error: `match is ${row.status}, not ACTIVE` })
     }
 
     const client = await pool.connect()
@@ -274,6 +293,11 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
       await client.query(
         `UPDATE matches SET status = 'REJECTED' WHERE match_id = $1`,
         [match_id],
+      )
+
+      await client.query(
+        `UPDATE match_runs SET status = 'CANCELLED' WHERE run_id = $1`,
+        [row.run_id],
       )
 
       await client.query(
@@ -292,18 +316,8 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
         blockId = blockResult.rows[0].id
       }
 
-      let autoActivated = null
-      if (row.status === 'PENDING_REVIEW' || row.status === 'ADMIN_APPROVED') {
-        autoActivated = await checkAutoActivate(client, row.mentee_email, req.adminEmail)
-      }
-
       await client.query('COMMIT')
-      res.json({
-        status: 'REJECTED',
-        block_created: !!block,
-        block_id: blockId,
-        auto_activated_match: autoActivated,
-      })
+      res.json({ status: 'REJECTED', block_created: !!block, block_id: blockId })
     } catch (err) {
       await client.query('ROLLBACK')
       throw err

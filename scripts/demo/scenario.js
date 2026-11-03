@@ -8,7 +8,7 @@ import {
   getPartnerName, submitFeedback, getFeedbackCount,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
-  adminApprovePendingMatches, selectMentor,
+  adminSelectCandidates, adminSubmitReview, selectMentor,
   pause,
 } from './helpers.js'
 
@@ -26,22 +26,25 @@ export default async function runScenario(page) {
   }
   await pause(page)
 
-  console.log('\n── Step 3: Admin reviews pending matches ──')
+  console.log('\n── Step 3: Admin reviews the run ──')
   await signOut(page)
   await login(page, ADMIN_EMAIL)
   await goToAdmin(page)
   console.log('  Opened admin panel (Pending tab)')
   await pause(page, 1500)
 
-  // Expand scores on the first pending match
-  console.log('  Expanding match scores...')
+  console.log('  Expanding candidate scores...')
   await adminExpandScores(page)
   await pause(page, 2000)
 
-  // Approve top 2 candidates
-  console.log('  Approving top 2 candidates...')
-  const approved = await adminApprovePendingMatches(page, 2)
-  console.log(`  Approved ${approved} candidates`)
+  console.log('  Selecting top 2 candidates...')
+  const selected = await adminSelectCandidates(page, 2)
+  console.log(`  Selected ${selected} candidates`)
+  await pause(page, 1000)
+
+  console.log('  Submitting batch review...')
+  const reviewMsg = await adminSubmitReview(page)
+  console.log(`  Review result: ${reviewMsg}`)
   await pause(page, 1500)
 
   console.log('\n── Step 4: Mentee picks a mentor ──')

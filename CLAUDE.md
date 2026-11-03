@@ -22,7 +22,7 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 ## Conventions
 
 - **JSONB payload for dynamic fields.** Stable columns (`email`, `name`, `role`) for queries; everything else in the `payload` JSONB column. No schema migrations for new profile fields.
-- **Multi-match review pipeline.** Algorithm → top N as `PENDING_REVIEW` → admin approves 1–3 (`ADMIN_APPROVED`) → mentee picks (`ACTIVE`). Auto-activates if admin approves exactly 1. `TOP_CANDIDATES` constant in `match-api.js` controls N.
+- **Run-based match pipeline.** Algorithm → creates a `match_run` (PENDING_REVIEW) with top N as `CANDIDATE` matches → admin batch-reviews the run (`POST /api/admin/runs/:run_id/review`) → approved 1–3 → mentee picks (`ACTIVE`). Auto-activates if admin approves exactly 1. `TOP_CANDIDATES` constant in `match-api.js` controls N. Run statuses: PENDING_REVIEW → AWAITING_MENTEE / ACTIVE / CANCELLED. Match statuses: CANDIDATE → APPROVED / REJECTED → ACTIVE / FINISHED. STORED for below-cutoff.
 - **Matches are immutable snapshots.** Never mutate a `computation_payload`. Profile changes only affect future match runs.
 - **Block list ≠ rejection.** The `rejections` table is a block list (prevents future matching). Rejecting a match does NOT auto-block — admin decides separately.
 - **Auth is email-based** for the pilot. Admin routes gated by `ADMIN_EMAILS` env var checked in `requireAdmin` middleware.
