@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS matches (
   match_id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   mentor_email          TEXT NOT NULL REFERENCES user_profiles(email),
   mentee_email          TEXT NOT NULL REFERENCES user_profiles(email),
-  status                TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'REJECTED', 'FINISHED', 'STORED')),
+  status                TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'REJECTED', 'FINISHED', 'STORED', 'PENDING_REVIEW', 'ADMIN_APPROVED')),
   final_score           NUMERIC(5,4) NOT NULL,
   rank                  INTEGER NOT NULL,
   computation_payload   JSONB NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS match_actions (
   action_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   match_id     UUID NOT NULL REFERENCES matches(match_id),
   actor_email  TEXT NOT NULL,
-  action_type  TEXT NOT NULL CHECK (action_type IN ('VIEW', 'FEEDBACK', 'CONTACT_CLICK', 'REJECT')),
+  action_type  TEXT NOT NULL CHECK (action_type IN ('VIEW', 'FEEDBACK', 'CONTACT_CLICK', 'REJECT', 'APPROVE', 'SELECT')),
   payload      JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -65,3 +65,12 @@ CREATE INDEX IF NOT EXISTS idx_rejections_pair ON rejections(mentor_email, mente
 
 -- Clean up the scaffold table from initial commit.
 DROP TABLE IF EXISTS greetings;
+
+-- Migration: expand CHECK constraints for existing databases.
+ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check;
+ALTER TABLE matches ADD CONSTRAINT matches_status_check
+  CHECK (status IN ('ACTIVE', 'REJECTED', 'FINISHED', 'STORED', 'PENDING_REVIEW', 'ADMIN_APPROVED'));
+
+ALTER TABLE match_actions DROP CONSTRAINT IF EXISTS match_actions_action_type_check;
+ALTER TABLE match_actions ADD CONSTRAINT match_actions_action_type_check
+  CHECK (action_type IN ('VIEW', 'FEEDBACK', 'CONTACT_CLICK', 'REJECT', 'APPROVE', 'SELECT'));

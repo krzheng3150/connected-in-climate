@@ -3,7 +3,7 @@ import { pool } from './db.js'
 
 const router = Router()
 
-const VALID_ACTIONS = new Set(['VIEW', 'CONTACT_CLICK', 'FEEDBACK', 'REJECT'])
+const VALID_ACTIONS = new Set(['VIEW', 'CONTACT_CLICK', 'FEEDBACK', 'REJECT', 'APPROVE', 'SELECT'])
 
 // ── POST /api/actions ──────────────────────────────────────────────
 // Log an action (VIEW, CONTACT_CLICK, etc.) against a match.

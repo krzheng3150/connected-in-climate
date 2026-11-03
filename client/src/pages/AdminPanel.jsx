@@ -1,14 +1,14 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ProfileDetail } from '../components/ProfileFields.jsx'
 
-const TABS = ['Search', 'Feedback', 'Blocks']
+const TABS = ['Pending', 'Search', 'Feedback', 'Blocks']
 
 export default function AdminPanel() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('Search')
+  const [tab, setTab] = useState('Pending')
 
   const adminHeaders = {
     'Content-Type': 'application/json',
@@ -31,10 +31,166 @@ export default function AdminPanel() {
       </div>
 
       <main className="page-body" style={{ paddingTop: '1rem' }}>
+        {tab === 'Pending' && <PendingTab headers={adminHeaders} />}
         {tab === 'Search' && <SearchTab headers={adminHeaders} />}
         {tab === 'Feedback' && <FeedbackTab headers={adminHeaders} />}
         {tab === 'Blocks' && <BlocksTab headers={adminHeaders} />}
       </main>
+    </div>
+  )
+}
+
+// ── Pending Tab ──────────────────────────────────────────────────
+
+function PendingTab({ headers }) {
+  const [groups, setGroups] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const loadPending = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/pending', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setGroups(data.pending_groups)
+      } else {
+        setError('Failed to load pending matches.')
+      }
+    } catch {
+      setError('Could not reach the server.')
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadPending() }, [loadPending])
+
+  if (loading) return <p className="placeholder-text">Loading pending matches...</p>
+  if (error) return <p className="form-error">{error}</p>
+
+  if (groups.length === 0) {
+    return <p className="placeholder-text">No matches pending review.</p>
+  }
+
+  return (
+    <div className="admin-section">
+      <h3>Pending Review ({groups.length} mentee{groups.length !== 1 ? 's' : ''})</h3>
+      {groups.map(group => (
+        <PendingGroup key={group.mentee_email} group={group} headers={headers} onUpdate={loadPending} />
+      ))}
+    </div>
+  )
+}
+
+function PendingGroup({ group, headers, onUpdate }) {
+  return (
+    <div className="admin-card" style={{ padding: '1rem' }}>
+      <div className="admin-card-header">
+        <strong>{group.mentee_name}</strong>
+        <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>{group.mentee_email}</span>
+      </div>
+      <div style={{ marginTop: '0.75rem' }}>
+        {group.matches.map(m => (
+          <PendingMatchRow key={m.match_id} match={m} headers={headers} onUpdate={onUpdate} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PendingMatchRow({ match: m, headers, onUpdate }) {
+  const [showScores, setShowScores] = useState(false)
+  const [actionMsg, setActionMsg] = useState(null)
+  const [acting, setActing] = useState(false)
+
+  async function handleApprove() {
+    setActing(true)
+    setActionMsg(null)
+    try {
+      const res = await fetch(`/api/admin/matches/${m.match_id}/approve`, {
+        method: 'POST',
+        headers,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setActionMsg(data.auto_activated ? 'Approved & auto-activated (only candidate)' : 'Approved')
+        onUpdate()
+      } else {
+        const data = await res.json()
+        setActionMsg(data.error || 'Failed')
+      }
+    } catch {
+      setActionMsg('Could not reach the server.')
+    }
+    setActing(false)
+  }
+
+  async function handleReject() {
+    setActing(true)
+    setActionMsg(null)
+    try {
+      const res = await fetch(`/api/admin/matches/${m.match_id}/reject`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reason: 'Admin rejected during review' }),
+      })
+      if (res.ok) {
+        setActionMsg('Rejected')
+        onUpdate()
+      } else {
+        const data = await res.json()
+        setActionMsg(data.error || 'Failed')
+      }
+    } catch {
+      setActionMsg('Could not reach the server.')
+    }
+    setActing(false)
+  }
+
+  const score = Math.round(m.final_score * 100)
+  const isApproved = m.status === 'ADMIN_APPROVED'
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+      <div className="admin-card-header">
+        <span>
+          <strong>{m.mentor_name}</strong>
+          <span style={{ marginLeft: '0.5rem', color: 'var(--muted)', fontSize: '0.875rem' }}>
+            Rank #{m.rank} &middot; {score}%
+          </span>
+        </span>
+        <span className={`badge badge-${isApproved ? 'done' : 'next'}`}>
+          {m.status.replace('_', ' ')}
+        </span>
+      </div>
+
+      <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>
+        <button className="btn-link" onClick={() => setShowScores(!showScores)}>
+          {showScores ? 'Hide scores' : 'Show scores'}
+        </button>
+        {m.status === 'PENDING_REVIEW' && (
+          <>
+            <button className="btn-link" style={{ color: 'var(--accent)' }} onClick={handleApprove} disabled={acting}>
+              Approve
+            </button>
+            <button className="btn-link" style={{ color: 'var(--error)' }} onClick={handleReject} disabled={acting}>
+              Reject
+            </button>
+          </>
+        )}
+        {isApproved && (
+          <button className="btn-link" style={{ color: 'var(--error)' }} onClick={handleReject} disabled={acting}>
+            Revoke
+          </button>
+        )}
+      </div>
+
+      {showScores && m.computation_payload && (
+        <ScoreBreakdown payload={m.computation_payload} />
+      )}
+
+      {actionMsg && <p className="feedback-msg">{actionMsg}</p>}
     </div>
   )
 }
@@ -134,6 +290,16 @@ function ProfileCard({ profile }) {
   )
 }
 
+function statusBadgeClass(status) {
+  switch (status) {
+    case 'ACTIVE': return 'badge-done'
+    case 'ADMIN_APPROVED': return 'badge-done'
+    case 'PENDING_REVIEW': return 'badge-next'
+    case 'STORED': return 'badge-future'
+    default: return 'badge-next'
+  }
+}
+
 function AdminMatchCard({ match: m, headers }) {
   const [showScores, setShowScores] = useState(false)
   const [showProfiles, setShowProfiles] = useState(false)
@@ -184,6 +350,7 @@ function AdminMatchCard({ match: m, headers }) {
 
   const score = Math.round(m.final_score * 100)
   const date = new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const canReject = ['ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED'].includes(status)
 
   return (
     <div className="admin-card">
@@ -193,8 +360,8 @@ function AdminMatchCard({ match: m, headers }) {
           <span className="admin-arrow"> → </span>
           <strong>{m.mentor_name}</strong>
         </span>
-        <span className={`badge badge-${status === 'ACTIVE' ? 'done' : status === 'STORED' ? 'future' : 'next'}`}>
-          {status}
+        <span className={`badge ${statusBadgeClass(status)}`}>
+          {status.replace(/_/g, ' ')}
         </span>
       </div>
       <div className="admin-card-meta">
@@ -211,7 +378,7 @@ function AdminMatchCard({ match: m, headers }) {
         <button className="btn-link" onClick={handleToggleProfiles} disabled={detailLoading}>
           {detailLoading ? 'Loading...' : showProfiles ? 'Hide profiles' : 'Show profiles'}
         </button>
-        {status === 'ACTIVE' && (
+        {canReject && (
           <button className="btn-link" style={{ color: 'var(--error)' }} onClick={() => setRejecting(!rejecting)}>
             {rejecting ? 'Cancel' : 'Reject'}
           </button>

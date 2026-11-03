@@ -8,6 +8,7 @@ import {
   getPartnerName, submitFeedback, getFeedbackCount,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
+  adminApprovePendingMatches, selectMentor,
   pause,
 } from './helpers.js'
 
@@ -17,7 +18,7 @@ export default async function runScenario(page) {
   console.log(`  Logged in as ${MENTEE_EMAIL}`)
   await pause(page)
 
-  console.log('\n── Step 2: Mentee finds a mentor ──')
+  console.log('\n── Step 2: Mentee requests a match ──')
   const matchMsg = await findMentor(page)
   console.log(`  Result: ${matchMsg}`)
   if (matchMsg.includes('No mentors')) {
@@ -25,15 +26,42 @@ export default async function runScenario(page) {
   }
   await pause(page)
 
-  console.log('\n── Step 3: Mentee views match detail ──')
+  console.log('\n── Step 3: Admin reviews pending matches ──')
+  await signOut(page)
+  await login(page, ADMIN_EMAIL)
+  await goToAdmin(page)
+  console.log('  Opened admin panel (Pending tab)')
+  await pause(page, 1500)
+
+  // Expand scores on the first pending match
+  console.log('  Expanding match scores...')
+  await adminExpandScores(page)
+  await pause(page, 2000)
+
+  // Approve top 2 candidates
+  console.log('  Approving top 2 candidates...')
+  const approved = await adminApprovePendingMatches(page, 2)
+  console.log(`  Approved ${approved} candidates`)
+  await pause(page, 1500)
+
+  console.log('\n── Step 4: Mentee picks a mentor ──')
+  await signOut(page)
+  await login(page, MENTEE_EMAIL)
+  console.log('  Mentee sees approved candidates')
+  await pause(page, 1500)
+
+  const selectMsg = await selectMentor(page)
+  console.log(`  Selection result: ${selectMsg}`)
+  await pause(page)
+
+  console.log('\n── Step 5: Mentee views match detail ──')
   await clickFirstMatch(page)
   const partnerName = await getPartnerName(page)
   console.log(`  Matched with: ${partnerName}`)
   const matchUrl = page.url()
   await pause(page, 2000)
 
-  console.log('\n── Step 4: Mentor views the same match ──')
-  // Extract mentor email from the match page URL via the API
+  console.log('\n── Step 6: Mentor views the same match ──')
   const matchId = matchUrl.split('/matches/')[1]
   const mentorEmail = await page.evaluate(async (id) => {
     const res = await fetch(`/api/admin/matches/${id}`, {
@@ -54,7 +82,7 @@ export default async function runScenario(page) {
   console.log(`  Mentor sees mentee: ${menteeName}`)
   await pause(page, 2000)
 
-  console.log('\n── Step 5: Mentee submits feedback ──')
+  console.log('\n── Step 7: Mentee submits feedback ──')
   await signOut(page)
   await login(page, MENTEE_EMAIL)
   await clickFirstMatch(page)
@@ -64,29 +92,23 @@ export default async function runScenario(page) {
   console.log(`  Feedback items visible: ${fbCount}`)
   await pause(page, 2000)
 
-  console.log('\n── Step 6: Admin reviews everything ──')
+  console.log('\n── Step 8: Admin inspects in Search tab ──')
   await signOut(page)
   await login(page, ADMIN_EMAIL)
   await goToAdmin(page)
-  console.log('  Opened admin panel')
-  await pause(page)
-
-  // Search mentee profile
+  await adminSwitchTab(page, 'Search')
   console.log('  Searching mentee profile...')
   await adminSearchProfile(page, MENTEE_EMAIL)
   await pause(page, 1500)
 
-  // Expand match scores
   console.log('  Expanding match scores...')
   await adminExpandScores(page)
-  await pause(page, 2000)
+  await pause(page, 1500)
 
-  // Expand mentor/mentee profiles
   console.log('  Expanding match profiles...')
   await adminExpandProfiles(page)
   await pause(page, 2000)
 
-  // Show raw computation payload
   console.log('  Showing raw payload...')
   await adminExpandRawPayload(page)
   await pause(page, 2000)

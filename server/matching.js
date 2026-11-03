@@ -15,11 +15,13 @@ const TOPIC_EXPERIENCE_MAP = [
 
 // ── Phase 1: Eligibility Filter ────────────────────────────────────
 
+const IN_PROGRESS_STATUSES = new Set(['ACTIVE', 'PENDING_REVIEW', 'ADMIN_APPROVED'])
+
 export function filterEligible(mentee, mentors, activeMatches, blockList) {
   const menteeEmail = mentee.email
-  const activePartners = new Set(
+  const inProgressPartners = new Set(
     activeMatches
-      .filter(m => m.mentee_email === menteeEmail && m.status === 'ACTIVE')
+      .filter(m => m.mentee_email === menteeEmail && IN_PROGRESS_STATUSES.has(m.status))
       .map(m => m.mentor_email),
   )
   const blocked = new Set(
@@ -35,7 +37,7 @@ export function filterEligible(mentee, mentors, activeMatches, blockList) {
     const reasons = []
     if (mentor.email === menteeEmail) reasons.push('self_match')
     if (!isMentor(mentor.role)) reasons.push('not_mentor')
-    if (activePartners.has(mentor.email)) reasons.push('active_match_exists')
+    if (inProgressPartners.has(mentor.email)) reasons.push('active_match_exists')
     if (blocked.has(mentor.email)) reasons.push('blocked')
 
     const capacity = mentor.payload?.max_capacity ?? 0

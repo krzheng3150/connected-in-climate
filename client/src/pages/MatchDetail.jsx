@@ -145,49 +145,57 @@ export default function MatchDetail() {
           </div>
         )}
 
-        <div className="feedback-section">
-          <h3>Feedback</h3>
-          <form className="feedback-form" onSubmit={handleFeedbackSubmit}>
-            <textarea
-              placeholder="How is the match going? Share your experience..."
-              value={feedbackText}
-              onChange={e => setFeedbackText(e.target.value)}
-              rows={3}
-              required
-            />
-            <div className="feedback-form-row">
-              <select value={feedbackRating} onChange={e => setFeedbackRating(e.target.value)}>
-                <option value="">Rating (optional)</option>
-                <option value="5">5 — Excellent</option>
-                <option value="4">4 — Good</option>
-                <option value="3">3 — Okay</option>
-                <option value="2">2 — Poor</option>
-                <option value="1">1 — Bad</option>
-              </select>
-              <button type="submit" className="btn-primary" disabled={submitting}>
-                {submitting ? 'Sending...' : 'Submit'}
-              </button>
-            </div>
-            {feedbackMsg && <p className="feedback-msg">{feedbackMsg}</p>}
-          </form>
+        {match.status === 'ADMIN_APPROVED' && (
+          <p className="placeholder-text" style={{ marginTop: '1rem' }}>
+            This match is pending your selection. Return to the dashboard to confirm.
+          </p>
+        )}
 
-          {feedbacks.length > 0 && (
-            <div className="feedback-list">
-              {feedbacks.map(fb => (
-                <div key={fb.feedback_id} className="feedback-item">
-                  <div className="feedback-item-header">
-                    <span className="feedback-author">You</span>
-                    {fb.rating && <span className="feedback-rating">{'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}</span>}
-                    <span className="feedback-date">
-                      {new Date(fb.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
+        {match.status === 'ACTIVE' && (
+          <div className="feedback-section">
+            <h3>Feedback</h3>
+            <form className="feedback-form" onSubmit={handleFeedbackSubmit}>
+              <textarea
+                placeholder="How is the match going? Share your experience..."
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                rows={3}
+                required
+              />
+              <div className="feedback-form-row">
+                <select value={feedbackRating} onChange={e => setFeedbackRating(e.target.value)}>
+                  <option value="">Rating (optional)</option>
+                  <option value="5">5 — Excellent</option>
+                  <option value="4">4 — Good</option>
+                  <option value="3">3 — Okay</option>
+                  <option value="2">2 — Poor</option>
+                  <option value="1">1 — Bad</option>
+                </select>
+                <button type="submit" className="btn-primary" disabled={submitting}>
+                  {submitting ? 'Sending...' : 'Submit'}
+                </button>
+              </div>
+              {feedbackMsg && <p className="feedback-msg">{feedbackMsg}</p>}
+            </form>
+
+            {feedbacks.length > 0 && (
+              <div className="feedback-list">
+                {feedbacks.map(fb => (
+                  <div key={fb.feedback_id} className="feedback-item">
+                    <div className="feedback-item-header">
+                      <span className="feedback-author">You</span>
+                      {fb.rating && <span className="feedback-rating">{'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}</span>}
+                      <span className="feedback-date">
+                        {new Date(fb.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="feedback-text">{fb.text}</p>
                   </div>
-                  <p className="feedback-text">{fb.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   )
