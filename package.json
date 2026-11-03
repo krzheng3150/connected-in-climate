@@ -21,11 +21,13 @@
     "test:all": "node --test server/field-registry.test.js server/matching.test.js && node --env-file=.env --test server/match-api.test.js server/action-feedback-api.test.js server/admin-api.test.js",
     "import": "node --env-file=.env scripts/import.js",
     "import:dry": "node --env-file=.env scripts/import.js --dry-run",
+    "sheet:create": "node --env-file=.env scripts/create-sheet.js",
     "demo": "node --env-file=.env scripts/demo.js",
     "demo:headless": "node --env-file=.env scripts/demo.js --headless"
   },
   "dependencies": {
     "express": "^4.21.0",
+    "googleapis": "^189.0.0",
     "pg": "^8.13.0"
   },
   "devDependencies": {

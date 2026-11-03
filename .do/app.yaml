@@ -29,6 +29,12 @@ services:
       - key: ADMIN_EMAILS
         scope: RUN_TIME
         value: krzheng3150@gmail.com,cohenca3@gmail.com
+      - key: GOOGLE_SERVICE_ACCOUNT_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        scope: RUN_TIME
+        value: connected-in-climate-sheets@i-see-493001.iam.gserviceaccount.com
 databases:
   - name: db
     engine: PG

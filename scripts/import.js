@@ -4,6 +4,8 @@ import { isMentor, isMentee } from '../server/roles.js'
 import { FIELDS, normalize, normalizeArray } from '../server/field-registry.js'
 import pg from 'pg'
 
+const SHEET_URL_RE = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/
+
 const EMBEDDING_DIMENSIONS = 1536
 
 const STABLE_COLUMNS = new Set(['email', 'name', 'role'])
@@ -40,10 +42,15 @@ const BOOL_FIELDS = new Set(['geo_match_preference'])
 const LINKS_PREFIX = 'links_'
 
 function usage() {
-  console.error(`Usage: node scripts/import.js [--dry-run] <file.csv|file.json>
+  console.error(`Usage: node scripts/import.js [--dry-run] <file.csv|file.json|sheet-url>
 
   Imports user profiles into the database.
   --dry-run   Parse and validate only, no DB writes or embedding calls.
+
+Sources:
+  file.csv / file.json   Local file.
+  Google Sheet URL        Fetches as CSV. Sheet must be link-shared or
+                          accessible by the service account in .env.
 
 CSV format:
   - First row is headers.
@@ -63,6 +70,43 @@ JSON format:
   - Array fields should be actual arrays (not pipe-separated).
   - Links should be an object: { "links": { "linkedin": "...", "phone": "..." } }.`)
   process.exit(1)
+}
+
+async function fetchSheet(source) {
+  const match = source.match(SHEET_URL_RE)
+  if (!match) return null
+
+  const sheetId = match[1]
+
+  // Try authenticated fetch first (private sheets), fall back to public export
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    try {
+      const { getAuth } = await import('./google-auth.js')
+      const { google } = await import('googleapis')
+      const auth = getAuth(['https://www.googleapis.com/auth/spreadsheets.readonly'])
+      const sheets = google.sheets({ version: 'v4', auth })
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'Profiles!A:ZZ',
+      })
+      const rows = res.data.values
+      if (!rows || rows.length < 2) throw new Error('Sheet is empty or has no data rows')
+      const headers = rows[0].map(h => h.toLowerCase().trim())
+      return rows.slice(1).map((r, idx) => {
+        const obj = {}
+        for (let i = 0; i < headers.length; i++) obj[headers[i]] = r[i] ?? ''
+        obj._row = idx + 2
+        return obj
+      })
+    } catch (err) {
+      console.error(`  Authenticated fetch failed (${err.message}), trying public export...`)
+    }
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`
+  const res = await fetch(url, { redirect: 'follow' })
+  if (!res.ok) throw new Error(`Sheet export failed: ${res.status} ${res.statusText}`)
+  return parseCSV(await res.text())
 }
 
 // ── CSV parser (handles quoted fields with commas/newlines) ──────────
@@ -120,6 +164,13 @@ function parseBool(val) {
   return null
 }
 
+function unknownValueMsg(columnName, value, registryField) {
+  const field = registryField || columnName
+  const validIds = FIELDS[field] ? Object.keys(FIELDS[field]) : []
+  const hint = validIds.length ? ` (valid: ${validIds.join(', ')})` : ''
+  return `${columnName}: unknown value "${value}"${hint}`
+}
+
 // ── Row → profile record ────────────────────────────────────────────
 
 function parseRow(raw) {
@@ -154,12 +205,12 @@ function parseRow(raw) {
     }
 
     if (ARRAY_FIELDS.has(key)) {
-      const items = Array.isArray(val) ? val : String(val).split('|').map(s => s.trim()).filter(Boolean)
+      const items = Array.isArray(val) ? val : String(val).split(/[|\n;]/).map(s => s.trim()).filter(Boolean)
       if (!items.length) continue
       const registryField = ENUM_FIELD_MAP[key] || key
       if (ENUM_ARRAY_FIELDS.has(key) && FIELDS[registryField]) {
         const { values, warnings } = normalizeArray(registryField, items)
-        for (const w of warnings) errors.push(`${key}: unknown value "${w.value}"`)
+        for (const w of warnings) errors.push(unknownValueMsg(key, w.value, registryField))
         if (values.length) payload[key] = values
       } else {
         payload[key] = items
@@ -167,7 +218,7 @@ function parseRow(raw) {
     } else if (ENUM_SINGLE_FIELDS.has(key)) {
       const result = normalize(key, val)
       if (result && typeof result === 'object' && result.unknown) {
-        errors.push(`${key}: unknown value "${result.value}"`)
+        errors.push(unknownValueMsg(key, result.value))
       } else if (result) {
         payload[key] = result
       }
@@ -246,10 +297,35 @@ function computeEmbeddings(texts) {
 
 async function upsertProfiles(pool, profiles) {
   const client = await pool.connect()
+  const stats = { created: [], updated: [], unchanged: [] }
   try {
     await client.query('BEGIN')
+
+    const existingEmails = new Set()
+    const existingRows = await client.query('SELECT email, name, role, payload FROM user_profiles')
+    const existingMap = new Map()
+    for (const row of existingRows.rows) {
+      existingEmails.add(row.email)
+      existingMap.set(row.email, row)
+    }
+
     for (const p of profiles) {
       const embeddingLiteral = p.embedding ? `[${p.embedding.join(',')}]` : null
+      const existing = existingMap.get(p.email)
+
+      if (existing) {
+        const payloadChanged = JSON.stringify(existing.payload) !== JSON.stringify(p.payload)
+        const nameChanged = existing.name !== p.name
+        const roleChanged = existing.role !== p.role
+        if (payloadChanged || nameChanged || roleChanged) {
+          stats.updated.push(p.email)
+        } else {
+          stats.unchanged.push(p.email)
+        }
+      } else {
+        stats.created.push(p.email)
+      }
+
       await client.query(
         `INSERT INTO user_profiles (email, name, role, payload, embedding, updated_at)
          VALUES ($1, $2, $3, $4, $5::vector, now())
@@ -269,25 +345,31 @@ async function upsertProfiles(pool, profiles) {
   } finally {
     client.release()
   }
+  return stats
 }
 
 // ── Main ────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
-const file = args.find(a => !a.startsWith('-'))
-if (!file) usage()
+const source = args.find(a => !a.startsWith('-'))
+if (!source) usage()
 
-console.log(`Reading ${file}...`)
-const raw = readFileSync(file, 'utf8')
-
-const ext = parse(file).ext.toLowerCase()
 let rows
-if (ext === '.json') {
-  rows = JSON.parse(raw)
-  if (!Array.isArray(rows)) throw new Error('JSON file must contain an array of objects')
+const isSheet = SHEET_URL_RE.test(source)
+if (isSheet) {
+  console.log(`Fetching from Google Sheet...`)
+  rows = await fetchSheet(source)
 } else {
-  rows = parseCSV(raw)
+  console.log(`Reading ${source}...`)
+  const raw = readFileSync(source, 'utf8')
+  const ext = parse(source).ext.toLowerCase()
+  if (ext === '.json') {
+    rows = JSON.parse(raw)
+    if (!Array.isArray(rows)) throw new Error('JSON file must contain an array of objects')
+  } else {
+    rows = parseCSV(raw)
+  }
 }
 console.log(`Parsed ${rows.length} rows`)
 
@@ -337,8 +419,11 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 try {
   const schemaSql = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8')
   await pool.query(schemaSql)
-  await upsertProfiles(pool, valid)
-  console.log(`Done! ${valid.length} profiles upserted.`)
+  const stats = await upsertProfiles(pool, valid)
+  console.log(`\nDone! ${valid.length} profiles processed.`)
+  console.log(`  New: ${stats.created.length}  |  Updated: ${stats.updated.length}  |  Unchanged: ${stats.unchanged.length}`)
+  if (stats.created.length) console.log(`  Created: ${stats.created.join(', ')}`)
+  if (stats.updated.length) console.log(`  Updated: ${stats.updated.join(', ')}`)
 } finally {
   await pool.end()
 }
