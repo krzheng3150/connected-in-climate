@@ -1,4 +1,3 @@
-// Must be set before any imports that read it
 process.env.ADMIN_EMAILS = 'admin@test.com'
 
 import { describe, it, before, after } from 'node:test'
@@ -20,11 +19,22 @@ before(async () => {
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS match_runs (
+      run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED')),
+      top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
+      code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS matches (
       match_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      run_id UUID NOT NULL REFERENCES match_runs(run_id),
       mentor_email TEXT NOT NULL REFERENCES user_profiles(email),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','REJECTED','FINISHED','STORED')),
+      status TEXT NOT NULL DEFAULT 'CANDIDATE'
+        CHECK (status IN ('CANDIDATE','APPROVED','REJECTED','ACTIVE','STORED','FINISHED')),
       final_score NUMERIC(5,4) NOT NULL, rank INTEGER NOT NULL,
       computation_payload JSONB NOT NULL, code_commit TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -33,7 +43,7 @@ before(async () => {
       action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       match_id UUID NOT NULL REFERENCES matches(match_id),
       actor_email TEXT NOT NULL,
-      action_type TEXT NOT NULL CHECK (action_type IN ('VIEW','FEEDBACK','CONTACT_CLICK','REJECT')),
+      action_type TEXT NOT NULL CHECK (action_type IN ('VIEW','FEEDBACK','CONTACT_CLICK','REJECT','APPROVE','SELECT')),
       payload JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE TABLE IF NOT EXISTS feedbacks (
@@ -55,6 +65,7 @@ before(async () => {
   await pool.query('DELETE FROM match_actions')
   await pool.query('DELETE FROM rejections')
   await pool.query('DELETE FROM matches')
+  await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM user_profiles')
 
   const profiles = [
@@ -63,6 +74,11 @@ before(async () => {
       top_strengths: ['Topic A'], general_topics: [],
       motivation: 'Helping.', max_capacity: 2, location: 'SF, CA',
       preferred_name: 'M', pronouns: 'they/them',
+    }],
+    ['mentor2@test.com', 'Mentor Two', 'mentor', {
+      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+      top_strengths: ['Topic X'], general_topics: [],
+      motivation: 'Policy.', max_capacity: 1, location: 'DC',
     }],
     ['mentee@test.com', 'Mentee', 'mentee', {
       career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
@@ -88,12 +104,8 @@ before(async () => {
   await new Promise(resolve => { server = app.listen(0, resolve) })
   baseUrl = `http://localhost:${server.address().port}`
 
-  // Create a match
+  // Create a run (matches start as CANDIDATE)
   await post('/api/matches/run', { email: 'mentee@test.com' })
-
-  // Submit feedback
-  const matchId = await getMatchId()
-  await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'Great match!' })
 })
 
 after(async () => {
@@ -101,6 +113,7 @@ after(async () => {
   await pool.query('DELETE FROM match_actions')
   await pool.query('DELETE FROM rejections')
   await pool.query('DELETE FROM matches')
+  await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()
@@ -127,11 +140,19 @@ async function del(path, headers = {}) {
 
 const admin = { 'x-user-email': 'admin@test.com' }
 
-async function getMatchId() {
+async function getRunId() {
   const result = await pool.query(
-    `SELECT match_id FROM matches WHERE mentee_email = 'mentee@test.com' AND rank = 1 LIMIT 1`,
+    `SELECT run_id FROM match_runs WHERE mentee_email = 'mentee@test.com' ORDER BY created_at DESC LIMIT 1`,
   )
-  return result.rows[0].match_id
+  return result.rows[0].run_id
+}
+
+async function getCandidateIds(runId) {
+  const result = await pool.query(
+    `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank`,
+    [runId],
+  )
+  return result.rows.map(r => r.match_id)
 }
 
 // ── Auth middleware ─────────────────────────────────────────────────
@@ -172,6 +193,73 @@ describe('GET /api/admin/profiles', () => {
   })
 })
 
+// ── GET /api/admin/pending ─────────────────────────────────────────
+
+describe('GET /api/admin/pending', () => {
+  it('returns pending runs with candidates', async () => {
+    const { status, data } = await get('/api/admin/pending', admin)
+    assert.equal(status, 200)
+    assert.ok(data.pending_runs.length >= 1)
+    const run = data.pending_runs[0]
+    assert.equal(run.mentee_email, 'mentee@test.com')
+    assert.ok(run.candidates.length >= 1)
+    assert.equal(run.candidates[0].status, 'CANDIDATE')
+    assert.ok(run.candidates[0].computation_payload)
+  })
+})
+
+// ── POST /api/admin/runs/:run_id/review ────────────────────────────
+
+describe('POST /api/admin/runs/:run_id/review', () => {
+  it('returns 400 when approved is not an array', async () => {
+    const runId = await getRunId()
+    const { status, data } = await post(`/api/admin/runs/${runId}/review`, { approved: 'bad' }, admin)
+    assert.equal(status, 400)
+    assert.ok(data.error.includes('array'))
+  })
+
+  it('returns 400 for invalid match_id in approved list', async () => {
+    const runId = await getRunId()
+    const { status, data } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: ['00000000-0000-0000-0000-000000000000'] },
+      admin,
+    )
+    assert.equal(status, 400)
+    assert.ok(data.error.includes('not a candidate'))
+  })
+
+  it('approves 1 candidate → auto-activates run', async () => {
+    const runId = await getRunId()
+    const candidateIds = await getCandidateIds(runId)
+
+    const { status, data } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: [candidateIds[0]] },
+      admin,
+    )
+    assert.equal(status, 200)
+    assert.equal(data.run_status, 'ACTIVE')
+    assert.equal(data.approved_count, 1)
+    assert.equal(data.rejected_count, candidateIds.length - 1)
+
+    // Verify match status in DB
+    const match = await pool.query('SELECT status FROM matches WHERE match_id = $1', [candidateIds[0]])
+    assert.equal(match.rows[0].status, 'ACTIVE')
+  })
+
+  it('returns 400 when reviewing an already-reviewed run', async () => {
+    const runId = await getRunId()
+    const { status, data } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: [] },
+      admin,
+    )
+    assert.equal(status, 400)
+    assert.ok(data.error.includes('not PENDING_REVIEW'))
+  })
+})
+
 // ── GET /api/admin/matches ─────────────────────────────────────────
 
 describe('GET /api/admin/matches', () => {
@@ -182,12 +270,13 @@ describe('GET /api/admin/matches', () => {
     assert.ok(hasRank1)
   })
 
-  it('includes computation_payload', async () => {
+  it('includes computation_payload and run_id', async () => {
     const { data } = await get('/api/admin/matches?email=mentee@test.com', admin)
     const match = data.matches[0]
     assert.ok(match.computation_payload)
     assert.ok(match.computation_payload.scores)
     assert.ok(match.code_commit)
+    assert.ok(match.run_id)
   })
 })
 
@@ -195,13 +284,16 @@ describe('GET /api/admin/matches', () => {
 
 describe('GET /api/admin/matches/:match_id', () => {
   it('returns full match detail with both profiles', async () => {
-    const matchId = await getMatchId()
+    const { data: listData } = await get('/api/admin/matches?email=mentee@test.com', admin)
+    const matchId = listData.matches[0].match_id
+
     const { status, data } = await get(`/api/admin/matches/${matchId}`, admin)
     assert.equal(status, 200)
     assert.ok(data.computation_payload)
     assert.ok(data.mentor_payload)
     assert.ok(data.mentee_payload)
     assert.ok(data.mentor_name)
+    assert.ok(data.run_id)
   })
 
   it('returns 404 for unknown match', async () => {
@@ -214,9 +306,12 @@ describe('GET /api/admin/matches/:match_id', () => {
 
 describe('POST /api/admin/matches/:match_id/reject', () => {
   it('rejects an active match', async () => {
-    const matchId = await getMatchId()
+    const { data: listData } = await get('/api/admin/matches?email=mentee@test.com', admin)
+    const activeMatch = listData.matches.find(m => m.status === 'ACTIVE')
+    assert.ok(activeMatch, 'expected an ACTIVE match')
+
     const { status, data } = await post(
-      `/api/admin/matches/${matchId}/reject`,
+      `/api/admin/matches/${activeMatch.match_id}/reject`,
       { reason: 'Domain mismatch' },
       admin,
     )
@@ -226,33 +321,43 @@ describe('POST /api/admin/matches/:match_id/reject', () => {
   })
 
   it('match status is now REJECTED in DB', async () => {
-    const matchId = await getMatchId()
-    const result = await pool.query('SELECT status FROM matches WHERE match_id = $1', [matchId])
+    const result = await pool.query(
+      `SELECT status FROM matches WHERE mentee_email = 'mentee@test.com' AND rank = 1`,
+    )
     assert.equal(result.rows[0].status, 'REJECTED')
   })
 
-  it('returns 400 when rejecting an already rejected match', async () => {
-    const matchId = await getMatchId()
+  it('returns 400 when rejecting a non-active match', async () => {
+    const { data: listData } = await get('/api/admin/matches?email=mentee@test.com', admin)
+    const rejectedMatch = listData.matches.find(m => m.status === 'REJECTED')
+
     const { status, data } = await post(
-      `/api/admin/matches/${matchId}/reject`,
+      `/api/admin/matches/${rejectedMatch.match_id}/reject`,
       { reason: 'Again' },
       admin,
     )
     assert.equal(status, 400)
-    assert.ok(data.error.includes('already'))
+    assert.ok(data.error.includes('not ACTIVE'))
   })
 })
 
-// ── POST /api/admin/matches/:match_id/reject with block ────────────
+// ── Reject with block ──────────────────────────────────────────────
 
 describe('Reject with block', () => {
   before(async () => {
-    // Re-run matching to get a fresh ACTIVE match
-    await pool.query(`UPDATE matches SET status = 'ACTIVE' WHERE mentee_email = 'mentee@test.com' AND rank = 1`)
+    // Set rank-1 match back to ACTIVE so we can test block
+    await pool.query(
+      `UPDATE matches SET status = 'ACTIVE'
+       WHERE mentee_email = 'mentee@test.com' AND rank = 1`,
+    )
   })
 
   it('rejects and creates a block entry', async () => {
-    const matchId = await getMatchId()
+    const result = await pool.query(
+      `SELECT match_id FROM matches WHERE mentee_email = 'mentee@test.com' AND rank = 1`,
+    )
+    const matchId = result.rows[0].match_id
+
     const { status, data } = await post(
       `/api/admin/matches/${matchId}/reject`,
       { reason: 'Conflict of interest', block: true },
@@ -267,6 +372,17 @@ describe('Reject with block', () => {
 // ── GET /api/admin/feedback ────────────────────────────────────────
 
 describe('GET /api/admin/feedback', () => {
+  before(async () => {
+    // Create feedback on an existing match
+    const result = await pool.query(
+      `SELECT match_id FROM matches WHERE mentee_email = 'mentee@test.com' LIMIT 1`,
+    )
+    await pool.query(
+      `INSERT INTO feedbacks (match_id, submitter_email, text) VALUES ($1, 'mentee@test.com', 'Great match!')`,
+      [result.rows[0].match_id],
+    )
+  })
+
   it('returns all feedback for matches involving user', async () => {
     const { status, data } = await get('/api/admin/feedback?email=mentee@test.com', admin)
     assert.equal(status, 200)

@@ -1,8 +1,11 @@
+process.env.ADMIN_EMAILS = 'admin@test.com'
+
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { pool } from './db.js'
 import matchRouter from './match-api.js'
+import adminRouter from './admin-api.js'
 import actionRouter from './action-api.js'
 import feedbackRouter from './feedback-api.js'
 
@@ -17,11 +20,22 @@ before(async () => {
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS match_runs (
+      run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED')),
+      top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
+      code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS matches (
       match_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      run_id UUID NOT NULL REFERENCES match_runs(run_id),
       mentor_email TEXT NOT NULL REFERENCES user_profiles(email),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','REJECTED','FINISHED','STORED')),
+      status TEXT NOT NULL DEFAULT 'CANDIDATE'
+        CHECK (status IN ('CANDIDATE','APPROVED','REJECTED','ACTIVE','STORED','FINISHED')),
       final_score NUMERIC(5,4) NOT NULL, rank INTEGER NOT NULL,
       computation_payload JSONB NOT NULL, code_commit TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -30,7 +44,7 @@ before(async () => {
       action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       match_id UUID NOT NULL REFERENCES matches(match_id),
       actor_email TEXT NOT NULL,
-      action_type TEXT NOT NULL CHECK (action_type IN ('VIEW','FEEDBACK','CONTACT_CLICK','REJECT')),
+      action_type TEXT NOT NULL CHECK (action_type IN ('VIEW','FEEDBACK','CONTACT_CLICK','REJECT','APPROVE','SELECT')),
       payload JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE TABLE IF NOT EXISTS feedbacks (
@@ -51,6 +65,7 @@ before(async () => {
   await pool.query('DELETE FROM feedbacks')
   await pool.query('DELETE FROM match_actions')
   await pool.query('DELETE FROM matches')
+  await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
   await pool.query('DELETE FROM user_profiles')
 
@@ -77,6 +92,7 @@ before(async () => {
   const app = express()
   app.use(express.json())
   app.use('/api/matches', matchRouter)
+  app.use('/api/admin', adminRouter)
   app.use('/api/actions', actionRouter)
   app.use('/api/feedback', feedbackRouter)
   app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
@@ -84,23 +100,36 @@ before(async () => {
   await new Promise(resolve => { server = app.listen(0, resolve) })
   baseUrl = `http://localhost:${server.address().port}`
 
-  await post('/api/matches/run', { email: 'mentee@test.com' })
+  // Create run → admin review (1 approved → auto-activate) so we have an ACTIVE match
+  const { data: runData } = await post('/api/matches/run', { email: 'mentee@test.com' })
+  const runId = runData.run.run_id
+
+  const candidates = await pool.query(
+    `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank LIMIT 1`,
+    [runId],
+  )
+  await post(
+    `/api/admin/runs/${runId}/review`,
+    { approved: [candidates.rows[0].match_id] },
+    { 'x-user-email': 'admin@test.com' },
+  )
 })
 
 after(async () => {
   await pool.query('DELETE FROM feedbacks')
   await pool.query('DELETE FROM match_actions')
   await pool.query('DELETE FROM matches')
+  await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()
 })
 
-async function post(path, body) {
+async function post(path, body, headers = {}) {
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
   return { status: res.status, data: await res.json() }
