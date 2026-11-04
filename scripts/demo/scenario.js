@@ -1,11 +1,13 @@
 import {
   MENTEE_EMAIL, MENTEE_NAME, ADMIN_EMAIL,
-  FEEDBACK_TEXT, FEEDBACK_RATING,
+  NO_PROFILE_EMAIL, FEEDBACK_TEXT, FEEDBACK_RATING,
 } from './fixtures.js'
 
 import {
-  login, signOut, goToAdmin, findMentor, clickFirstMatch,
-  getPartnerName, submitFeedback, getFeedbackCount,
+  login, signOut, goToAdmin, findMentor,
+  openMatchPanel, getPartnerName, closeAllPanels,
+  openPickDetail, getOpenPanelCount,
+  submitFeedback, getFeedbackCount, getNoProfileMessage,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
@@ -13,12 +15,26 @@ import {
 } from './helpers.js'
 
 export default async function runScenario(page) {
-  console.log('\n── Step 1: Mentee logs in ──')
+  // ── Step 1: No-profile user sees welcome message ──
+  console.log('\n── Step 1: No-profile user sees welcome message ──')
+  await login(page, NO_PROFILE_EMAIL)
+  const noProfileMsg = await getNoProfileMessage(page)
+  console.log(`  Message: ${noProfileMsg.slice(0, 80)}...`)
+  if (!noProfileMsg.includes('don\'t have a profile yet')) {
+    throw new Error('Expected no-profile message')
+  }
+  await signOut(page)
+  console.log('  Signed out.')
+  await pause(page)
+
+  // ── Step 2: Mentee logs in ──
+  console.log('\n── Step 2: Mentee logs in ──')
   await login(page, MENTEE_EMAIL)
   console.log(`  Logged in as ${MENTEE_EMAIL}`)
   await pause(page)
 
-  console.log('\n── Step 2: Mentee requests a match ──')
+  // ── Step 3: Mentee requests a match ──
+  console.log('\n── Step 3: Mentee requests a match ──')
   const matchMsg = await findMentor(page)
   console.log(`  Result: ${matchMsg}`)
   if (matchMsg.includes('No mentors')) {
@@ -26,7 +42,8 @@ export default async function runScenario(page) {
   }
   await pause(page)
 
-  console.log('\n── Step 3: Admin reviews the run ──')
+  // ── Step 4: Admin reviews the run ──
+  console.log('\n── Step 4: Admin reviews the run ──')
   await signOut(page)
   await login(page, ADMIN_EMAIL)
   await goToAdmin(page)
@@ -47,58 +64,88 @@ export default async function runScenario(page) {
   console.log(`  Review result: ${reviewMsg}`)
   await pause(page, 1500)
 
-  console.log('\n── Step 4: Mentee picks a mentor ──')
+  // ── Step 5: Mentee compares mentors side by side, then picks ──
+  console.log('\n── Step 5: Mentee compares mentors side by side, then picks ──')
   await signOut(page)
   await login(page, MENTEE_EMAIL)
   console.log('  Mentee sees approved candidates')
   await pause(page, 1500)
 
+  console.log('  Opening first mentor detail panel...')
+  await openPickDetail(page, 0)
+  const panelCount1 = await getOpenPanelCount(page)
+  console.log(`  Open panels: ${panelCount1}`)
+  await pause(page, 1000)
+
+  if (selected > 1) {
+    console.log('  Opening second mentor detail panel...')
+    await openPickDetail(page, 1)
+    const panelCount2 = await getOpenPanelCount(page)
+    console.log(`  Open panels: ${panelCount2} (side by side)`)
+    await pause(page, 2000)
+  }
+
+  console.log('  Closing panels...')
+  await closeAllPanels(page)
+  await pause(page, 500)
+
+  console.log('  Selecting a mentor...')
   const selectMsg = await selectMentor(page)
   console.log(`  Selection result: ${selectMsg}`)
   await pause(page)
 
-  console.log('\n── Step 5: Mentee views match detail ──')
-  await clickFirstMatch(page)
+  // ── Step 6: Mentee views match detail in panel ──
+  console.log('\n── Step 6: Mentee views match detail in panel ──')
+  await openMatchPanel(page)
   const partnerName = await getPartnerName(page)
   console.log(`  Matched with: ${partnerName}`)
-  const matchUrl = page.url()
   await pause(page, 2000)
 
-  console.log('\n── Step 6: Mentor views the same match ──')
-  const matchId = matchUrl.split('/matches/')[1]
-  const mentorEmail = await page.evaluate(async (id) => {
-    const res = await fetch(`/api/admin/matches/${id}`, {
-      headers: { 'x-user-email': 'krzheng3150@gmail.com' },
+  // Get the match info via API for the mentor step
+  const matchInfo = await page.evaluate(async (email) => {
+    const res = await fetch(`/api/matches?email=${encodeURIComponent(email)}`, {
+      headers: { 'x-user-email': email },
     })
     const data = await res.json()
-    return data.mentor_email
-  }, matchId)
-  console.log(`  Mentor email: ${mentorEmail}`)
+    const active = data.matches.find(m => m.status === 'ACTIVE')
+    return active ? { matchId: active.match_id, mentorEmail: active.mentor_email } : null
+  }, MENTEE_EMAIL)
 
+  if (!matchInfo) throw new Error('No active match found')
+  console.log(`  Mentor email: ${matchInfo.mentorEmail}`)
+  await closeAllPanels(page)
+
+  // ── Step 7: Mentor views the same match ──
+  console.log('\n── Step 7: Mentor views the same match ──')
   await signOut(page)
-  await login(page, mentorEmail)
+  await login(page, matchInfo.mentorEmail)
   console.log(`  Logged in as mentor`)
   await pause(page)
 
-  await clickFirstMatch(page)
+  await openMatchPanel(page)
   const menteeName = await getPartnerName(page)
   console.log(`  Mentor sees mentee: ${menteeName}`)
   await pause(page, 2000)
+  await closeAllPanels(page)
 
-  console.log('\n── Step 7: Mentee submits feedback ──')
+  // ── Step 8: Mentee submits feedback ──
+  console.log('\n── Step 8: Mentee submits feedback ──')
   await signOut(page)
   await login(page, MENTEE_EMAIL)
-  await clickFirstMatch(page)
+  await openMatchPanel(page)
   const fbMsg = await submitFeedback(page, FEEDBACK_TEXT, FEEDBACK_RATING)
   console.log(`  Feedback result: ${fbMsg}`)
   const fbCount = await getFeedbackCount(page)
   console.log(`  Feedback items visible: ${fbCount}`)
   await pause(page, 2000)
+  await closeAllPanels(page)
 
-  console.log('\n── Step 8: Admin inspects in Search tab ──')
+  // ── Step 9: Admin inspects in Search tab ──
+  console.log('\n── Step 9: Admin inspects in Search tab ──')
   await signOut(page)
   await login(page, ADMIN_EMAIL)
   await goToAdmin(page)
+  await pause(page, 2000)
   await adminSwitchTab(page, 'Search')
   console.log('  Searching mentee profile...')
   await adminSearchProfile(page, MENTEE_EMAIL)

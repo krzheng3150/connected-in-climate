@@ -28,6 +28,14 @@ export async function signOut(page) {
 export async function goToAdmin(page) {
   await page.click('button:has-text("Admin")')
   await page.waitForURL('**/admin')
+  await page.waitForSelector('.role-tab', { timeout: 10000 })
+}
+
+// ── No-profile state ──────────────────────────────────────────────
+
+export async function getNoProfileMessage(page) {
+  await page.waitForSelector('.placeholder-text')
+  return page.textContent('.placeholder-text')
 }
 
 // ── Mentee Actions ─────────────────────────────────────────────────
@@ -35,33 +43,56 @@ export async function goToAdmin(page) {
 export async function findMentor(page) {
   await page.click('button:has-text("Find a Mentor")')
   await page.waitForSelector('.dashboard-message')
-  const msg = await page.textContent('.dashboard-message')
-  return msg
+  return page.textContent('.dashboard-message')
 }
 
-export async function clickFirstMatch(page) {
-  await page.click('.match-card a, .match-card')
-  await page.waitForURL('**/matches/**')
+export async function openMatchPanel(page) {
+  await page.click('.match-card')
+  await page.waitForSelector('.detail-panel')
 }
 
 export async function getPartnerName(page) {
-  return page.textContent('.partner-header h2')
+  return page.textContent('.detail-panel .partner-header h2')
+}
+
+export async function closePanel(page, index = 0) {
+  const closeBtns = await page.$$('.detail-panel-close')
+  if (closeBtns[index]) await closeBtns[index].click()
+  await page.waitForTimeout(300)
+}
+
+export async function closeAllPanels(page) {
+  while (await page.$('.detail-panel-close')) {
+    await page.click('.detail-panel-close')
+    await page.waitForTimeout(200)
+  }
+}
+
+export async function openPickDetail(page, index = 0) {
+  const btns = await page.$$('.admin-card-actions .btn-link')
+  if (btns[index]) await btns[index].click()
+  await page.waitForTimeout(500)
+}
+
+export async function getOpenPanelCount(page) {
+  const panels = await page.$$('.detail-panel')
+  return panels.length
 }
 
 // ── Feedback ───────────────────────────────────────────────────────
 
 export async function submitFeedback(page, text, rating) {
-  await page.fill('.feedback-form textarea', text)
+  await page.fill('.detail-panel .feedback-form textarea', text)
   if (rating) {
-    await page.selectOption('.feedback-form select', rating)
+    await page.selectOption('.detail-panel .feedback-form select', rating)
   }
-  await page.click('.feedback-form button[type="submit"]')
-  await page.waitForSelector('.feedback-msg')
-  return page.textContent('.feedback-msg')
+  await page.click('.detail-panel .feedback-form button[type="submit"]')
+  await page.waitForSelector('.detail-panel .feedback-msg')
+  return page.textContent('.detail-panel .feedback-msg')
 }
 
 export async function getFeedbackCount(page) {
-  const items = await page.$$('.feedback-item')
+  const items = await page.$$('.detail-panel .feedback-item')
   return items.length
 }
 
@@ -70,14 +101,25 @@ export async function getFeedbackCount(page) {
 export async function adminSearchProfile(page, email) {
   await page.fill('.admin-search-form input[type="email"]', email)
   await page.click('.admin-search-form button[type="submit"]')
-  await page.waitForSelector('.admin-card')
+  await page.waitForSelector('.admin-card', { timeout: 10000 })
 }
 
 export async function adminSwitchTab(page, tabName) {
-  await page.click(`.role-tab:has-text("${tabName}")`)
+  await page.waitForSelector('.role-tab', { timeout: 10000 })
+  await page.evaluate((name) => {
+    const tabs = document.querySelectorAll('.role-tab')
+    for (const tab of tabs) {
+      if (tab.textContent.trim() === name) {
+        tab.click()
+        return
+      }
+    }
+  }, tabName)
+  await page.waitForTimeout(500)
 }
 
 export async function adminExpandScores(page) {
+  await page.waitForSelector('button:has-text("Show scores")', { timeout: 10000 })
   await page.click('button:has-text("Show scores")')
   await page.waitForSelector('.admin-scores')
 }
