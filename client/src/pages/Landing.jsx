@@ -1,5 +1,4 @@
-import { SignIn, useAuth as useClerkAuth } from '@clerk/react'
-import { Navigate } from 'react-router-dom'
+import { SignIn } from '@clerk/react'
 
 const FEATURES = [
   {
@@ -30,10 +29,6 @@ function FeatureCard({ icon, title, description }) {
 }
 
 export default function Landing() {
-  const { isSignedIn } = useClerkAuth()
-
-  if (isSignedIn) return <Navigate to="/dashboard" replace />
-
   return (
     <div className="landing">
       <div className="landing-hero">
