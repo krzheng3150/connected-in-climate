@@ -6,19 +6,16 @@ import { getAuth, clerkClient } from '@clerk/express'
  */
 export async function getAuthEmail(req) {
   try {
-    const auth = getAuth(req)
-    const { userId } = auth
-    console.log('[auth] getAuth result:', { userId, sessionId: auth.sessionId })
+    const { userId } = getAuth(req)
     if (userId) {
       const user = await clerkClient.users.getUser(userId)
       const primary = user.emailAddresses.find(
         e => e.id === user.primaryEmailAddressId,
       )
-      console.log('[auth] resolved email:', primary?.emailAddress)
       return primary?.emailAddress || null
     }
-  } catch (err) {
-    console.log('[auth] Clerk error, falling through:', err.message)
+  } catch {
+    // clerkMiddleware not applied (e.g., tests) — fall through to header
   }
   if (process.env.NODE_ENV !== 'production') {
     const header = req.headers['x-user-email']
