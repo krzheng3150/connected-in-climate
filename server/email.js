@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const FROM = process.env.EMAIL_FROM || 'Connected in Climate <noreply@connected.climateactionforge.com>'
-const APP_URL = process.env.APP_URL || 'https://connected.climateactionforge.com'
+const APP_URL = process.env.APP_URL || 'https://connected-in-climate-n42zu.ondigitalocean.app'
 
 const sent = []
 export function _testGetSent() { return sent }

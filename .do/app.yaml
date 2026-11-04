@@ -1,8 +1,5 @@
 name: connected-in-climate
 region: nyc
-domains:
-  - domain: connected.climateactionforge.com
-    type: PRIMARY
 services:
   - name: web
     github:
