@@ -27,6 +27,7 @@
     "demo:headless": "node --env-file=.env scripts/demo.js --headless"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.87",
     "express": "^4.21.0",
     "googleapis": "^189.0.0",
     "pg": "^8.13.0",

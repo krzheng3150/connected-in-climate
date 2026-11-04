@@ -1,62 +1,65 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { useUser as useClerkUser, useAuth as useClerkAuth } from '@clerk/react'
 
 const AuthContext = createContext(null)
 
-const STORAGE_KEY = 'cic_user'
-
-function readStorage() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
-}
-
-function writeStorage(user) {
-  try {
-    if (user) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-    else sessionStorage.removeItem(STORAGE_KEY)
-  } catch { /* blocked storage is fine */ }
-}
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(readStorage)
-  const [loading, setLoading] = useState(false)
+  const { isSignedIn, isLoaded: authLoaded, getToken } = useClerkAuth()
+  const { user: clerkUser, isLoaded: userLoaded } = useClerkUser()
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => { writeStorage(user) }, [user])
-
-  const login = useCallback(async (email) => {
+  const fetchProfile = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/profiles/me?email=${encodeURIComponent(email)}`)
-      if (res.status === 404) {
-        setError('No profile found for that email.')
+      const token = await getToken()
+      if (!token) {
+        setProfile(null)
         setLoading(false)
-        return false
+        return
+      }
+      const res = await fetch(`/api/profiles/me`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      if (res.status === 401) {
+        setProfile(null)
+        setLoading(false)
+        return
       }
       if (!res.ok) {
-        setError('Something went wrong. Please try again.')
+        setError('Something went wrong loading your profile.')
         setLoading(false)
-        return false
+        return
       }
       const data = await res.json()
-      setUser(data)
-      setLoading(false)
-      return true
+      setProfile(data)
     } catch {
       setError('Could not reach the server.')
+    } finally {
       setLoading(false)
-      return false
     }
-  }, [])
+  }, [getToken])
 
-  const logout = useCallback(() => {
-    setUser(null)
-  }, [])
+  useEffect(() => {
+    if (!authLoaded || !userLoaded) return
+    if (!isSignedIn) {
+      setProfile(null)
+      setLoading(false)
+      return
+    }
+    fetchProfile()
+  }, [isSignedIn, authLoaded, userLoaded, clerkUser, fetchProfile])
+
+  const user = profile
+  const hasProfile = profile?.has_profile !== false
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, hasProfile, loading, error, isSignedIn }}>
       {children}
     </AuthContext.Provider>
   )

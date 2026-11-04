@@ -17,6 +17,7 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 | Data import | `scripts/import.js` |
 | Google Sheet setup | `scripts/create-sheet.js` |
 | Google auth | `scripts/google-auth.js` |
+| Auth (shared helper) | `server/auth.js` |
 | Admin backend | `server/admin-api.js` |
 | Client routes | `client/src/App.jsx` |
 | E2E demo | `scripts/demo/` (`scenario.js` for the flow, `helpers.js` for page actions) |
@@ -30,7 +31,7 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 - **Run-based match pipeline.** Algorithm → creates a `match_run` (PENDING_REVIEW) with top N as `CANDIDATE` matches → admin batch-reviews the run (`POST /api/admin/runs/:run_id/review`) → approved 1–3 → mentee picks (`ACTIVE`). Auto-activates if admin approves exactly 1. `TOP_CANDIDATES` constant in `match-api.js` controls N. Run statuses: PENDING_REVIEW → AWAITING_MENTEE / ACTIVE / CANCELLED. Match statuses: CANDIDATE → APPROVED / REJECTED → ACTIVE / FINISHED. STORED for below-cutoff.
 - **Matches are immutable snapshots.** Never mutate a `computation_payload`. Profile changes only affect future match runs.
 - **Block list ≠ rejection.** The `rejections` table is a block list (prevents future matching). Rejecting a match does NOT auto-block — admin decides separately.
-- **Auth is email-based** for the pilot. Admin routes gated by `ADMIN_EMAILS` env var checked in `requireAdmin` middleware.
+- **Auth via Clerk.** Social login (Google, LinkedIn, Microsoft) on the frontend (`@clerk/react`), session verification on the backend (`@clerk/express`). `server/auth.js` exports `getAuthEmail(req)` — extracts verified email from the Clerk session, falls back to `x-user-email` header in non-production (for tests). Admin routes still gated by `ADMIN_EMAILS` env var. Users can sign in without a profile — they see a "profile not ready" message until imported via Google Sheets.
 - **Profile field propagation.** New field → `field-registry.js` → `import.js` → `ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `sample-profiles.csv`. Then re-run `npm run sheet:create -- <url>` to update sheet dropdowns.
 - **Google Sheets import.** `import.js` accepts a Google Sheet URL or a local file. Authenticated via service account (`GOOGLE_SERVICE_ACCOUNT_KEY` env var — file path locally, raw JSON on DO). Sheet setup: `npm run sheet:create -- <url>` configures headers, dropdowns (labels from `field-registry.js`), Reference tab, and header protection on an existing sheet shared with the service account. Multi-select fields accept pipes, newlines, or semicolons. Both labels and IDs resolve via `normalize()`.
 - **TF-IDF embeddings.** Computed locally at import time (no OpenAI API calls). Stored in pgvector `VECTOR(1536)` column.

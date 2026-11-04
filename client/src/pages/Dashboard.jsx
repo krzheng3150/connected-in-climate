@@ -1,13 +1,42 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useClerk } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
 import MenteeDashboard from './MenteeDashboard.jsx'
 import MentorDashboard from './MentorDashboard.jsx'
 
 export default function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user, hasProfile, loading } = useAuth()
+  const { signOut } = useClerk()
   const navigate = useNavigate()
-  const [view, setView] = useState(user.is_mentee ? 'mentee' : 'mentor')
+  const [view, setView] = useState(user?.is_mentee ? 'mentee' : 'mentor')
+
+  if (loading || !user) {
+    return <div className="page"><p>Loading…</p></div>
+  }
+
+  if (!hasProfile) {
+    return (
+      <div className="page">
+        <header className="page-header">
+          <h1>Connected in Climate</h1>
+          <div className="user-info">
+            <span>{user?.email}</span>
+            {user?.is_admin && (
+              <button className="btn-link" onClick={() => navigate('/admin')}>Admin</button>
+            )}
+            <button className="btn-link" onClick={() => signOut()}>Sign out</button>
+          </div>
+        </header>
+        <main className="page-body">
+          <h2>Welcome!</h2>
+          <p className="placeholder-text">
+            You're signed in but don't have a profile yet. Your program admin will set up your profile — once it's ready, you'll see your dashboard here.
+          </p>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="page">
@@ -18,7 +47,7 @@ export default function Dashboard() {
           {user.is_admin && (
             <button className="btn-link" onClick={() => navigate('/admin')}>Admin</button>
           )}
-          <button className="btn-link" onClick={logout}>Sign out</button>
+          <button className="btn-link" onClick={() => signOut()}>Sign out</button>
         </div>
       </header>
 

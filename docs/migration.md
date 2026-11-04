@@ -7,6 +7,7 @@ This guide covers moving the Connected in Climate app to a different DigitalOcea
 - A DigitalOcean account with App Platform access
 - The GitHub repo (fork it or grant the new account access to `krzheng3150/connected-in-climate`)
 - A DigitalOcean API token (Full Access) — generate at cloud.digitalocean.com → API → Tokens
+- A Clerk application — create at clerk.com. Enable social login providers (Google, LinkedIn, Microsoft) under User & Authentication → Social Connections. LinkedIn requires a LinkedIn OAuth app (linkedin.com/developers).
 
 ## Step 1: Update `.do/app.yaml`
 
@@ -18,6 +19,8 @@ The app spec has instance-specific values that must change. Edit `.do/app.yaml`:
 | `services[0].envs → DATABASE_URL` | `${NEW_DB_NAME.DATABASE_URL}` | DO auto-generates the DB name when you create the app — update after step 2 |
 | `services[0].envs → ADMIN_EMAILS` | New admin email addresses | Whoever should have admin access |
 | `services[0].envs → GOOGLE_SERVICE_ACCOUNT_EMAIL` | New service account email | Google Cloud Console → IAM → Service Accounts |
+| `services[0].envs → CLERK_PUBLISHABLE_KEY` | New Clerk publishable key | clerk.com → your app → API Keys |
+| `services[0].envs → VITE_CLERK_PUBLISHABLE_KEY` | Same value as above | Needed at build time for the Vite frontend |
 | `databases[0].name` | New DB name | DO assigns this — update after step 2 |
 | `region` | Preferred region (e.g., `nyc`, `sfo`, `tor`) | Optional — change if needed |
 
@@ -39,6 +42,7 @@ These cannot be set via the app spec file — they must be entered manually:
 | `OPENAI_API_KEY` | platform.openai.com → API Keys (not currently used for matching — TF-IDF is local — but referenced in the spec) |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Google Cloud Console → IAM → Service Accounts → Keys → Create Key (JSON). Paste the raw JSON as the value. |
 | `RESEND_API_KEY` | resend.com → API Keys. Also verify/add the sending domain. |
+| `CLERK_SECRET_KEY` | clerk.com → your app → API Keys → Secret Key |
 
 Set these at: **Apps → your app → Settings → web component → Environment Variables**
 
@@ -104,7 +108,8 @@ If using Google Sheets for profile import:
 
 - [ ] App spec updated with new repo, DB name, admin emails, service account
 - [ ] App created on DO App Platform
-- [ ] Secrets set in DO console (OPENAI_API_KEY, GOOGLE_SERVICE_ACCOUNT_KEY, RESEND_API_KEY)
+- [ ] Secrets set in DO console (OPENAI_API_KEY, GOOGLE_SERVICE_ACCOUNT_KEY, RESEND_API_KEY, CLERK_SECRET_KEY)
+- [ ] Clerk publishable keys updated in app.yaml (CLERK_PUBLISHABLE_KEY + VITE_CLERK_PUBLISHABLE_KEY)
 - [ ] `DIGITALOCEAN_ACCESS_TOKEN` set in GitHub repo secrets
 - [ ] Database migrated (or profiles re-imported)
 - [ ] Deploy succeeded

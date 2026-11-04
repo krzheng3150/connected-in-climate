@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
+import { SignIn, useAuth as useClerkAuth } from '@clerk/react'
+import { Navigate } from 'react-router-dom'
 
 const FEATURES = [
   {
@@ -30,43 +29,11 @@ function FeatureCard({ icon, title, description }) {
   )
 }
 
-function LoginForm() {
-  const [email, setEmail] = useState('')
-  const { login, error, loading } = useAuth()
-  const navigate = useNavigate()
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    const trimmed = email.trim().toLowerCase()
-    if (!trimmed) return
-    const ok = await login(trimmed)
-    if (ok) navigate('/dashboard', { replace: true })
-  }
-
-  return (
-    <form className="login-form" onSubmit={handleSubmit}>
-      <label htmlFor="email">Enter your email to get started</label>
-      <div className="input-row">
-        <input
-          id="email"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-          autoFocus
-          autoComplete="email"
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? 'Checking…' : "Let’s Connect"}
-        </button>
-      </div>
-      {error && <p className="form-error">{error}</p>}
-    </form>
-  )
-}
-
 export default function Landing() {
+  const { isSignedIn } = useClerkAuth()
+
+  if (isSignedIn) return <Navigate to="/dashboard" replace />
+
   return (
     <div className="landing">
       <div className="landing-hero">
@@ -86,8 +53,16 @@ export default function Landing() {
 
       <hr className="landing-divider" />
 
-      <LoginForm />
-
+      <div className="clerk-signin-wrapper">
+        <SignIn
+          routing="hash"
+          appearance={{
+            elements: {
+              rootBox: { width: '100%', maxWidth: '420px', margin: '0 auto' },
+            },
+          }}
+        />
+      </div>
     </div>
   )
 }

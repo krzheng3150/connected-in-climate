@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { pool } from './db.js'
+import { getAuthEmail } from './auth.js'
 import { notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
 
 const router = Router()
@@ -10,8 +11,8 @@ function getAdminEmails() {
   )
 }
 
-function requireAdmin(req, res, next) {
-  const email = (req.headers['x-user-email'] || '').toLowerCase().trim()
+async function requireAdmin(req, res, next) {
+  const email = await getAuthEmail(req)
   if (!email || !getAdminEmails().has(email)) {
     return res.status(403).json({ error: 'admin access required' })
   }
