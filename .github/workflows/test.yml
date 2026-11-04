@@ -38,6 +38,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Create .env for node --env-file
+        run: touch .env
+
       - name: Unit tests
         run: npm test
 
