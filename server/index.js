@@ -8,6 +8,7 @@ import matchRouter from './match-api.js'
 import actionRouter from './action-api.js'
 import feedbackRouter from './feedback-api.js'
 import adminRouter from './admin-api.js'
+import profileRouter from './profile-api.js'
 import { isMentor, isMentee } from './roles.js'
 
 const app = express()
@@ -69,6 +70,7 @@ app.get('/api/profiles/me', async (req, res, next) => {
 app.use('/api/matches', matchRouter)
 app.use('/api/actions', actionRouter)
 app.use('/api/feedback', feedbackRouter)
+app.use('/api/profiles', profileRouter)
 app.use('/api/admin', adminRouter)
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }))

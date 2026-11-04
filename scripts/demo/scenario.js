@@ -7,7 +7,7 @@ import {
   login, signOut, goToAdmin, findMentor,
   openMatchPanel, getPartnerName, closeAllPanels,
   openPickDetail, getOpenPanelCount,
-  submitFeedback, getFeedbackCount, getNoProfileMessage,
+  submitFeedback, getFeedbackCount, getApplicationForm,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
@@ -15,14 +15,11 @@ import {
 } from './helpers.js'
 
 export default async function runScenario(page) {
-  // ── Step 1: No-profile user sees welcome message ──
-  console.log('\n── Step 1: No-profile user sees welcome message ──')
+  // ── Step 1: No-profile user sees application form ──
+  console.log('\n── Step 1: No-profile user sees application form ──')
   await login(page, NO_PROFILE_EMAIL)
-  const noProfileMsg = await getNoProfileMessage(page)
-  console.log(`  Message: ${noProfileMsg.slice(0, 80)}...`)
-  if (!noProfileMsg.includes('don\'t have a profile yet')) {
-    throw new Error('Expected no-profile message')
-  }
+  await getApplicationForm(page)
+  console.log('  Application form is shown')
   await signOut(page)
   console.log('  Signed out.')
   await pause(page)

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { useUser as useClerkUser, useAuth as useClerkAuth } from '@clerk/react'
 
 const TEST_USER = import.meta.env.VITE_TEST_USER
@@ -10,9 +10,10 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const hasLoaded = useRef(false)
 
   const fetchProfile = useCallback(async () => {
-    setLoading(true)
+    if (!hasLoaded.current) setLoading(true)
     setError(null)
     try {
       const headers = { 'Content-Type': 'application/json' }
@@ -41,6 +42,7 @@ export function AuthProvider({ children }) {
     } catch {
       setError('Could not reach the server.')
     } finally {
+      hasLoaded.current = true
       setLoading(false)
     }
   }, [getToken])
@@ -63,7 +65,7 @@ export function AuthProvider({ children }) {
   const hasProfile = profile?.has_profile !== false
 
   return (
-    <AuthContext.Provider value={{ user, hasProfile, loading, error, isSignedIn: TEST_USER ? !!profile : isSignedIn }}>
+    <AuthContext.Provider value={{ user, hasProfile, loading, error, isSignedIn: TEST_USER ? !!profile : isSignedIn, refreshProfile: fetchProfile }}>
       {children}
     </AuthContext.Provider>
   )

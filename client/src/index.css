@@ -972,3 +972,58 @@ h1, h2, h3, h4, h5, h6 {
   max-height: 400px;
   overflow-y: auto;
 }
+
+/* ── Application Form ──────────────────────────────────────────── */
+
+.application-form { max-width: 640px; }
+.application-form h2 { margin-bottom: 0.5rem; }
+.application-form > p { color: var(--muted); margin-bottom: 1.5rem; }
+
+.role-select { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+.role-option {
+  display: flex; flex-direction: column; gap: 0.25rem;
+  padding: 1rem 1.25rem; border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); cursor: pointer; text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.role-option:hover { border-color: var(--accent); }
+.role-option.selected { border-color: var(--accent); background: var(--accent-light); }
+.role-option strong { font-size: 1.05rem; }
+.role-option span { color: var(--muted); font-size: 0.9rem; }
+
+.form-group { margin-bottom: 1.25rem; }
+.form-group label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; }
+.form-group input[type="text"],
+.form-group input[type="url"],
+.form-group textarea,
+.form-group select {
+  width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.95rem; font-family: var(--font-body);
+  background: var(--surface); color: var(--fg);
+}
+.form-group textarea { resize: vertical; }
+.form-group select { appearance: auto; }
+
+.checkbox-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem 1rem;
+}
+@media (max-width: 600px) { .checkbox-grid { grid-template-columns: 1fr; } }
+.checkbox-option {
+  display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.9rem; cursor: pointer;
+}
+.checkbox-option input[type="checkbox"] { margin-top: 0.2rem; accent-color: var(--accent); }
+
+.form-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+.btn-primary {
+  padding: 0.6rem 1.5rem; background: var(--accent); color: white; border: none;
+  border-radius: var(--radius); font-size: 0.95rem; font-weight: 600; cursor: pointer;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
+.btn-secondary {
+  padding: 0.6rem 1.5rem; background: var(--surface); color: var(--fg); border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.95rem; cursor: pointer;
+}
+.btn-secondary:hover { background: var(--accent-light); }
+
+.form-error { color: var(--error); font-size: 0.9rem; margin-bottom: 0.5rem; }

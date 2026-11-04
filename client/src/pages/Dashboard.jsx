@@ -4,6 +4,7 @@ import { useClerk } from '@clerk/react'
 import { useNavigate } from 'react-router-dom'
 import MenteeDashboard from './MenteeDashboard.jsx'
 import MentorDashboard from './MentorDashboard.jsx'
+import ApplicationForm from '../components/ApplicationForm.jsx'
 
 export default function Dashboard() {
   const { user, hasProfile, loading } = useAuth()
@@ -29,10 +30,7 @@ export default function Dashboard() {
           </div>
         </header>
         <main className="page-body">
-          <h2>Welcome!</h2>
-          <p className="placeholder-text">
-            You're signed in but don't have a profile yet. Your program admin will set up your profile — once it's ready, you'll see your dashboard here.
-          </p>
+          <ApplicationForm />
         </main>
       </div>
     )

@@ -33,9 +33,8 @@ export async function goToAdmin(page) {
 
 // ── No-profile state ──────────────────────────────────────────────
 
-export async function getNoProfileMessage(page) {
-  await page.waitForSelector('.placeholder-text')
-  return page.textContent('.placeholder-text')
+export async function getApplicationForm(page) {
+  await page.waitForSelector('.application-form', { timeout: 10000 })
 }
 
 // ── Mentee Actions ─────────────────────────────────────────────────
