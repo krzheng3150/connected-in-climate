@@ -1,17 +1,27 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { useNavigate } from 'react-router-dom'
 import { lbl } from '../components/ProfileFields.jsx'
 import MatchCard from '../components/MatchCard.jsx'
+import MatchDetailPanel from '../components/MatchDetailPanel.jsx'
 
 export default function MenteeDashboard() {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [run, setRun] = useState(undefined)
   const [loading, setLoading] = useState(true)
   const [finding, setFinding] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [message, setMessage] = useState(null)
+  const [openPanels, setOpenPanels] = useState([])
+
+  function togglePanel(matchId) {
+    setOpenPanels(prev =>
+      prev.includes(matchId) ? prev.filter(id => id !== matchId) : [...prev, matchId],
+    )
+  }
+
+  function closePanel(matchId) {
+    setOpenPanels(prev => prev.filter(id => id !== matchId))
+  }
 
   const fetchRun = useCallback(async () => {
     setLoading(true)
@@ -127,7 +137,7 @@ export default function MenteeDashboard() {
                 key={m.match_id}
                 match={m}
                 onSelect={() => handleSelect(m.match_id)}
-                onViewDetail={() => navigate(`/matches/${m.match_id}`)}
+                onViewDetail={() => togglePanel(m.match_id)}
                 disabled={selecting}
               />
             ))}
@@ -139,7 +149,15 @@ export default function MenteeDashboard() {
         <div className="match-list">
           <h3>Your Matches</h3>
           {run.matches.map(m => (
-            <MatchCard key={m.match_id} match={m} userEmail={user.email} />
+            <MatchCard key={m.match_id} match={m} userEmail={user.email} onOpen={togglePanel} />
+          ))}
+        </div>
+      )}
+
+      {openPanels.length > 0 && (
+        <div className="detail-panels">
+          {openPanels.map(id => (
+            <MatchDetailPanel key={id} matchId={id} onClose={() => closePanel(id)} />
           ))}
         </div>
       )}

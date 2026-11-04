@@ -19,6 +19,7 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 | Google auth | `scripts/google-auth.js` |
 | Auth (shared helper) | `server/auth.js` |
 | Admin backend | `server/admin-api.js` |
+| Match detail panel | `client/src/components/MatchDetailPanel.jsx` |
 | Client routes | `client/src/App.jsx` |
 | E2E demo | `scripts/demo/` (`scenario.js` for the flow, `helpers.js` for page actions) |
 | Email notifications | `server/email.js` |

@@ -441,6 +441,58 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
 }
 
+/* ── Detail panels (side-by-side) ─────────────────────────────── */
+.detail-panels {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 1rem 0;
+  margin-top: 1rem;
+}
+
+.detail-panel {
+  flex: 0 0 420px;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  overflow-y: auto;
+  max-height: 80vh;
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.detail-panel-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.detail-panel-close:hover {
+  color: var(--fg);
+}
+
+@media (max-width: 600px) {
+  .detail-panels {
+    flex-direction: column;
+  }
+  .detail-panel {
+    flex: none;
+    max-width: 100%;
+  }
+}
+
 /* ── Match detail page ─────────────────────────────────────────── */
 .match-detail-score {
   font-size: 0.875rem;
