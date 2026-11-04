@@ -5,7 +5,13 @@ export const MENTEE_NAME = 'Jane Doe'
 
 export const ADMIN_EMAIL = 'krzheng3150@gmail.com'
 
-export const NO_PROFILE_EMAIL = 'newuser@example.com'
+export const NEW_MENTEE_EMAIL = 'newmentee@example.com'
+export const NEW_MENTEE_NAME = 'Sam Taylor'
+export const NEW_MENTEE_STATEMENT = 'I want to transition from software engineering into climate policy and learn how to navigate the nonprofit sector.'
+
+export const NEW_MENTOR_EMAIL = 'newmentor@example.com'
+export const NEW_MENTOR_NAME = 'Dana Kim'
+export const NEW_MENTOR_MOTIVATION = 'I have 12 years in renewable energy project finance and want to help early-career professionals navigate the climate finance landscape.'
 
 export const FEEDBACK_TEXT = 'Great mentor! Very helpful with career transition advice and networking tips.'
 export const FEEDBACK_RATING = '4'

@@ -31,10 +31,69 @@ export async function goToAdmin(page) {
   await page.waitForSelector('.role-tab', { timeout: 10000 })
 }
 
-// ── No-profile state ──────────────────────────────────────────────
+// ── Application form ──────────────────────────────────────────────
 
-export async function getApplicationForm(page) {
+function reactClick(page, selector) {
+  return page.evaluate((sel) => {
+    const el = document.querySelector(sel)
+    if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  }, selector)
+}
+
+function reactClickNth(page, selector, index) {
+  return page.evaluate(({ sel, idx }) => {
+    const els = document.querySelectorAll(sel)
+    if (els[idx]) els[idx].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  }, { sel: selector, idx: index })
+}
+
+export async function fillApplication(page, { name, role, freeText }) {
   await page.waitForSelector('.application-form', { timeout: 10000 })
+  const roleIndex = role === 'mentor' ? 1 : 0
+
+  // Step 0: select role
+  await reactClickNth(page, '.role-option', roleIndex)
+  await page.waitForTimeout(2500)
+  await reactClick(page, '.btn-primary')
+  await page.waitForSelector('input[placeholder="Your full name"]', { timeout: 5000 })
+
+  // Step 1: basic info — fill name, then reveal each dropdown
+  await page.fill('input[placeholder="Your full name"]', name)
+  await page.waitForTimeout(1000)
+  const selects = await page.$$('.form-group select')
+  for (const sel of selects) {
+    await sel.click()
+    await page.waitForTimeout(1500)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+  }
+  await page.waitForTimeout(1000)
+  await reactClickNth(page, '.form-actions button', 1)
+  await page.waitForSelector('.checkbox-grid', { timeout: 5000 })
+
+  // Step 2: select a few interests
+  await reactClickNth(page, '.checkbox-option input', 0)
+  await reactClickNth(page, '.checkbox-option input', 2)
+  await reactClickNth(page, '.checkbox-option input', 4)
+  await page.waitForTimeout(2500)
+  await reactClickNth(page, '.form-actions button', 1)
+  await page.waitForSelector('textarea', { timeout: 5000 })
+
+  // Step 3: free text + submit
+  await page.fill('textarea', freeText)
+  await page.waitForTimeout(2500)
+  await page.evaluate(() => {
+    const btns = document.querySelectorAll('.form-actions button')
+    for (const b of btns) {
+      if (b.textContent.includes('Submit')) {
+        b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        return
+      }
+    }
+  })
+
+  // Wait for form to disappear and dashboard to load
+  await page.waitForSelector('.application-form', { state: 'hidden', timeout: 15000 })
 }
 
 // ── Mentee Actions ─────────────────────────────────────────────────

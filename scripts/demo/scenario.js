@@ -1,13 +1,15 @@
 import {
   MENTEE_EMAIL, MENTEE_NAME, ADMIN_EMAIL,
-  NO_PROFILE_EMAIL, FEEDBACK_TEXT, FEEDBACK_RATING,
+  NEW_MENTEE_EMAIL, NEW_MENTEE_NAME, NEW_MENTEE_STATEMENT,
+  NEW_MENTOR_EMAIL, NEW_MENTOR_NAME, NEW_MENTOR_MOTIVATION,
+  FEEDBACK_TEXT, FEEDBACK_RATING,
 } from './fixtures.js'
 
 import {
   login, signOut, goToAdmin, findMentor,
   openMatchPanel, getPartnerName, closeAllPanels,
   openPickDetail, getOpenPanelCount,
-  submitFeedback, getFeedbackCount, getApplicationForm,
+  submitFeedback, getFeedbackCount, fillApplication,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
@@ -15,23 +17,44 @@ import {
 } from './helpers.js'
 
 export default async function runScenario(page) {
-  // ── Step 1: No-profile user sees application form ──
-  console.log('\n── Step 1: No-profile user sees application form ──')
-  await login(page, NO_PROFILE_EMAIL)
-  await getApplicationForm(page)
-  console.log('  Application form is shown')
+  // ── Step 1: New mentee applies ──
+  console.log('\n── Step 1: New mentee applies ──')
+  await login(page, NEW_MENTEE_EMAIL)
+  console.log('  Application form shown')
+  await fillApplication(page, { name: NEW_MENTEE_NAME, role: 'mentee', freeText: NEW_MENTEE_STATEMENT })
+  await page.waitForTimeout(2000)
+  const menteeWelcome = await page.textContent('.page-body h2')
+  console.log(`  Dashboard: "${menteeWelcome}"`)
+  if (!menteeWelcome.includes(NEW_MENTEE_NAME)) {
+    throw new Error(`Expected welcome for ${NEW_MENTEE_NAME}, got: ${menteeWelcome}`)
+  }
   await signOut(page)
   console.log('  Signed out.')
   await pause(page)
 
-  // ── Step 2: Mentee logs in ──
-  console.log('\n── Step 2: Mentee logs in ──')
+  // ── Step 2: New mentor applies ──
+  console.log('\n── Step 2: New mentor applies ──')
+  await login(page, NEW_MENTOR_EMAIL)
+  console.log('  Application form shown')
+  await fillApplication(page, { name: NEW_MENTOR_NAME, role: 'mentor', freeText: NEW_MENTOR_MOTIVATION })
+  await page.waitForTimeout(2000)
+  const mentorWelcome = await page.textContent('.page-body h2')
+  console.log(`  Dashboard: "${mentorWelcome}"`)
+  if (!mentorWelcome.includes(NEW_MENTOR_NAME)) {
+    throw new Error(`Expected welcome for ${NEW_MENTOR_NAME}, got: ${mentorWelcome}`)
+  }
+  await signOut(page)
+  console.log('  Signed out.')
+  await pause(page)
+
+  // ── Step 3: Mentee logs in ──
+  console.log('\n── Step 3: Mentee logs in ──')
   await login(page, MENTEE_EMAIL)
   console.log(`  Logged in as ${MENTEE_EMAIL}`)
   await pause(page)
 
-  // ── Step 3: Mentee requests a match ──
-  console.log('\n── Step 3: Mentee requests a match ──')
+  // ── Step 4: Mentee requests a match ──
+  console.log('\n── Step 4: Mentee requests a match ──')
   const matchMsg = await findMentor(page)
   console.log(`  Result: ${matchMsg}`)
   if (matchMsg.includes('No mentors')) {
@@ -39,8 +62,8 @@ export default async function runScenario(page) {
   }
   await pause(page)
 
-  // ── Step 4: Admin reviews the run ──
-  console.log('\n── Step 4: Admin reviews the run ──')
+  // ── Step 5: Admin reviews the run ──
+  console.log('\n── Step 5: Admin reviews the run ──')
   await signOut(page)
   await login(page, ADMIN_EMAIL)
   await goToAdmin(page)
@@ -61,8 +84,8 @@ export default async function runScenario(page) {
   console.log(`  Review result: ${reviewMsg}`)
   await pause(page, 1500)
 
-  // ── Step 5: Mentee compares mentors side by side, then picks ──
-  console.log('\n── Step 5: Mentee compares mentors side by side, then picks ──')
+  // ── Step 6: Mentee compares mentors side by side, then picks ──
+  console.log('\n── Step 6: Mentee compares mentors side by side, then picks ──')
   await signOut(page)
   await login(page, MENTEE_EMAIL)
   console.log('  Mentee sees approved candidates')
@@ -91,8 +114,8 @@ export default async function runScenario(page) {
   console.log(`  Selection result: ${selectMsg}`)
   await pause(page)
 
-  // ── Step 6: Mentee views match detail in panel ──
-  console.log('\n── Step 6: Mentee views match detail in panel ──')
+  // ── Step 7: Mentee views match detail in panel ──
+  console.log('\n── Step 7: Mentee views match detail in panel ──')
   await openMatchPanel(page)
   const partnerName = await getPartnerName(page)
   console.log(`  Matched with: ${partnerName}`)
@@ -112,8 +135,8 @@ export default async function runScenario(page) {
   console.log(`  Mentor email: ${matchInfo.mentorEmail}`)
   await closeAllPanels(page)
 
-  // ── Step 7: Mentor views the same match ──
-  console.log('\n── Step 7: Mentor views the same match ──')
+  // ── Step 8: Mentor views the same match ──
+  console.log('\n── Step 8: Mentor views the same match ──')
   await signOut(page)
   await login(page, matchInfo.mentorEmail)
   console.log(`  Logged in as mentor`)
@@ -125,8 +148,8 @@ export default async function runScenario(page) {
   await pause(page, 2000)
   await closeAllPanels(page)
 
-  // ── Step 8: Mentee submits feedback ──
-  console.log('\n── Step 8: Mentee submits feedback ──')
+  // ── Step 9: Mentee submits feedback ──
+  console.log('\n── Step 9: Mentee submits feedback ──')
   await signOut(page)
   await login(page, MENTEE_EMAIL)
   await openMatchPanel(page)
@@ -137,8 +160,8 @@ export default async function runScenario(page) {
   await pause(page, 2000)
   await closeAllPanels(page)
 
-  // ── Step 9: Admin inspects in Search tab ──
-  console.log('\n── Step 9: Admin inspects in Search tab ──')
+  // ── Step 10: Admin inspects in Search tab ──
+  console.log('\n── Step 10: Admin inspects in Search tab ──')
   await signOut(page)
   await login(page, ADMIN_EMAIL)
   await goToAdmin(page)

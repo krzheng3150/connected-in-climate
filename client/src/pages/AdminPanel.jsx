@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ProfileDetail } from '../components/ProfileFields.jsx'
 
-const TABS = ['Pending', 'Search', 'Feedback', 'Blocks']
+const TABS = ['Pending', 'Profiles', 'Search', 'Feedback', 'Blocks']
 
 export default function AdminPanel() {
   const { user } = useAuth()
@@ -32,6 +32,7 @@ export default function AdminPanel() {
 
       <main className="page-body" style={{ paddingTop: '1rem' }}>
         {tab === 'Pending' && <PendingTab headers={adminHeaders} />}
+        {tab === 'Profiles' && <ProfilesTab headers={adminHeaders} />}
         {tab === 'Search' && <SearchTab headers={adminHeaders} />}
         {tab === 'Feedback' && <FeedbackTab headers={adminHeaders} />}
         {tab === 'Blocks' && <BlocksTab headers={adminHeaders} />}
@@ -205,6 +206,91 @@ function RunReviewCard({ run, headers, onUpdate }) {
       </div>
 
       {resultMsg && <p className="feedback-msg" style={{ marginTop: '0.5rem' }}>{resultMsg}</p>}
+    </div>
+  )
+}
+
+// ── Profiles Tab ──────────────────────────────────────────────────
+
+function ProfilesTab({ headers }) {
+  const [profiles, setProfiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/applications', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          setProfiles(data.profiles)
+        } else {
+          setError('Failed to load profiles.')
+        }
+      } catch {
+        setError('Could not reach the server.')
+      }
+      setLoading(false)
+    })()
+  }, [])
+
+  if (loading) return <p className="placeholder-text">Loading profiles...</p>
+  if (error) return <p className="form-error">{error}</p>
+  if (profiles.length === 0) return <p className="placeholder-text">No profiles found.</p>
+
+  const allPayloadKeys = new Set()
+  for (const p of profiles) {
+    if (p.payload) {
+      for (const k of Object.keys(p.payload)) allPayloadKeys.add(k)
+    }
+  }
+  const payloadCols = [...allPayloadKeys].sort()
+
+  function formatCell(val) {
+    if (val == null || val === '') return ''
+    if (Array.isArray(val)) return val.join(', ')
+    if (typeof val === 'object') return JSON.stringify(val)
+    return String(val)
+  }
+
+  function formatDate(d) {
+    if (!d) return ''
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  return (
+    <div className="admin-section admin-table-section">
+      <h3>All Profiles ({profiles.length})</h3>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Role</th>
+              {payloadCols.map(k => <th key={k}>{k}</th>)}
+              <th>Embedding</th>
+              <th>Created</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {profiles.map(p => (
+              <tr key={p.email}>
+                <td>{p.email}</td>
+                <td>{p.name}</td>
+                <td><span className="role-badge">{p.role}</span></td>
+                {payloadCols.map(k => (
+                  <td key={k} title={formatCell(p.payload?.[k])}>{formatCell(p.payload?.[k])}</td>
+                ))}
+                <td>{p.has_embedding ? '✓' : '—'}</td>
+                <td>{formatDate(p.created_at)}</td>
+                <td>{formatDate(p.updated_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

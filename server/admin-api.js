@@ -22,6 +22,22 @@ async function requireAdmin(req, res, next) {
 
 router.use(requireAdmin)
 
+// ── GET /api/admin/applications ────────────────────────────────────
+// All profiles, raw, for the admin table view.
+
+router.get('/applications', async (_req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT email, name, role, payload, embedding IS NOT NULL AS has_embedding,
+              created_at, updated_at
+       FROM user_profiles ORDER BY created_at DESC`,
+    )
+    res.json({ profiles: result.rows })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ── GET /api/admin/profiles?email= ─────────────────────────────────
 
 router.get('/profiles', async (req, res, next) => {
