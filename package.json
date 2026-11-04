@@ -18,7 +18,8 @@
     "db:reset": "docker compose down -v && echo 'DB wiped. Run npm run go to start fresh.'",
     "test": "node --test server/field-registry.test.js server/matching.test.js",
     "test:api": "node --env-file=.env --test server/match-api.test.js && node --env-file=.env --test server/action-feedback-api.test.js && node --env-file=.env --test server/admin-api.test.js",
-    "test:all": "node --test server/field-registry.test.js server/matching.test.js && npm run test:api",
+    "test:email": "node --env-file=.env --test server/email.test.js",
+    "test:all": "node --test server/field-registry.test.js server/matching.test.js && npm run test:api && npm run test:email",
     "import": "node --env-file=.env scripts/import.js",
     "import:dry": "node --env-file=.env scripts/import.js --dry-run",
     "sheet:create": "node --env-file=.env scripts/create-sheet.js",
@@ -28,7 +29,8 @@
   "dependencies": {
     "express": "^4.21.0",
     "googleapis": "^189.0.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "resend": "^6.37.0"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

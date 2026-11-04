@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { pool } from './db.js'
+import { notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
 
 const router = Router()
 
@@ -168,6 +169,30 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
       )
 
       await client.query('COMMIT')
+
+      const menteeEmail = run.rows[0].mentee_email
+      if (runStatus === 'ACTIVE') {
+        const activeId = [...approvedSet][0]
+        const matchRow = await pool.query(
+          `SELECT m.mentor_email, mentor.name AS mentor_name, mentee.name AS mentee_name
+           FROM matches m
+           JOIN user_profiles mentor ON mentor.email = m.mentor_email
+           JOIN user_profiles mentee ON mentee.email = m.mentee_email
+           WHERE m.match_id = $1`,
+          [activeId],
+        )
+        if (matchRow.rows.length > 0) {
+          const { mentor_email, mentor_name, mentee_name } = matchRow.rows[0]
+          notifyMatchActive(mentor_email, mentor_name, menteeEmail, mentee_name)
+        }
+      } else if (runStatus === 'AWAITING_MENTEE') {
+        const menteeRow = await pool.query(
+          'SELECT name FROM user_profiles WHERE email = $1',
+          [menteeEmail],
+        )
+        const menteeName = menteeRow.rows[0]?.name || menteeEmail
+        notifyMenteeMatchesReady(menteeEmail, menteeName, approvedSet.size)
+      }
 
       res.json({
         run_status: runStatus,

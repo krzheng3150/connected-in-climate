@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { pool } from './db.js'
 import { rankMentors } from './matching.js'
 import { isMentee } from './roles.js'
+import { notifyAdminsNewRun, notifyMatchActive } from './email.js'
 
 const router = Router()
 
@@ -135,6 +136,11 @@ router.post('/run', async (req, res, next) => {
       }
 
       await client.query('COMMIT')
+
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
+      if (adminEmails.length > 0) {
+        notifyAdminsNewRun(adminEmails, menteeProfile.name, mentee.email)
+      }
 
       res.json({
         run: { run_id: runId, status: 'PENDING_REVIEW' },
@@ -394,6 +400,14 @@ router.post('/:match_id/select', async (req, res, next) => {
       )
 
       await client.query('COMMIT')
+
+      const names = await pool.query(
+        `SELECT email, name FROM user_profiles WHERE email IN ($1, $2)`,
+        [row.mentor_email, normalEmail],
+      )
+      const nameMap = Object.fromEntries(names.rows.map(r => [r.email, r.name]))
+      notifyMatchActive(row.mentor_email, nameMap[row.mentor_email] || row.mentor_email, normalEmail, nameMap[normalEmail] || normalEmail)
+
       res.json({ status: 'ACTIVE', match_id })
     } catch (err) {
       await client.query('ROLLBACK')

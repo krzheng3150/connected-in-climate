@@ -35,6 +35,9 @@ services:
       - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
         scope: RUN_TIME
         value: connected-in-climate-sheets@i-see-493001.iam.gserviceaccount.com
+      - key: RESEND_API_KEY
+        scope: RUN_TIME
+        type: SECRET
 databases:
   - name: db
     engine: PG
