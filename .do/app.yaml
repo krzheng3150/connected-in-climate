@@ -39,4 +39,3 @@ databases:
   - name: db
     engine: PG
     version: "16"
-    production: false # dev database; switch to a managed cluster before real traffic
