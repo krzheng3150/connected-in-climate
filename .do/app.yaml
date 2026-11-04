@@ -1,5 +1,8 @@
+# App spec for DigitalOcean App Platform.
+# Migration guide: docs/migration.md
+# Lines marked [INSTANCE-SPECIFIC] must change when moving to a new DO account.
 name: connected-in-climate
-region: tor
+region: tor # [INSTANCE-SPECIFIC] change to preferred region
 alerts:
   - rule: DEPLOYMENT_FAILED
   - rule: DOMAIN_FAILED
@@ -9,7 +12,7 @@ services:
   - name: connected-in-climate
     environment_slug: node-js
     github:
-      repo: krzheng3150/connected-in-climate
+      repo: krzheng3150/connected-in-climate # [INSTANCE-SPECIFIC] new owner/repo
       branch: main
       deploy_on_push: true
     run_command: npm start
@@ -25,23 +28,23 @@ services:
         value: production
       - key: DATABASE_URL
         scope: RUN_TIME
-        value: ${dev-db-900747.DATABASE_URL}
+        value: ${dev-db-900747.DATABASE_URL} # [INSTANCE-SPECIFIC] matches databases[0].name
       - key: ADMIN_EMAILS
         scope: RUN_TIME
-        value: krzheng3150@gmail.com,cohenca3@gmail.com
+        value: krzheng3150@gmail.com,cohenca3@gmail.com # [INSTANCE-SPECIFIC] new admin emails
       - key: OPENAI_API_KEY
         scope: RUN_TIME
-        type: SECRET
+        type: SECRET # set in DO console
       - key: GOOGLE_SERVICE_ACCOUNT_KEY
         scope: RUN_TIME
-        type: SECRET
+        type: SECRET # set in DO console — raw JSON of the service account key
       - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
         scope: RUN_TIME
-        value: connected-in-climate-sheets@i-see-493001.iam.gserviceaccount.com
+        value: connected-in-climate-sheets@i-see-493001.iam.gserviceaccount.com # [INSTANCE-SPECIFIC]
       - key: RESEND_API_KEY
         scope: RUN_TIME
-        type: SECRET
+        type: SECRET # set in DO console
 databases:
-  - name: dev-db-900747
+  - name: dev-db-900747 # [INSTANCE-SPECIFIC] DO auto-generates this name
     engine: PG
     version: "17"

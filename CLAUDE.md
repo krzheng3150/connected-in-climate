@@ -1,6 +1,6 @@
 # Connected in Climate
 
-Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) frontend, Express.js API, PostgreSQL 16 + pgvector. Deployed to DigitalOcean App Platform.
+Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) frontend, Express.js API, PostgreSQL 17 + pgvector. Deployed to DigitalOcean App Platform.
 
 - AI primer (algorithm, decisions, field propagation): `docs/primer.md`
 - Full design doc: `docs/design.md` | [Google Doc](https://docs.google.com/document/d/1n1yqMimYnSUDaC_lV49F4yo33U1V3lm_/edit)
@@ -20,6 +20,9 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 | Admin backend | `server/admin-api.js` |
 | Client routes | `client/src/App.jsx` |
 | E2E demo | `scripts/demo/` (`scenario.js` for the flow, `helpers.js` for page actions) |
+| Email notifications | `server/email.js` |
+| DO deploy & app spec | `.do/app.yaml` + `.github/workflows/deploy.yml` |
+| Migrating to a new DO instance | `docs/migration.md` |
 
 ## Conventions
 
