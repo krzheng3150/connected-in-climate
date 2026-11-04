@@ -58,8 +58,8 @@ async function setup() {
   console.log('Importing sample data...')
   run('node --env-file=.env scripts/import.js scripts/sample-profiles.csv')
 
-  console.log('Building client...')
-  run('npm run build', { stdio: 'pipe' })
+  console.log('Building client (test mode)...')
+  run('VITE_TEST_USER=1 npm run build', { stdio: 'pipe' })
 
   console.log('Killing any existing process on port 3000...')
   try { execSync('lsof -ti:3000 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' }) } catch { /* nothing to kill */ }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useUser as useClerkUser, useAuth as useClerkAuth } from '@clerk/react'
 
+const TEST_USER = import.meta.env.VITE_TEST_USER
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
@@ -14,18 +15,17 @@ export function AuthProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      const token = await getToken()
-      if (!token) {
-        setProfile(null)
-        setLoading(false)
-        return
+      const headers = { 'Content-Type': 'application/json' }
+      if (!TEST_USER) {
+        const token = await getToken()
+        if (!token) {
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+        headers['Authorization'] = `Bearer ${token}`
       }
-      const res = await fetch(`/api/profiles/me`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      })
+      const res = await fetch(`/api/profiles/me`, { headers })
       if (res.status === 401) {
         setProfile(null)
         setLoading(false)
@@ -46,6 +46,10 @@ export function AuthProvider({ children }) {
   }, [getToken])
 
   useEffect(() => {
+    if (TEST_USER) {
+      fetchProfile()
+      return
+    }
     if (!authLoaded || !userLoaded) return
     if (!isSignedIn) {
       setProfile(null)
@@ -59,7 +63,7 @@ export function AuthProvider({ children }) {
   const hasProfile = profile?.has_profile !== false
 
   return (
-    <AuthContext.Provider value={{ user, hasProfile, loading, error, isSignedIn }}>
+    <AuthContext.Provider value={{ user, hasProfile, loading, error, isSignedIn: TEST_USER ? !!profile : isSignedIn }}>
       {children}
     </AuthContext.Provider>
   )

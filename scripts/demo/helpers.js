@@ -2,17 +2,27 @@ import { BASE_URL } from './fixtures.js'
 
 // ── Navigation ─────────────────────────────────────────────────────
 
+let activeRouteHandler = null
+
 export async function login(page, email) {
-  await page.goto(BASE_URL)
-  await page.fill('input[type="email"]', email)
-  await page.click('button[type="submit"]')
-  await page.waitForURL('**/dashboard')
+  if (activeRouteHandler) {
+    await page.unroute('**/api/**', activeRouteHandler)
+  }
+  activeRouteHandler = (route) => {
+    const headers = { ...route.request().headers(), 'x-user-email': email }
+    route.continue({ headers })
+  }
+  await page.route('**/api/**', activeRouteHandler)
+  await page.goto(BASE_URL + '/dashboard')
+  await page.waitForSelector('.page-header, .page-body', { timeout: 10000 })
 }
 
 export async function signOut(page) {
-  await page.goto(BASE_URL + '/dashboard')
-  await page.click('button:has-text("Sign out")')
-  await page.waitForURL(BASE_URL + '/')
+  if (activeRouteHandler) {
+    await page.unroute('**/api/**', activeRouteHandler)
+    activeRouteHandler = null
+  }
+  await page.goto(BASE_URL + '/')
 }
 
 export async function goToAdmin(page) {
