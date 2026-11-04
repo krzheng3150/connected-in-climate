@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  APP_URL: https://connected-in-climate-n42zu.ondigitalocean.app
+
 jobs:
   deploy-app:
     runs-on: ubuntu-latest
@@ -19,3 +22,24 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           print_build_logs: true
+
+      - name: Wait for app to stabilize
+        run: sleep 15
+
+      - name: Smoke test — health check
+        run: |
+          status=$(curl -sf "$APP_URL/api/health" | jq -r '.ok')
+          if [ "$status" != "true" ]; then
+            echo "Health check failed"
+            exit 1
+          fi
+          echo "Health check passed"
+
+      - name: Smoke test — admin email recognition
+        run: |
+          is_admin=$(curl -sf "$APP_URL/api/profiles/me?email=krzheng3150@gmail.com" | jq -r '.is_admin')
+          if [ "$is_admin" != "true" ]; then
+            echo "Admin email not recognized"
+            exit 1
+          fi
+          echo "Admin email recognized"
