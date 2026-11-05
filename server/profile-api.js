@@ -160,8 +160,13 @@ function validateProfile(body) {
 
 function buildEmbedding(role, payload) {
   const embeddingText = isMentee(role) ? payload.statement_of_intent : payload.motivation
-  const embedding = computeSingleEmbedding(embeddingText)
-  return embedding ? `[${embedding.join(',')}]` : null
+  try {
+    const embedding = computeSingleEmbedding(embeddingText)
+    return embedding ? `[${embedding.join(',')}]` : null
+  } catch (err) {
+    console.error(`[profile] embedding failed for role=${role}:`, err.message || err)
+    return null
+  }
 }
 
 // ── POST /api/profiles ────────────────────────────────────────────
