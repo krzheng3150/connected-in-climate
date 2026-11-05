@@ -129,17 +129,34 @@ export default function MatchDetailPanel({ matchId, onClose }) {
 
       <ProfileDetail
         payload={p}
-        exclude={['preferred_name', 'pronouns', 'location', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url']}
+        exclude={['preferred_name', 'pronouns', 'location', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url', 'scheduling_link']}
       />
 
       <div className="partner-section">
         <h3>Contact</h3>
+        {p.scheduling_link && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <a
+              className="btn-primary"
+              href={p.scheduling_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => handleContactClick('scheduling_link', p.scheduling_link)}
+              style={{ display: 'inline-block', textDecoration: 'none' }}
+            >
+              Book a Meeting
+            </a>
+          </div>
+        )}
         <div className="contact-links">
           <ContactLink type="email" value={p.email} onClick={handleContactClick} />
           {p.links && Object.entries(p.links).map(([type, value]) => (
             <ContactLink key={type} type={type} value={value} onClick={handleContactClick} />
           ))}
         </div>
+        <p className="placeholder-text" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
+          Tip: Add each session to your calendar and turn on reminders to make sure you don't miss it.
+        </p>
       </div>
 
       {match.status === 'APPROVED' && (

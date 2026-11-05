@@ -52,6 +52,7 @@ const FIELD_NAMES = {
   motivation: 'About',
   statement_of_intent: 'Statement of Intent',
   fun_fact: 'Fun Fact',
+  scheduling_link: 'Scheduling Link',
   links: 'Contact',
 }
 
@@ -79,7 +80,7 @@ const FIELD_ORDER = [
   'top_strengths', 'general_topics', 'top_topics',
   'certifications', 'interests_hobbies',
   'motivation', 'statement_of_intent', 'fun_fact',
-  'links',
+  'scheduling_link', 'links',
 ]
 
 export function ProfileDetail({ payload, exclude = [] }) {

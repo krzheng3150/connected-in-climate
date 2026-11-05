@@ -26,7 +26,7 @@ const ENUM_FIELD_MAP = {
 }
 
 const FREE_TEXT_FIELDS = new Set([
-  'preferred_name', 'pronouns', 'location', 'organization', 'timezone',
+  'preferred_name', 'pronouns', 'location', 'organization', 'timezone', 'scheduling_link',
   'motivation', 'statement_of_intent', 'fun_fact',
 ])
 

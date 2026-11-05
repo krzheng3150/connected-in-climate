@@ -291,6 +291,12 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         <label>LinkedIn URL</label>
         <input type="url" value={form.links?.linkedin || ''} onChange={e => set('links', { ...form.links, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." />
       </div>
+      {isMentor(form.role) && (
+        <div className="form-group">
+          <label>Scheduling Link</label>
+          <input type="url" value={form.scheduling_link || ''} onChange={e => set('scheduling_link', e.target.value)} placeholder="e.g. https://calendly.com/yourname" />
+        </div>
+      )}
       {errorsForStep(3).map((msg, i) => <p key={i} className="form-error">{msg}</p>)}
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions">
