@@ -193,6 +193,7 @@ router.post('/', async (req, res, next) => {
       [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload)],
     )
 
+    console.log(`[profile] created: email=${email} role=${role} name="${name}"`)
     res.status(201).json({ ok: true })
   } catch (err) {
     next(err)
@@ -224,6 +225,7 @@ router.patch('/', async (req, res, next) => {
       [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload)],
     )
 
+    console.log(`[profile] updated: email=${email} role=${role} name="${name}"`)
     res.json({ ok: true })
   } catch (err) {
     next(err)

@@ -211,6 +211,7 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
         notifyMenteeMatchesReady(menteeEmail, menteeName, approvedSet.size)
       }
 
+      console.log(`[admin] review: run_id=${run_id} admin=${req.adminEmail} approved=${approvedSet.size} rejected=${candidateIds.size - approvedSet.size} status=${runStatus}`)
       res.json({
         run_status: runStatus,
         approved_count: approvedSet.size,
@@ -218,6 +219,7 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
       })
     } catch (err) {
       await client.query('ROLLBACK')
+      console.error(`[admin] review failed: run_id=${run_id} admin=${req.adminEmail}`, err.message)
       throw err
     } finally {
       client.release()
@@ -359,6 +361,7 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
       }
 
       await client.query('COMMIT')
+      console.log(`[admin] reject: match_id=${match_id} admin=${req.adminEmail} block=${!!block}`)
       res.json({ status: 'REJECTED', block_created: !!block, block_id: blockId })
     } catch (err) {
       await client.query('ROLLBACK')
@@ -425,6 +428,7 @@ router.post('/blocks', async (req, res, next) => {
       [mentor_email.toLowerCase().trim(), mentee_email.toLowerCase().trim(), reason || null, req.adminEmail],
     )
 
+    console.log(`[admin] block created: mentor=${mentor_email} mentee=${mentee_email} by=${req.adminEmail}`)
     res.status(201).json({
       block_id: result.rows[0].id,
       created_at: result.rows[0].created_at,
@@ -445,6 +449,7 @@ router.delete('/blocks/:id', async (req, res, next) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'block not found' })
     }
+    console.log(`[admin] block deleted: id=${req.params.id} by=${req.adminEmail}`)
     res.json({ deleted: true })
   } catch (err) {
     next(err)

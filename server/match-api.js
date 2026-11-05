@@ -142,6 +142,7 @@ router.post('/run', async (req, res, next) => {
         notifyAdminsNewRun(adminEmails, menteeProfile.name, mentee.email)
       }
 
+      console.log(`[match] run created: mentee=${mentee.email} run_id=${runId} candidates=${candidateCount} total_scored=${finalResults.length}`)
       res.json({
         run: { run_id: runId, status: 'PENDING_REVIEW' },
         message: `${candidateCount} mentor candidates are now pending admin review.`,
@@ -408,6 +409,7 @@ router.post('/:match_id/select', async (req, res, next) => {
       const nameMap = Object.fromEntries(names.rows.map(r => [r.email, r.name]))
       notifyMatchActive(row.mentor_email, nameMap[row.mentor_email] || row.mentor_email, normalEmail, nameMap[normalEmail] || normalEmail)
 
+      console.log(`[match] mentee selected: match_id=${match_id} mentee=${normalEmail} mentor=${row.mentor_email}`)
       res.json({ status: 'ACTIVE', match_id })
     } catch (err) {
       await client.query('ROLLBACK')
