@@ -57,12 +57,22 @@ export async function fillApplication(page, { name, role, freeText }) {
   await reactClick(page, '.btn-primary')
   await page.waitForSelector('input[placeholder="Your full name"]', { timeout: 5000 })
 
-  // Step 1: basic info — fill name, select career_level
+  // Step 1: basic info — fill name, reveal each dropdown, select career_level
   await page.fill('input[placeholder="Your full name"]', name)
   await page.waitForTimeout(1000)
-  const careerSelect = await page.$('.form-group select')
-  await careerSelect.selectOption({ index: 1 })
-  await page.waitForTimeout(1500)
+  const selects = await page.$$('.form-group select')
+  for (let i = 0; i < selects.length; i++) {
+    await selects[i].click()
+    await page.waitForTimeout(1500)
+    if (i === 0) {
+      await selects[i].selectOption({ index: 1 })
+      await page.waitForTimeout(500)
+    } else {
+      await page.keyboard.press('Escape')
+    }
+    await page.waitForTimeout(300)
+  }
+  await page.waitForTimeout(1000)
   await reactClickNth(page, '.form-actions button', 1)
   await page.waitForSelector('.checkbox-grid', { timeout: 5000 })
 

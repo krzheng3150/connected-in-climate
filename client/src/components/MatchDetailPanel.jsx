@@ -132,16 +132,15 @@ export default function MatchDetailPanel({ matchId, onClose }) {
         exclude={['preferred_name', 'pronouns', 'location', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url']}
       />
 
-      {p.links && Object.keys(p.links).length > 0 && (
-        <div className="partner-section">
-          <h3>Contact</h3>
-          <div className="contact-links">
-            {Object.entries(p.links).map(([type, value]) => (
-              <ContactLink key={type} type={type} value={value} onClick={handleContactClick} />
-            ))}
-          </div>
+      <div className="partner-section">
+        <h3>Contact</h3>
+        <div className="contact-links">
+          <ContactLink type="email" value={p.email} onClick={handleContactClick} />
+          {p.links && Object.entries(p.links).map(([type, value]) => (
+            <ContactLink key={type} type={type} value={value} onClick={handleContactClick} />
+          ))}
         </div>
-      )}
+      </div>
 
       {match.status === 'APPROVED' && (
         <p className="placeholder-text" style={{ marginTop: '1rem' }}>
