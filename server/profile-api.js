@@ -103,7 +103,13 @@ function validateProfile(body) {
 
     if (key === 'links' && typeof val === 'object' && !Array.isArray(val)) {
       for (const [k, v] of Object.entries(val)) {
-        if (v && String(v).trim()) links[k] = String(v).trim()
+        const url = String(v).trim()
+        if (!url) continue
+        if (!/^https?:\/\//i.test(url)) {
+          errors.push({ field: 'links', message: `Invalid URL for ${k}: must start with http:// or https://` })
+          continue
+        }
+        links[k] = url
       }
       continue
     }

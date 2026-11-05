@@ -184,6 +184,32 @@ describe('POST /api/profiles', () => {
     assert.equal(row.payload.links.linkedin, 'https://linkedin.com/in/test')
   })
 
+  it('rejects javascript: URL in links', async () => {
+    const { status, data } = await post({
+      ...VALID_MENTEE,
+      links: { linkedin: 'javascript:alert(1)' },
+    })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'links'))
+  })
+
+  it('rejects data: URL in links', async () => {
+    const { status, data } = await post({
+      ...VALID_MENTEE,
+      links: { linkedin: 'data:text/html,<script>alert(1)</script>' },
+    })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'links'))
+  })
+
+  it('accepts http:// URL in links', async () => {
+    const { status } = await post({
+      ...VALID_MENTEE,
+      links: { linkedin: 'http://linkedin.com/in/test' },
+    })
+    assert.equal(status, 201)
+  })
+
   it('rejects missing career_level', async () => {
     const { status, data } = await post({ name: 'No Level', role: 'mentee', statement_of_intent: 'Goals.', climate_areas: ['ai_climate'], career_areas: ['consulting'] })
     assert.equal(status, 400)
