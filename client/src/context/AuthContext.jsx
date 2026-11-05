@@ -39,7 +39,8 @@ export function AuthProvider({ children }) {
       }
       const data = await res.json()
       setProfile(data)
-    } catch {
+    } catch (err) {
+      console.error('[auth] profile fetch failed:', err)
       setError('Could not reach the server.')
     } finally {
       hasLoaded.current = true

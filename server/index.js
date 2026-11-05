@@ -27,8 +27,13 @@ app.use((req, res, next) => {
 })
 
 app.get('/api/health', async (_req, res) => {
-  await pool.query('SELECT 1')
-  res.json({ ok: true })
+  try {
+    await pool.query('SELECT 1')
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[health] DB check failed:', err.message)
+    res.status(503).json({ ok: false, error: 'database unavailable' })
+  }
 })
 
 app.use(clerkMiddleware())

@@ -14,8 +14,8 @@ export async function getAuthEmail(req) {
       )
       return primary?.emailAddress || null
     }
-  } catch {
-    // clerkMiddleware not applied (e.g., tests) — fall through to header
+  } catch (err) {
+    console.error('[auth] Clerk lookup failed:', err.message || err)
   }
   if (process.env.NODE_ENV !== 'production') {
     const header = req.headers['x-user-email']
