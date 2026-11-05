@@ -34,6 +34,16 @@ const ARRAY_FREE_TEXT_FIELDS = new Set([
   'certifications', 'interests_hobbies', 'locations_open_to',
 ])
 
+const MAX_TEXT_LENGTH = {
+  statement_of_intent: 2000,
+  motivation: 2000,
+  fun_fact: 500,
+  preferred_name: 200,
+  pronouns: 100,
+  location: 200,
+  organization: 200,
+}
+
 // ── TF-IDF (same algorithm as import.js) ─────────────────────────
 
 function tokenize(text) {
@@ -127,10 +137,16 @@ function validateProfile(body) {
       if (FIELDS[registryField]) {
         const { values, warnings } = normalizeArray(registryField, items)
         for (const w of warnings) errors.push({ field: key, message: `Invalid value for ${key}: "${w.value}"` })
-        if (values.length) payload[key] = values
+        if (values.length) payload[key] = [...new Set(values)]
       }
     } else if (FREE_TEXT_FIELDS.has(key)) {
-      payload[key] = String(val).trim()
+      const text = String(val).trim()
+      const max = MAX_TEXT_LENGTH[key] || 1000
+      if (text.length > max) {
+        errors.push({ field: key, message: `${key} must be ${max} characters or fewer.` })
+        continue
+      }
+      payload[key] = text
     } else if (ARRAY_FREE_TEXT_FIELDS.has(key)) {
       const items = Array.isArray(val) ? val : String(val).split(/[|\n;]/).map(s => s.trim()).filter(Boolean)
       if (items.length) payload[key] = items

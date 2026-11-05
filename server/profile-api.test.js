@@ -210,6 +210,33 @@ describe('POST /api/profiles', () => {
     assert.equal(status, 201)
   })
 
+  it('rejects text exceeding max length', async () => {
+    const { status, data } = await post({
+      ...VALID_MENTEE,
+      motivation: 'x'.repeat(2001),
+      statement_of_intent: 'x'.repeat(2001),
+    })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'statement_of_intent'))
+  })
+
+  it('accepts text at max length', async () => {
+    const { status } = await post({
+      ...VALID_MENTEE,
+      statement_of_intent: 'x'.repeat(2000),
+    })
+    assert.equal(status, 201)
+  })
+
+  it('deduplicates array values', async () => {
+    await post({
+      ...VALID_MENTEE,
+      career_areas: ['consulting', 'consulting', 'engineering'],
+    })
+    const row = await getProfile('new@test.com')
+    assert.deepEqual(row.payload.career_areas, ['consulting', 'engineering'])
+  })
+
   it('rejects missing career_level', async () => {
     const { status, data } = await post({ name: 'No Level', role: 'mentee', statement_of_intent: 'Goals.', climate_areas: ['ai_climate'], career_areas: ['consulting'] })
     assert.equal(status, 400)
