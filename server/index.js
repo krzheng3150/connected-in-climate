@@ -17,6 +17,15 @@ const clientDist = path.join(path.dirname(fileURLToPath(import.meta.url)), '../c
 
 app.use(express.json())
 
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const ms = Date.now() - start
+    console.log(`[req] ${req.method} ${req.path} ${res.statusCode} ${ms}ms`)
+  })
+  next()
+})
+
 app.get('/api/health', async (_req, res) => {
   await pool.query('SELECT 1')
   res.json({ ok: true })
@@ -81,8 +90,8 @@ app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }))
 app.use(express.static(clientDist))
 app.use((_req, res) => res.sendFile(path.join(clientDist, 'index.html')))
 
-app.use((err, _req, res, _next) => {
-  console.error(err)
+app.use((err, req, res, _next) => {
+  console.error(`[error] ${req.method} ${req.path} user=${req.headers['x-user-email'] || 'unknown'}`, err)
   res.status(500).json({ error: 'internal error' })
 })
 
