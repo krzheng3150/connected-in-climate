@@ -65,7 +65,7 @@ router.get('/pending', async (_req, res, next) => {
   try {
     const runs = await pool.query(
       `SELECT r.run_id, r.mentee_email, r.status, r.top_candidates, r.total_scored,
-              r.created_at, p.name AS mentee_name
+              r.created_at, p.name AS mentee_name, p.payload AS mentee_payload
        FROM match_runs r
        JOIN user_profiles p ON p.email = r.mentee_email
        WHERE r.status = 'PENDING_REVIEW'
@@ -77,7 +77,7 @@ router.get('/pending', async (_req, res, next) => {
       const matches = await pool.query(
         `SELECT m.match_id, m.mentor_email, m.status, m.final_score, m.rank,
                 m.computation_payload, m.created_at,
-                mentor.name AS mentor_name
+                mentor.name AS mentor_name, mentor.payload AS mentor_payload
          FROM matches m
          JOIN user_profiles mentor ON mentor.email = m.mentor_email
          WHERE m.run_id = $1 AND m.status = 'CANDIDATE'
@@ -89,6 +89,7 @@ router.get('/pending', async (_req, res, next) => {
         run_id: run.run_id,
         mentee_email: run.mentee_email,
         mentee_name: run.mentee_name,
+        mentee_payload: run.mentee_payload,
         status: run.status,
         top_candidates: run.top_candidates,
         total_scored: run.total_scored,
@@ -97,6 +98,7 @@ router.get('/pending', async (_req, res, next) => {
           match_id: m.match_id,
           mentor_email: m.mentor_email,
           mentor_name: m.mentor_name,
+          mentor_payload: m.mentor_payload,
           status: m.status,
           final_score: parseFloat(m.final_score),
           rank: m.rank,

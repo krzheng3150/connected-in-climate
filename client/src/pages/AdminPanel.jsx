@@ -100,6 +100,17 @@ function RunReviewCard({ run, headers, onUpdate }) {
   const [submitting, setSubmitting] = useState(false)
   const [resultMsg, setResultMsg] = useState(null)
   const [expandedScores, setExpandedScores] = useState(new Set())
+  const [expandedProfiles, setExpandedProfiles] = useState(new Set())
+  const [showMentee, setShowMentee] = useState(false)
+
+  function toggleProfile(matchId) {
+    setExpandedProfiles(prev => {
+      const next = new Set(prev)
+      if (next.has(matchId)) next.delete(matchId)
+      else next.add(matchId)
+      return next
+    })
+  }
 
   function toggleCandidate(matchId) {
     setSelected(prev => {
@@ -159,6 +170,12 @@ function RunReviewCard({ run, headers, onUpdate }) {
           {run.mentee_email} &middot; {date} &middot; {run.candidates.length} candidates / {run.total_scored} scored
         </span>
       </div>
+      <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>
+        <button className="btn-link" onClick={() => setShowMentee(!showMentee)}>
+          {showMentee ? 'Hide mentee profile' : 'Show mentee profile'}
+        </button>
+      </div>
+      {showMentee && <ProfileDetail payload={run.mentee_payload} />}
 
       <div style={{ marginTop: '0.75rem' }}>
         {run.candidates.map(m => {
@@ -183,10 +200,18 @@ function RunReviewCard({ run, headers, onUpdate }) {
                 <button className="btn-link" onClick={() => toggleScores(m.match_id)}>
                   {showScores ? 'Hide scores' : 'Show scores'}
                 </button>
+                <button className="btn-link" onClick={() => toggleProfile(m.match_id)}>
+                  {expandedProfiles.has(m.match_id) ? 'Hide mentor profile' : 'Show mentor profile'}
+                </button>
               </div>
               {showScores && m.computation_payload && (
                 <div style={{ marginLeft: '1.5rem' }}>
                   <ScoreBreakdown payload={m.computation_payload} />
+                </div>
+              )}
+              {expandedProfiles.has(m.match_id) && (
+                <div style={{ marginLeft: '1.5rem' }}>
+                  <ProfileDetail payload={m.mentor_payload} />
                 </div>
               )}
             </div>
