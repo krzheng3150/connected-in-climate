@@ -11,7 +11,7 @@ A mentor/mentee matching platform for climate tech. A mentee clicks "Find a Ment
 1. **Eligibility filter** — hard gates: no self-match, mentor has capacity (only ACTIVE matches count against capacity), no in-progress duplicate (ACTIVE/CANDIDATE/APPROVED), not on block list.
 2. **Categorical scoring** — weighted Jaccard overlap on three axes (horizontal career areas, vertical climate areas, sectors). Mentee sets weights 1–5 per axis.
 3. **Topic alignment** — rank-discounted match of mentee's priority topics against mentor's top strengths (1.0) and general topics (0.6). Normalized by H(N) so score is [0,1] for any topic count.
-4. **Semantic similarity** — cosine similarity of TF-IDF embeddings (mentee statement of intent vs mentor motivation). Computed at import, not at match time.
+4. **Semantic similarity** — cosine similarity of TF-IDF embeddings (mentee statement of intent vs mentor motivation). Computed at import and at profile creation/edit, not at match time.
 5. **Final synthesis** — weighted blend: 0.40 categorical + 0.30 topic + 0.15 semantic + 0.15 experience. With geo enabled: 0.35/0.25/0.15/0.15/0.10. Reliability multiplier defaults to 1.0 (future: feedback-derived).
 
 ## Key design decisions
@@ -21,7 +21,7 @@ A mentor/mentee matching platform for climate tech. A mentee clicks "Find a Ment
 - **Block list ≠ rejection.** `rejections` table is a block list (prevents future matching). Rejecting a match does NOT auto-block — admin decides separately.
 - **Multi-match review pipeline.** Algorithm scores all mentors, top N (default 5) become `CANDIDATE` for admin review, rest `STORED`. Admin batch-reviews the run: selects which to approve, rest rejected. If exactly 1 approved → auto-activates. If 2–3 approved → mentee picks. If 0 approved → run cancelled.
 - **JSONB for dynamic fields.** Stable columns for queries (`email`, `name`, `role`); everything else in `payload`. No schema migrations for new profile fields.
-- **Email-based auth** for the pilot. Admin gated by `ADMIN_EMAILS` env var.
+- **Clerk auth.** Social login (Google, LinkedIn, Microsoft) via Clerk. Admin gated by `ADMIN_EMAILS` env var. Users without a profile see a self-service application form.
 
 ## Run status lifecycle
 
@@ -50,10 +50,10 @@ Mentee cannot re-run matching while any run is PENDING_REVIEW, AWAITING_MENTEE, 
 
 ## Profile field propagation
 
-New field → `server/field-registry.js` → `scripts/import.js` → `client/src/components/ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `scripts/sample-profiles.csv`
+New field → `server/field-registry.js` → `scripts/import.js` → `client/src/components/ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `client/src/components/ApplicationForm.jsx` → `server/profile-api.js` (field set) → `scripts/sample-profiles.csv`
 
 ## Milestones
 
-- **P1 (pilot):** Import, matching, email-based views, feedback, admin panel, action tracking. Magic-link auth is stretch.
-- **P2:** OAuth login, role assignment, quick-links for scheduling.
+- **P1 (pilot):** ✅ Import, matching, feedback, admin panel, action tracking, Clerk OAuth login, self-service application form, profile editing, email notifications.
+- **P2:** Quick-links for scheduling, enhanced admin analytics.
 - **P3:** Payments, incentives, AI feedback evaluation, AI application gateway.

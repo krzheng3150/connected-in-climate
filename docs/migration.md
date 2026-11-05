@@ -33,27 +33,21 @@ Values you do NOT need to change: `engine`, `version`, `http_port`, `instance_si
 3. DO will detect the app spec and create the app with a dev database
 4. Note the auto-generated **database name** (e.g., `dev-db-XXXXXX`) — update `app.yaml` as described in step 1
 
-## Step 3: Set Secrets in the DO Console
+## Step 3: Set GitHub Actions Secrets
 
-These cannot be set via the app spec file — they must be entered manually:
+The deploy workflow injects secrets into the app spec at deploy time. Go to **github.com → your repo → Settings → Secrets and variables → Actions** and add these repository secrets:
 
 | Secret | Where to get it |
 |--------|----------------|
-| `OPENAI_API_KEY` | platform.openai.com → API Keys (not currently used for matching — TF-IDF is local — but referenced in the spec) |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | Google Cloud Console → IAM → Service Accounts → Keys → Create Key (JSON). Paste the raw JSON as the value. |
-| `RESEND_API_KEY` | resend.com → API Keys. Also verify/add the sending domain. |
+| `DIGITALOCEAN_ACCESS_TOKEN` | DigitalOcean → API → Tokens (Full Access) |
 | `CLERK_SECRET_KEY` | clerk.com → your app → API Keys → Secret Key |
+| `RESEND_API_KEY` | resend.com → API Keys. Also verify/add the sending domain. |
+| `OPENAI_API_KEY` | platform.openai.com → API Keys (not currently used for matching — TF-IDF is local — but referenced in the spec) |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Google Cloud Console → IAM → Service Accounts → Keys → Create Key (JSON). Paste the raw JSON. |
 
-Set these at: **Apps → your app → Settings → web component → Environment Variables**
+These are NOT set in the DO console — the workflow handles injection automatically.
 
-## Step 4: Set GitHub Actions Secret
-
-The deploy workflow needs a DO API token:
-
-1. Go to **github.com → your repo → Settings → Secrets and variables → Actions**
-2. Add a repository secret: `DIGITALOCEAN_ACCESS_TOKEN` = your DO API token from the prerequisites
-
-## Step 5: Migrate the Database (if needed)
+## Step 4: Migrate the Database (if needed)
 
 Skip this if starting fresh with no existing profiles/matches.
 
@@ -80,24 +74,25 @@ Or re-import from your Google Sheet / CSV:
 DATABASE_URL="$NEW_DATABASE_URL" node --env-file=.env scripts/import.js <source>
 ```
 
-## Step 6: Deploy and Verify
+## Step 5: Deploy and Verify
 
 Push to `main` (or re-run the workflow). The deploy workflow will:
-1. Sync the app spec to DO
-2. Build and deploy the app
-3. Run smoke tests (health check + admin email recognition)
+1. Inject secrets from GH Actions into the app spec
+2. Sync the app spec and deploy the app
+3. Run smoke tests (health check + frontend load)
 
 Manual verification:
 ```bash
 # Health check
 curl -sf "https://YOUR_APP.ondigitalocean.app/api/health"
+# Should return {"ok": true}
 
-# Admin access
-curl -sf "https://YOUR_APP.ondigitalocean.app/api/profiles/me?email=YOUR_ADMIN_EMAIL"
-# Should return {"is_admin": true, ...}
+# Frontend
+curl -sf -o /dev/null -w '%{http_code}' "https://YOUR_APP.ondigitalocean.app/"
+# Should return 200
 ```
 
-## Step 7: Google Sheets (if used)
+## Step 6: Google Sheets (if used)
 
 If using Google Sheets for profile import:
 1. Create a new Google Cloud service account (or share the existing one with the new team)
@@ -106,13 +101,11 @@ If using Google Sheets for profile import:
 
 ## Checklist
 
-- [ ] App spec updated with new repo, DB name, admin emails, service account
+- [ ] App spec updated with new repo, DB name, admin emails, Clerk publishable keys, service account email
 - [ ] App created on DO App Platform
-- [ ] Secrets set in DO console (OPENAI_API_KEY, GOOGLE_SERVICE_ACCOUNT_KEY, RESEND_API_KEY, CLERK_SECRET_KEY)
-- [ ] Clerk publishable keys updated in app.yaml (CLERK_PUBLISHABLE_KEY + VITE_CLERK_PUBLISHABLE_KEY)
-- [ ] `DIGITALOCEAN_ACCESS_TOKEN` set in GitHub repo secrets
+- [ ] GitHub Actions secrets set (DIGITALOCEAN_ACCESS_TOKEN, CLERK_SECRET_KEY, RESEND_API_KEY, OPENAI_API_KEY, GOOGLE_SERVICE_ACCOUNT_KEY)
 - [ ] Database migrated (or profiles re-imported)
 - [ ] Deploy succeeded
-- [ ] Smoke tests pass (health + admin email)
+- [ ] Smoke tests pass (health check + frontend load)
 - [ ] Google Sheet shared with service account (if applicable)
 - [ ] Resend sending domain verified for the new account
