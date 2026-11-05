@@ -4,6 +4,7 @@ import { pool } from './db.js'
 import { rankMentors } from './matching.js'
 import { isMentee } from './roles.js'
 import { notifyAdminsNewRun, notifyMatchActive } from './email.js'
+import { createMatchResources } from './resources.js'
 
 const router = Router()
 
@@ -283,7 +284,7 @@ router.get('/:match_id', async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
-              m.rank, m.created_at,
+              m.rank, m.created_at, m.resources_folder_url,
               mentor.name AS mentor_name, mentor.payload AS mentor_payload,
               mentee.name AS mentee_name, mentee.payload AS mentee_payload
        FROM matches m
@@ -342,7 +343,9 @@ router.get('/:match_id', async (req, res, next) => {
         sectors: partnerPayload?.sectors,
         motivation: partnerPayload?.motivation,
         statement_of_intent: partnerPayload?.statement_of_intent,
+        scheduling_link: partnerPayload?.scheduling_link,
       },
+      resources_folder_url: row.resources_folder_url,
     })
   } catch (err) {
     next(err)
@@ -412,6 +415,19 @@ router.post('/:match_id/select', async (req, res, next) => {
       notifyMatchActive(row.mentor_email, nameMap[row.mentor_email] || row.mentor_email, normalEmail, nameMap[normalEmail] || normalEmail)
 
       console.log(`[match] mentee selected: match_id=${match_id} mentee=${normalEmail} mentor=${row.mentor_email}`)
+
+      createMatchResources({
+        mentorEmail: row.mentor_email,
+        mentorName: nameMap[row.mentor_email] || row.mentor_email,
+        menteeEmail: normalEmail,
+        menteeName: nameMap[normalEmail] || normalEmail,
+        matchDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      }).then(async (folderUrl) => {
+        if (folderUrl) {
+          await pool.query('UPDATE matches SET resources_folder_url = $1 WHERE match_id = $2', [folderUrl, match_id])
+        }
+      }).catch(err => console.error('[resources] creation failed:', err.message))
+
       res.json({ status: 'ACTIVE', match_id })
     } catch (err) {
       await client.query('ROLLBACK')

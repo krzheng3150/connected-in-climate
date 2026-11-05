@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS resources_folder_url TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_matches_mentee ON matches(mentee_email, status);
 CREATE INDEX IF NOT EXISTS idx_matches_mentor ON matches(mentor_email, status);
 CREATE INDEX IF NOT EXISTS idx_matches_run ON matches(run_id, status);

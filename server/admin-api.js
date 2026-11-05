@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from './db.js'
 import { getAuthEmail } from './auth.js'
 import { notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
+import { createMatchResources } from './resources.js'
 
 const router = Router()
 
@@ -203,6 +204,18 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
         if (matchRow.rows.length > 0) {
           const { mentor_email, mentor_name, mentee_name } = matchRow.rows[0]
           notifyMatchActive(mentor_email, mentor_name, menteeEmail, mentee_name)
+
+          createMatchResources({
+            mentorEmail: mentor_email,
+            mentorName: mentor_name,
+            menteeEmail,
+            menteeName: mentee_name,
+            matchDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          }).then(async (folderUrl) => {
+            if (folderUrl) {
+              await pool.query('UPDATE matches SET resources_folder_url = $1 WHERE match_id = $2', [folderUrl, activeId])
+            }
+          }).catch(err => console.error('[resources] creation failed:', err.message))
         }
       } else if (runStatus === 'AWAITING_MENTEE') {
         const menteeRow = await pool.query(

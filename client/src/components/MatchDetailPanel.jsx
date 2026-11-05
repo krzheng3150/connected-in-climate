@@ -159,6 +159,22 @@ export default function MatchDetailPanel({ matchId, onClose }) {
         </p>
       </div>
 
+      {match.resources_folder_url && match.status === 'ACTIVE' && (
+        <div className="partner-section">
+          <h3>Shared Resources</h3>
+          <a
+            className="btn-primary"
+            href={match.resources_folder_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => handleContactClick('resources_folder', match.resources_folder_url)}
+            style={{ display: 'inline-block', textDecoration: 'none' }}
+          >
+            Open Resources Folder
+          </a>
+        </div>
+      )}
+
       {match.status === 'APPROVED' && (
         <p className="placeholder-text" style={{ marginTop: '1rem' }}>
           This match is pending your selection. Return to the dashboard to confirm.
