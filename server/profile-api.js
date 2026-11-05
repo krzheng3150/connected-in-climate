@@ -11,7 +11,7 @@ const EMBEDDING_DIMENSIONS = 1536
 const ENUM_SINGLE_FIELDS = new Set([
   'education_level', 'career_level', 'years_experience', 'years_climate_experience',
   'employment_situation', 'management_experience', 'business_experience',
-  'international_experience', 'nonprofit_board_experience',
+  'international_experience', 'nonprofit_board_experience', 'freelance_experience',
 ])
 
 const ENUM_ARRAY_FIELDS = new Set([
@@ -26,7 +26,7 @@ const ENUM_FIELD_MAP = {
 }
 
 const FREE_TEXT_FIELDS = new Set([
-  'preferred_name', 'pronouns', 'location', 'organization',
+  'preferred_name', 'pronouns', 'location', 'organization', 'timezone',
   'motivation', 'statement_of_intent', 'fun_fact',
 ])
 

@@ -30,7 +30,7 @@ const ENUM_FIELD_MAP = {
 const ENUM_SINGLE_FIELDS = new Set([
   'education_level', 'career_level', 'years_experience', 'years_climate_experience',
   'employment_situation', 'management_experience', 'business_experience',
-  'international_experience', 'nonprofit_board_experience',
+  'international_experience', 'nonprofit_board_experience', 'freelance_experience',
 ])
 
 const INT_FIELDS = new Set([

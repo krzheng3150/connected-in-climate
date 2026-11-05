@@ -1009,7 +1009,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 @media (max-width: 600px) { .checkbox-grid { grid-template-columns: 1fr; } }
 .checkbox-option {
-  display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.9rem; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; padding: 0.15rem 0;
 }
 .checkbox-option input[type="checkbox"] { margin-top: 0.2rem; accent-color: var(--accent); }
 

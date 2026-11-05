@@ -19,6 +19,7 @@ const MENTOR_SINGLE = [
   { key: 'business_experience', label: 'Business Experience' },
   { key: 'international_experience', label: 'International Experience' },
   { key: 'nonprofit_board_experience', label: 'Nonprofit Board Experience' },
+  { key: 'freelance_experience', label: 'Freelance Experience' },
 ]
 
 const MENTEE_SINGLE = [
@@ -213,6 +214,10 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
           <label>Location</label>
           <input type="text" value={form.location || ''} onChange={e => set('location', e.target.value)} placeholder="City, Country" />
         </div>
+        <div className="form-group">
+          <label>Timezone</label>
+          <input type="text" value={form.timezone || ''} onChange={e => set('timezone', e.target.value)} placeholder="e.g. EST, PST, GMT+1" />
+        </div>
         {singleFields.map(f => (
           <SelectField key={f.key} field={f} value={form[f.key]} onChange={set} />
         ))}
@@ -253,6 +258,9 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
   return (
     <div className="application-form">
       <h2>Tell Us More</h2>
+      <p className="placeholder-text" style={{ marginBottom: '1rem' }}>
+        Please write in your own words — we want to hear your genuine thoughts and goals.
+      </p>
       {isMentee(form.role) && (
         <div className="form-group">
           <label>Statement of Intent *</label>

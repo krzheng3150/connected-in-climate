@@ -6,11 +6,11 @@ import { FIELDS, normalize, normalizeArray, label, hasExperience } from './field
 
 describe('normalize', () => {
   it('returns ID when given the display label', () => {
-    assert.equal(normalize('management_experience', 'I have managed teams (5+) of direct reports.'), 'managed_5plus')
+    assert.equal(normalize('management_experience', 'Managed teams of 5+ direct reports'), 'managed_5plus')
   })
 
   it('is case-insensitive', () => {
-    assert.equal(normalize('management_experience', 'i have managed teams (5+) of direct reports.'), 'managed_5plus')
+    assert.equal(normalize('management_experience', 'managed teams of 5+ direct reports'), 'managed_5plus')
   })
 
   it('trims whitespace', () => {
@@ -45,6 +45,11 @@ describe('normalize', () => {
     assert.equal(normalize('nonprofit_board_experience', 'Yes.'), 'yes')
     assert.equal(normalize('employment_situation', 'Full time student.'), 'student')
     assert.equal(normalize('years_experience', '15+'), '15_plus')
+    assert.equal(normalize('career_level', 'Mid-Level'), 'mid_level')
+    assert.equal(normalize('employment_situation', 'Freelance / self-employed.'), 'freelance')
+    assert.equal(normalize('employment_situation', 'On a career break.'), 'career_break')
+    assert.equal(normalize('freelance_experience', '0–3 years'), '0_3')
+    assert.equal(normalize('freelance_experience', '10+ years'), '10_plus')
   })
 
   it('normalizes climate_areas display labels', () => {
@@ -170,7 +175,7 @@ describe('FIELDS integrity', () => {
       'education_level', 'years_experience', 'years_climate_experience', 'career_level',
       'sectors', 'climate_areas', 'career_areas', 'topics',
       'management_experience', 'business_experience', 'international_experience',
-      'nonprofit_board_experience', 'employment_situation',
+      'nonprofit_board_experience', 'freelance_experience', 'employment_situation',
     ]
     for (const f of expected) {
       assert.ok(FIELDS[f], `Missing field: ${f}`)

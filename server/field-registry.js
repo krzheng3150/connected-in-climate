@@ -26,6 +26,7 @@ export const FIELDS = {
   },
   career_level: {
     entry: 'Associate / Entry',
+    mid_level: 'Mid-Level',
     lead: 'Lead',
     managerial: 'Managerial',
     director: 'Director / Executive',
@@ -98,10 +99,10 @@ export const FIELDS = {
 
   // ── Mentor single-select ────────────────────────────────────────
   management_experience: {
-    managed_5plus: 'I have managed teams (5+) of direct reports.',
-    managed_few: 'I have had a few (<5) direct reports.',
-    project_managed: 'I have not had direct reports, but managed people in projects.',
-    none: 'None - I have mostly been in individual contributor roles.',
+    managed_5plus: 'Managed teams of 5+ direct reports',
+    managed_few: 'Managed fewer than 5 direct reports',
+    project_managed: 'Managed people in projects (no direct reports)',
+    none: 'Individual contributor (no management experience)',
   },
   business_experience: {
     started_own: 'Yes, I have started my own business.',
@@ -117,12 +118,20 @@ export const FIELDS = {
     yes: 'Yes.',
     none: 'No.',
   },
+  freelance_experience: {
+    none: 'No',
+    '0_3': '0–3 years',
+    '4_10': '4–10 years',
+    '10_plus': '10+ years',
+  },
 
   // ── Mentee single-select ────────────────────────────────────────
   employment_situation: {
     pivoting: 'Currently employed, but looking to pivot.',
     growing: 'Employed and looking to stay and grow at my current organization.',
     job_searching: 'Unemployed and job searching or looking to start my own venture.',
+    freelance: 'Freelance / self-employed.',
+    career_break: 'On a career break.',
     student: 'Full time student.',
   },
 }
