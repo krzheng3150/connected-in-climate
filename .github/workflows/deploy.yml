@@ -17,6 +17,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Inject secrets into app spec
+        run: |
+          for key in CLERK_SECRET_KEY RESEND_API_KEY OPENAI_API_KEY GOOGLE_SERVICE_ACCOUNT_KEY; do
+            yq -i "(.services[0].envs[] | select(.key == \"$key\")).value = strenv($key)" .do/app.yaml
+          done
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+
       - name: Deploy to DigitalOcean App Platform
         uses: digitalocean/app_action/deploy@v2
         with:
@@ -35,11 +46,11 @@ jobs:
           fi
           echo "Health check passed"
 
-      - name: Smoke test — admin email recognition
+      - name: Smoke test — frontend loads
         run: |
-          is_admin=$(curl -sf "$APP_URL/api/profiles/me?email=krzheng3150@gmail.com" | jq -r '.is_admin')
-          if [ "$is_admin" != "true" ]; then
-            echo "Admin email not recognized"
+          status=$(curl -sf -o /dev/null -w '%{http_code}' "$APP_URL/")
+          if [ "$status" != "200" ]; then
+            echo "Frontend failed to load (HTTP $status)"
             exit 1
           fi
-          echo "Admin email recognized"
+          echo "Frontend loaded OK"

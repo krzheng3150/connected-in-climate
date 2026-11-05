@@ -16,12 +16,13 @@ const port = process.env.PORT || 3000
 const clientDist = path.join(path.dirname(fileURLToPath(import.meta.url)), '../client/dist')
 
 app.use(express.json())
-app.use(clerkMiddleware())
 
 app.get('/api/health', async (_req, res) => {
   await pool.query('SELECT 1')
   res.json({ ok: true })
 })
+
+app.use(clerkMiddleware())
 
 function getAdminEmails() {
   return new Set(
