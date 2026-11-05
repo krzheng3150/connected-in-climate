@@ -71,6 +71,7 @@ const VALID_MENTEE = {
   statement_of_intent: 'I want to learn about climate policy.',
   career_level: 'entry',
   climate_areas: ['ai_climate'],
+  career_areas: ['consulting'],
 }
 
 const VALID_MENTOR = {
@@ -78,6 +79,7 @@ const VALID_MENTOR = {
   role: 'mentor',
   motivation: 'I want to share my climate finance experience.',
   career_level: 'lead',
+  climate_areas: ['ai_climate'],
   career_areas: ['consulting'],
 }
 
@@ -124,25 +126,25 @@ describe('POST /api/profiles', () => {
   it('rejects missing name', async () => {
     const { status, data } = await post({ ...VALID_MENTEE, name: '' })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /name/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'name'))
   })
 
   it('rejects invalid role', async () => {
     const { status, data } = await post({ ...VALID_MENTEE, role: 'wizard' })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /role/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'role'))
   })
 
   it('rejects mentee without statement_of_intent', async () => {
-    const { status, data } = await post({ name: 'No Statement', role: 'mentee' })
+    const { status, data } = await post({ name: 'No Statement', role: 'mentee', career_level: 'entry', climate_areas: ['ai_climate'], career_areas: ['consulting'] })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /statement of intent/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'statement_of_intent'))
   })
 
   it('rejects mentor without motivation', async () => {
-    const { status, data } = await post({ name: 'No Motivation', role: 'mentor' })
+    const { status, data } = await post({ name: 'No Motivation', role: 'mentor', career_level: 'lead', climate_areas: ['ai_climate'], career_areas: ['consulting'] })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /motivation/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'motivation'))
   })
 
   it('stores free text fields in payload', async () => {
@@ -183,9 +185,31 @@ describe('POST /api/profiles', () => {
   })
 
   it('rejects missing career_level', async () => {
-    const { status, data } = await post({ name: 'No Level', role: 'mentee', statement_of_intent: 'Goals.' })
+    const { status, data } = await post({ name: 'No Level', role: 'mentee', statement_of_intent: 'Goals.', climate_areas: ['ai_climate'], career_areas: ['consulting'] })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /career level/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'career_level'))
+  })
+
+  it('rejects missing climate_areas', async () => {
+    const { status, data } = await post({ ...VALID_MENTEE, climate_areas: [] })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'climate_areas'))
+  })
+
+  it('rejects missing career_areas', async () => {
+    const { status, data } = await post({ ...VALID_MENTEE, career_areas: [] })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'career_areas'))
+  })
+
+  it('returns structured errors with field and message', async () => {
+    const { status, data } = await post({ name: '', role: 'mentee' })
+    assert.equal(status, 400)
+    assert.ok(data.errors.length >= 1)
+    for (const err of data.errors) {
+      assert.ok(err.field, 'each error should have a field')
+      assert.ok(err.message, 'each error should have a message')
+    }
   })
 
   it('rejects invalid enum value', async () => {
@@ -194,7 +218,7 @@ describe('POST /api/profiles', () => {
       career_level: 'supreme_overlord',
     })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /career_level/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'career_level'))
   })
 
   it('computes embedding from statement_of_intent for mentees', async () => {
@@ -249,7 +273,7 @@ describe('PATCH /api/profiles', () => {
     await post(VALID_MENTEE)
     const { status, data } = await patch({ ...VALID_MENTEE, name: '' })
     assert.equal(status, 400)
-    assert.ok(data.errors.some(e => /name/i.test(e)))
+    assert.ok(data.errors.some(e => e.field === 'name'))
   })
 
   it('recomputes embedding on update', async () => {

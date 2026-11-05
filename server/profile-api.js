@@ -76,17 +76,23 @@ function validateProfile(body) {
   const errors = []
   const { role, name, ...fields } = body
 
-  if (!name || !String(name).trim()) errors.push('Name is required.')
-  if (!['mentor', 'mentee', 'both'].includes(role)) errors.push('Role must be mentor, mentee, or both.')
+  if (!name || !String(name).trim()) errors.push({ field: 'name', message: 'Name is required.' })
+  if (!['mentor', 'mentee', 'both'].includes(role)) errors.push({ field: 'role', message: 'Role must be mentor, mentee, or both.' })
 
   if (isMentee(role) && !fields.statement_of_intent?.trim()) {
-    errors.push('Statement of intent is required for mentees.')
+    errors.push({ field: 'statement_of_intent', message: 'Statement of intent is required for mentees.' })
   }
   if (isMentor(role) && !fields.motivation?.trim()) {
-    errors.push('Motivation is required for mentors.')
+    errors.push({ field: 'motivation', message: 'Motivation is required for mentors.' })
   }
   if (!fields.career_level) {
-    errors.push('Career level is required.')
+    errors.push({ field: 'career_level', message: 'Career level is required.' })
+  }
+  if (!fields.climate_areas || (Array.isArray(fields.climate_areas) && fields.climate_areas.length === 0)) {
+    errors.push({ field: 'climate_areas', message: 'At least one climate area is required.' })
+  }
+  if (!fields.career_areas || (Array.isArray(fields.career_areas) && fields.career_areas.length === 0)) {
+    errors.push({ field: 'career_areas', message: 'At least one career area is required.' })
   }
 
   const payload = {}
@@ -105,7 +111,7 @@ function validateProfile(body) {
     if (ENUM_SINGLE_FIELDS.has(key)) {
       const result = normalize(key, val)
       if (result && typeof result === 'object' && result.unknown) {
-        errors.push(`Invalid value for ${key}: "${val}"`)
+        errors.push({ field: key, message: `Invalid value for ${key}: "${val}"` })
       } else if (result) {
         payload[key] = result
       }
@@ -114,7 +120,7 @@ function validateProfile(body) {
       const registryField = ENUM_FIELD_MAP[key] || key
       if (FIELDS[registryField]) {
         const { values, warnings } = normalizeArray(registryField, items)
-        for (const w of warnings) errors.push(`Invalid value for ${key}: "${w.value}"`)
+        for (const w of warnings) errors.push({ field: key, message: `Invalid value for ${key}: "${w.value}"` })
         if (values.length) payload[key] = values
       }
     } else if (FREE_TEXT_FIELDS.has(key)) {

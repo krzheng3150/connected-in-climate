@@ -96,6 +96,19 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  const STEP_FIELDS = {
+    0: ['role'],
+    1: ['name', 'career_level'],
+    2: ['climate_areas', 'career_areas'],
+    3: ['statement_of_intent', 'motivation'],
+  }
+
+  function errorsForStep(s) {
+    const fields = STEP_FIELDS[s] || []
+    return fields.filter(f => fieldErrors[f]).map(f => fieldErrors[f])
+  }
 
   function set(key, val) {
     setForm(prev => ({ ...prev, [key]: val }))
@@ -104,6 +117,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
   async function handleSubmit() {
     setSubmitting(true)
     setError(null)
+    setFieldErrors({})
     try {
       const headers = { 'Content-Type': 'application/json' }
       const res = await fetch('/api/profiles', {
@@ -111,14 +125,31 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         headers,
         body: JSON.stringify(form),
       })
-      const data = await res.json()
+      let data
+      try {
+        data = await res.json()
+      } catch (parseErr) {
+        console.error('[ApplicationForm] Non-JSON response:', res.status, parseErr)
+        setError(`Server error (${res.status}) — please try again.`)
+        return
+      }
       if (!res.ok) {
-        setError(data.errors?.join(' ') || data.error || 'Something went wrong.')
+        if (Array.isArray(data.errors) && data.errors[0]?.field) {
+          const byField = {}
+          for (const e of data.errors) byField[e.field] = e.message
+          setFieldErrors(byField)
+          const allSteps = [0, 1, 2, 3]
+          const earliest = allSteps.find(s => (STEP_FIELDS[s] || []).some(f => byField[f]))
+          if (earliest !== undefined) setStep(earliest)
+        } else {
+          setError(data.errors?.map(e => e.message || e).join(' ') || data.error || 'Something went wrong.')
+        }
         return
       }
       await refreshProfile()
       if (isEdit && onCancel) onCancel()
-    } catch {
+    } catch (err) {
+      console.error('[ApplicationForm] Network error:', err)
       setError('Could not reach the server.')
     } finally {
       setSubmitting(false)
@@ -185,6 +216,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         {singleFields.map(f => (
           <SelectField key={f.key} field={f} value={form[f.key]} onChange={set} />
         ))}
+        {errorsForStep(1).map((msg, i) => <p key={i} className="form-error">{msg}</p>)}
         <div className="form-actions">
           {isEdit
             ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
@@ -208,9 +240,10 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         {[...topicFields, ...menteeTopics].map(f => (
           <MultiSelectField key={f.key} field={f} value={form[f.key] || []} onChange={set} />
         ))}
+        {errorsForStep(2).map((msg, i) => <p key={i} className="form-error">{msg}</p>)}
         <div className="form-actions">
           <button className="btn-secondary" onClick={() => setStep(1)}>Back</button>
-          <button className="btn-primary" onClick={() => setStep(3)}>Next</button>
+          <button className="btn-primary" disabled={!form.climate_areas?.length || !form.career_areas?.length} onClick={() => setStep(3)}>Next</button>
         </div>
       </div>
     )
@@ -250,6 +283,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         <label>LinkedIn URL</label>
         <input type="url" value={form.links?.linkedin || ''} onChange={e => set('links', { ...form.links, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." />
       </div>
+      {errorsForStep(3).map((msg, i) => <p key={i} className="form-error">{msg}</p>)}
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions">
         <button className="btn-secondary" onClick={() => setStep(2)}>Back</button>
