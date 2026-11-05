@@ -57,25 +57,23 @@ export async function fillApplication(page, { name, role, freeText }) {
   await reactClick(page, '.btn-primary')
   await page.waitForSelector('input[placeholder="Your full name"]', { timeout: 5000 })
 
-  // Step 1: basic info — fill name, then reveal each dropdown
+  // Step 1: basic info — fill name, select career_level
   await page.fill('input[placeholder="Your full name"]', name)
   await page.waitForTimeout(1000)
-  const selects = await page.$$('.form-group select')
-  for (const sel of selects) {
-    await sel.click()
-    await page.waitForTimeout(1500)
-    await page.keyboard.press('Escape')
-    await page.waitForTimeout(300)
-  }
-  await page.waitForTimeout(1000)
+  const careerSelect = await page.$('.form-group select')
+  await careerSelect.selectOption({ index: 1 })
+  await page.waitForTimeout(1500)
   await reactClickNth(page, '.form-actions button', 1)
   await page.waitForSelector('.checkbox-grid', { timeout: 5000 })
 
-  // Step 2: select a few interests
-  await reactClickNth(page, '.checkbox-option input', 0)
-  await reactClickNth(page, '.checkbox-option input', 2)
-  await reactClickNth(page, '.checkbox-option input', 4)
-  await page.waitForTimeout(2500)
+  // Step 2: select at least one option in each checkbox grid
+  const grids = await page.$$('.checkbox-grid')
+  for (const grid of grids) {
+    const firstBox = await grid.$('.checkbox-option input')
+    if (firstBox) await firstBox.click()
+    await page.waitForTimeout(500)
+  }
+  await page.waitForTimeout(1500)
   await reactClickNth(page, '.form-actions button', 1)
   await page.waitForSelector('textarea', { timeout: 5000 })
 
