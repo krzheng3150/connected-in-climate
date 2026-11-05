@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+const SEND_EMAIL = process.env.SEND_EMAIL === '1' || process.env.SEND_EMAIL === 'true'
 const FROM = process.env.EMAIL_FROM || 'Connected in Climate <noreply@climateactionforge.com>'
 const APP_URL = process.env.APP_URL || 'https://connected-in-climate-n42zu.ondigitalocean.app'
 
@@ -10,8 +11,8 @@ export function _testClear() { sent.length = 0 }
 
 async function send(to, subject, html) {
   sent.push({ to, subject })
-  if (!resend) {
-    console.log(`[email] skipped (no RESEND_API_KEY): to=${to} subject="${subject}"`)
+  if (!resend || !SEND_EMAIL) {
+    console.log(`[email] skipped (sending disabled): to=${to} subject="${subject}"`)
     return
   }
   try {

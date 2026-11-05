@@ -44,6 +44,9 @@ services:
       - key: RESEND_API_KEY
         scope: RUN_TIME
         type: SECRET # set in DO console
+      - key: SEND_EMAIL
+        scope: RUN_TIME
+        value: "1"
       - key: CLERK_PUBLISHABLE_KEY
         scope: RUN_AND_BUILD_TIME
         value: pk_test_aGVscGZ1bC1saW9uLTk1MzYuY2xlcmsuYWNjb3VudHMuZGV2JA # [INSTANCE-SPECIFIC] public key from Clerk dashboard
