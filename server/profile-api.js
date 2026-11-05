@@ -127,6 +127,12 @@ function validateProfile(body) {
   return { errors, name: String(name).trim(), role, payload }
 }
 
+function buildEmbedding(role, payload) {
+  const embeddingText = isMentee(role) ? payload.statement_of_intent : payload.motivation
+  const embedding = computeSingleEmbedding(embeddingText)
+  return embedding ? `[${embedding.join(',')}]` : null
+}
+
 // ── POST /api/profiles ────────────────────────────────────────────
 
 router.post('/', async (req, res, next) => {
@@ -145,17 +151,44 @@ router.post('/', async (req, res, next) => {
     const { errors, name, role, payload } = validateProfile(req.body)
     if (errors.length) return res.status(400).json({ errors })
 
-    const embeddingText = isMentee(role) ? payload.statement_of_intent : payload.motivation
-    const embedding = computeSingleEmbedding(embeddingText)
-    const embeddingLiteral = embedding ? `[${embedding.join(',')}]` : null
-
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload, embedding, updated_at)
        VALUES ($1, $2, $3, $4, $5::vector, now())`,
-      [email, name, role, JSON.stringify(payload), embeddingLiteral],
+      [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload)],
     )
 
     res.status(201).json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── PATCH /api/profiles ───────────────────────────────────────────
+
+router.patch('/', async (req, res, next) => {
+  try {
+    const email = await getAuthEmail(req)
+    if (!email) return res.status(401).json({ error: 'not authenticated' })
+
+    const existing = await pool.query(
+      'SELECT email FROM user_profiles WHERE email = $1',
+      [email],
+    )
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found.' })
+    }
+
+    const { errors, name, role, payload } = validateProfile(req.body)
+    if (errors.length) return res.status(400).json({ errors })
+
+    await pool.query(
+      `UPDATE user_profiles SET name = $2, role = $3, payload = $4,
+              embedding = $5::vector, updated_at = now()
+       WHERE email = $1`,
+      [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload)],
+    )
+
+    res.json({ ok: true })
   } catch (err) {
     next(err)
   }

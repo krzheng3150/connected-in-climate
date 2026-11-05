@@ -11,6 +11,7 @@ export default function Dashboard() {
   const { signOut } = useClerk()
   const navigate = useNavigate()
   const [view, setView] = useState(user?.is_mentee ? 'mentee' : 'mentor')
+  const [editing, setEditing] = useState(false)
 
   if (loading || !user) {
     return <div className="page"><p>Loading…</p></div>
@@ -50,7 +51,16 @@ export default function Dashboard() {
       </header>
 
       <main className="page-body">
+        {editing && (
+          <ApplicationForm
+            existingProfile={{ name: user.name, role: user.role, payload: user.payload }}
+            onCancel={() => setEditing(false)}
+          />
+        )}
+
+        {!editing && <>
         <h2>Welcome, {user.preferred_name || user.name}</h2>
+        <button className="btn-link" onClick={() => setEditing(true)}>Edit Profile</button>
 
         {user.is_mentee && user.is_mentor && (
           <div className="role-tabs">
@@ -80,6 +90,7 @@ export default function Dashboard() {
         {view === 'mentee' && user.is_mentee && <MenteeDashboard />}
 
         {view === 'mentor' && user.is_mentor && <MentorDashboard />}
+        </>}
       </main>
     </div>
   )

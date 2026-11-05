@@ -60,6 +60,7 @@ app.get('/api/profiles/me', async (req, res, next) => {
       is_mentor: isMentor(row.role),
       is_mentee: isMentee(row.role),
       preferred_name: row.payload?.preferred_name || null,
+      payload: row.payload,
       is_admin: isAdmin,
       has_profile: true,
     })

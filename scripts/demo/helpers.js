@@ -96,6 +96,48 @@ export async function fillApplication(page, { name, role, freeText }) {
   await page.waitForSelector('.application-form', { state: 'hidden', timeout: 15000 })
 }
 
+export async function editProfile(page, { name }) {
+  // Click "Edit Profile"
+  await page.evaluate(() => {
+    const links = document.querySelectorAll('.btn-link')
+    for (const l of links) {
+      if (l.textContent.includes('Edit Profile')) {
+        l.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        return
+      }
+    }
+  })
+  await page.waitForSelector('.application-form', { timeout: 5000 })
+  await page.waitForTimeout(1500)
+
+  // Step 1 (edit skips role selection): update name
+  const nameInput = await page.$('input[placeholder="Your full name"]')
+  await nameInput.fill('')
+  await nameInput.fill(name)
+  await page.waitForTimeout(1500)
+  await reactClickNth(page, '.form-actions button', 1)
+  await page.waitForSelector('.checkbox-grid', { timeout: 5000 })
+
+  // Step 2: leave interests as-is, advance
+  await page.waitForTimeout(1500)
+  await reactClickNth(page, '.form-actions button', 1)
+  await page.waitForSelector('textarea', { timeout: 5000 })
+
+  // Step 3: click Save Changes
+  await page.waitForTimeout(1500)
+  await page.evaluate(() => {
+    const btns = document.querySelectorAll('.form-actions button')
+    for (const b of btns) {
+      if (b.textContent.includes('Save')) {
+        b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+        return
+      }
+    }
+  })
+
+  await page.waitForSelector('.application-form', { state: 'hidden', timeout: 15000 })
+}
+
 // ── Mentee Actions ─────────────────────────────────────────────────
 
 export async function findMentor(page) {

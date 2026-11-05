@@ -1,7 +1,7 @@
 import {
   MENTEE_EMAIL, MENTEE_NAME, ADMIN_EMAIL,
-  NEW_MENTEE_EMAIL, NEW_MENTEE_NAME, NEW_MENTEE_STATEMENT,
-  NEW_MENTOR_EMAIL, NEW_MENTOR_NAME, NEW_MENTOR_MOTIVATION,
+  NEW_MENTEE_EMAIL, NEW_MENTEE_NAME, NEW_MENTEE_EDITED_NAME, NEW_MENTEE_STATEMENT,
+  NEW_MENTOR_EMAIL, NEW_MENTOR_NAME, NEW_MENTOR_EDITED_NAME, NEW_MENTOR_MOTIVATION,
   FEEDBACK_TEXT, FEEDBACK_RATING,
 } from './fixtures.js'
 
@@ -9,7 +9,7 @@ import {
   login, signOut, goToAdmin, findMentor,
   openMatchPanel, getPartnerName, closeAllPanels,
   openPickDetail, getOpenPanelCount,
-  submitFeedback, getFeedbackCount, fillApplication,
+  submitFeedback, getFeedbackCount, fillApplication, editProfile,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
@@ -28,6 +28,14 @@ export default async function runScenario(page) {
   if (!menteeWelcome.includes(NEW_MENTEE_NAME)) {
     throw new Error(`Expected welcome for ${NEW_MENTEE_NAME}, got: ${menteeWelcome}`)
   }
+  console.log('  Editing profile...')
+  await editProfile(page, { name: NEW_MENTEE_EDITED_NAME })
+  await page.waitForTimeout(1000)
+  const editedWelcome = await page.textContent('.page-body h2')
+  console.log(`  Dashboard after edit: "${editedWelcome}"`)
+  if (!editedWelcome.includes(NEW_MENTEE_EDITED_NAME)) {
+    throw new Error(`Expected welcome for ${NEW_MENTEE_EDITED_NAME}, got: ${editedWelcome}`)
+  }
   await signOut(page)
   console.log('  Signed out.')
   await pause(page)
@@ -42,6 +50,14 @@ export default async function runScenario(page) {
   console.log(`  Dashboard: "${mentorWelcome}"`)
   if (!mentorWelcome.includes(NEW_MENTOR_NAME)) {
     throw new Error(`Expected welcome for ${NEW_MENTOR_NAME}, got: ${mentorWelcome}`)
+  }
+  console.log('  Editing profile...')
+  await editProfile(page, { name: NEW_MENTOR_EDITED_NAME })
+  await page.waitForTimeout(1000)
+  const editedMentorWelcome = await page.textContent('.page-body h2')
+  console.log(`  Dashboard after edit: "${editedMentorWelcome}"`)
+  if (!editedMentorWelcome.includes(NEW_MENTOR_EDITED_NAME)) {
+    throw new Error(`Expected welcome for ${NEW_MENTOR_EDITED_NAME}, got: ${editedMentorWelcome}`)
   }
   await signOut(page)
   console.log('  Signed out.')

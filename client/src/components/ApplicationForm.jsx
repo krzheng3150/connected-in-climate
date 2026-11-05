@@ -85,10 +85,15 @@ function MultiSelectField({ field, value = [], onChange }) {
   )
 }
 
-export default function ApplicationForm() {
+export default function ApplicationForm({ existingProfile, onCancel }) {
+  const isEdit = Boolean(existingProfile)
   const { user, refreshProfile } = useAuth()
-  const [step, setStep] = useState(0)
-  const [form, setForm] = useState({ role: null, name: '' })
+  const [step, setStep] = useState(isEdit ? 1 : 0)
+  const [form, setForm] = useState(() => {
+    if (!existingProfile) return { role: null, name: '' }
+    const { name, role, payload = {} } = existingProfile
+    return { role, name, ...payload }
+  })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -102,7 +107,7 @@ export default function ApplicationForm() {
     try {
       const headers = { 'Content-Type': 'application/json' }
       const res = await fetch('/api/profiles', {
-        method: 'POST',
+        method: isEdit ? 'PATCH' : 'POST',
         headers,
         body: JSON.stringify(form),
       })
@@ -113,6 +118,7 @@ export default function ApplicationForm() {
         return
       }
       await refreshProfile()
+      if (isEdit && onCancel) onCancel()
     } catch {
       setError('Could not reach the server.')
       setSubmitting(false)
@@ -180,7 +186,9 @@ export default function ApplicationForm() {
           <SelectField key={f.key} field={f} value={form[f.key]} onChange={set} />
         ))}
         <div className="form-actions">
-          <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>
+          {isEdit
+            ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+            : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
           <button className="btn-primary" disabled={!form.name?.trim()} onClick={() => setStep(2)}>Next</button>
         </div>
       </div>
@@ -246,7 +254,7 @@ export default function ApplicationForm() {
       <div className="form-actions">
         <button className="btn-secondary" onClick={() => setStep(2)}>Back</button>
         <button className="btn-primary" disabled={submitting} onClick={handleSubmit}>
-          {submitting ? 'Submitting…' : 'Submit Application'}
+          {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Submit Application'}
         </button>
       </div>
     </div>
