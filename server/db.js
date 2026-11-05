@@ -20,4 +20,5 @@ export const pool = new pg.Pool({
 export async function migrate() {
   const sql = await fs.readFile(new URL('../db/schema.sql', import.meta.url), 'utf8')
   await pool.query(sql)
+  console.log('[db] migration complete')
 }

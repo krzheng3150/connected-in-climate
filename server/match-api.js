@@ -97,11 +97,13 @@ router.post('/run', async (req, res, next) => {
       priorByMentor.set(row.mentor_email, arr)
     }
 
+    const matchStart = Date.now()
     const { results, filtered } = rankMentors(mentee, mentors, inProgressMatches, blockList, {
       algorithm_version: codeCommit,
       reliability_multiplier: 1.0,
       menteeEmbedding: mentee.embedding,
     })
+    console.log(`[match] scored ${results.length} mentors (${filtered.total_eligible} eligible) in ${Date.now() - matchStart}ms`)
 
     if (results.length === 0) {
       return res.json({ run: null, message: 'No mentors available right now', filtered })
