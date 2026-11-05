@@ -85,6 +85,9 @@ function validateProfile(body) {
   if (isMentor(role) && !fields.motivation?.trim()) {
     errors.push('Motivation is required for mentors.')
   }
+  if (!fields.career_level) {
+    errors.push('Career level is required.')
+  }
 
   const payload = {}
   const links = {}

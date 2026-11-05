@@ -182,6 +182,12 @@ describe('POST /api/profiles', () => {
     assert.equal(row.payload.links.linkedin, 'https://linkedin.com/in/test')
   })
 
+  it('rejects missing career_level', async () => {
+    const { status, data } = await post({ name: 'No Level', role: 'mentee', statement_of_intent: 'Goals.' })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => /career level/i.test(e)))
+  })
+
   it('rejects invalid enum value', async () => {
     const { status, data } = await post({
       ...VALID_MENTEE,

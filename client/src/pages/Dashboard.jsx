@@ -7,14 +7,23 @@ import MentorDashboard from './MentorDashboard.jsx'
 import ApplicationForm from '../components/ApplicationForm.jsx'
 
 export default function Dashboard() {
-  const { user, hasProfile, loading } = useAuth()
+  const { user, hasProfile, loading, error, refreshProfile } = useAuth()
   const { signOut } = useClerk()
   const navigate = useNavigate()
   const [view, setView] = useState(user?.is_mentee ? 'mentee' : 'mentor')
   const [editing, setEditing] = useState(false)
 
-  if (loading || !user) {
+  if (loading) {
     return <div className="page"><p>Loading…</p></div>
+  }
+
+  if (error || !user) {
+    return (
+      <div className="page">
+        <p className="form-error">{error || 'Unable to load your profile.'}</p>
+        <button className="btn-primary" onClick={refreshProfile}>Retry</button>
+      </div>
+    )
   }
 
   if (!hasProfile) {

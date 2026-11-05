@@ -114,13 +114,13 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
       const data = await res.json()
       if (!res.ok) {
         setError(data.errors?.join(' ') || data.error || 'Something went wrong.')
-        setSubmitting(false)
         return
       }
       await refreshProfile()
       if (isEdit && onCancel) onCancel()
     } catch {
       setError('Could not reach the server.')
+    } finally {
       setSubmitting(false)
     }
   }
@@ -189,7 +189,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
           {isEdit
             ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
             : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
-          <button className="btn-primary" disabled={!form.name?.trim()} onClick={() => setStep(2)}>Next</button>
+          <button className="btn-primary" disabled={!form.name?.trim() || !form.career_level} onClick={() => setStep(2)}>Next</button>
         </div>
       </div>
     )
