@@ -156,7 +156,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .landing-feature {
   padding: 1.25rem 0.75rem;
-  background: var(--surface);
+  background: var(--accent-light);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
