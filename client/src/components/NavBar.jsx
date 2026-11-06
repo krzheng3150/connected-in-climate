@@ -9,8 +9,8 @@ export default function NavBar() {
 
   return (
     <header className="page-header">
-      <Link to="/" className="nav-brand">Connected in Climate</Link>
       <div className="user-info">
+        <Link to="/" className="btn-link">Home</Link>
         <Link to="/about" className="btn-link">About Us</Link>
         {user && (
           <>
