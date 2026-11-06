@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ProfileDetail } from '../components/ProfileFields.jsx'
+import ConfirmationModal from '../components/ConfirmationModal.jsx'
 
 const TABS = ['Pending', 'Profiles', 'Search', 'Feedback', 'Blocks']
 
@@ -102,6 +103,7 @@ function RunReviewCard({ run, headers, onUpdate }) {
   const [expandedScores, setExpandedScores] = useState(new Set())
   const [expandedProfiles, setExpandedProfiles] = useState(new Set())
   const [showMentee, setShowMentee] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   function toggleProfile(matchId) {
     setExpandedProfiles(prev => {
@@ -220,7 +222,7 @@ function RunReviewCard({ run, headers, onUpdate }) {
       </div>
 
       <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <button className="btn-primary" onClick={handleSubmit} disabled={submitting}>
+        <button className="btn-primary" onClick={() => setShowConfirm(true)} disabled={submitting}>
           {submitting ? 'Submitting...' : `Submit Review (${selected.size} approved)`}
         </button>
         {selected.size === 0 && (
@@ -231,6 +233,52 @@ function RunReviewCard({ run, headers, onUpdate }) {
       </div>
 
       {resultMsg && <p className="feedback-msg" style={{ marginTop: '0.5rem' }}>{resultMsg}</p>}
+
+      {showConfirm && (() => {
+        const approved = run.candidates.filter(m => selected.has(m.match_id))
+        const rejected = run.candidates.filter(m => !selected.has(m.match_id))
+        return (
+          <ConfirmationModal
+            title="Confirm Review"
+            confirmLabel="Submit Review"
+            onConfirm={() => { setShowConfirm(false); handleSubmit() }}
+            onCancel={() => setShowConfirm(false)}
+            confirming={submitting}
+          >
+            <p style={{ marginBottom: '0.75rem' }}>
+              <strong>Mentee:</strong> {run.mentee_name}
+            </p>
+            {approved.length > 0 && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <strong style={{ color: 'var(--accent)' }}>Approving ({approved.length}):</strong>
+                <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0 }}>
+                  {approved.map(m => (
+                    <li key={m.match_id}>{m.mentor_name} — Rank #{m.rank}, {Math.round(m.final_score * 100)}%</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {rejected.length > 0 && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <strong style={{ color: 'var(--muted)' }}>Rejecting ({rejected.length}):</strong>
+                <ul style={{ margin: '0.25rem 0 0 1.25rem', padding: 0 }}>
+                  {rejected.map(m => (
+                    <li key={m.match_id}>{m.mentor_name} — Rank #{m.rank}, {Math.round(m.final_score * 100)}%</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {approved.length === 0 && (
+              <p style={{ color: 'var(--error)' }}>No candidates approved — this will cancel the run.</p>
+            )}
+            {approved.length === 1 && (
+              <p style={{ color: 'var(--accent)', fontSize: '0.875rem' }}>
+                One candidate approved — match will auto-activate.
+              </p>
+            )}
+          </ConfirmationModal>
+        )
+      })()}
     </div>
   )
 }

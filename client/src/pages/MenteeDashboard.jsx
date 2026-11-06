@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { lbl } from '../components/ProfileFields.jsx'
+import { lbl, ProfileDetail } from '../components/ProfileFields.jsx'
 import MatchCard from '../components/MatchCard.jsx'
 import MatchDetailPanel from '../components/MatchDetailPanel.jsx'
+import ConfirmationModal from '../components/ConfirmationModal.jsx'
 
 export default function MenteeDashboard() {
   const { user } = useAuth()
@@ -12,6 +13,8 @@ export default function MenteeDashboard() {
   const [selecting, setSelecting] = useState(false)
   const [message, setMessage] = useState(null)
   const [openPanels, setOpenPanels] = useState([])
+  const [confirmFind, setConfirmFind] = useState(false)
+  const [confirmSelect, setConfirmSelect] = useState(null)
 
   function togglePanel(matchId) {
     setOpenPanels(prev =>
@@ -97,7 +100,7 @@ export default function MenteeDashboard() {
       {noRun && (
         <>
           <div className="dashboard-actions">
-            <button className="btn-primary" onClick={handleFindMentor} disabled={finding}>
+            <button className="btn-primary" onClick={() => setConfirmFind(true)} disabled={finding}>
               {finding ? 'Finding...' : 'Find a Mentor'}
             </button>
           </div>
@@ -107,6 +110,20 @@ export default function MenteeDashboard() {
               Click "Find a Mentor" to get matched with a climate tech mentor.
             </p>
           </div>
+          {confirmFind && (
+            <ConfirmationModal
+              title="Confirm Match Request"
+              confirmLabel="Find a Mentor"
+              onConfirm={() => { setConfirmFind(false); handleFindMentor() }}
+              onCancel={() => setConfirmFind(false)}
+              confirming={finding}
+            >
+              <p style={{ marginBottom: '0.75rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
+                The algorithm will use your profile to find the best mentor match. Please review your submission:
+              </p>
+              <ProfileDetail payload={user.payload} exclude={['max_capacity', 'w_horiz', 'w_vert', 'w_sector', 'geo_match_preference']} />
+            </ConfirmationModal>
+          )}
         </>
       )}
 
@@ -136,7 +153,7 @@ export default function MenteeDashboard() {
               <PickCard
                 key={m.match_id}
                 match={m}
-                onSelect={() => handleSelect(m.match_id)}
+                onSelect={() => setConfirmSelect(m)}
                 onViewDetail={() => togglePanel(m.match_id)}
                 disabled={selecting}
               />
@@ -160,6 +177,26 @@ export default function MenteeDashboard() {
             <MatchDetailPanel key={id} matchId={id} onClose={() => closePanel(id)} />
           ))}
         </div>
+      )}
+
+      {confirmSelect && (
+        <ConfirmationModal
+          title="Confirm Mentor Selection"
+          confirmLabel="Select This Mentor"
+          onConfirm={() => { const id = confirmSelect.match_id; setConfirmSelect(null); handleSelect(id) }}
+          onCancel={() => setConfirmSelect(null)}
+          confirming={selecting}
+        >
+          <p style={{ marginBottom: '0.75rem' }}>
+            You are selecting <strong>{confirmSelect.mentor_name}</strong> as your mentor.
+          </p>
+          {confirmSelect.mentor_payload && (
+            <>
+              <div style={{ fontSize: '0.875rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>Mentor profile:</div>
+              <ProfileDetail payload={confirmSelect.mentor_payload} exclude={['max_capacity', 'w_horiz', 'w_vert', 'w_sector', 'geo_match_preference']} />
+            </>
+          )}
+        </ConfirmationModal>
       )}
     </div>
   )

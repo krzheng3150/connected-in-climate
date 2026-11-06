@@ -150,6 +150,9 @@ export async function editProfile(page, { name }) {
 
 export async function findMentor(page) {
   await page.click('button:has-text("Find a Mentor")')
+  await page.waitForSelector('.modal-overlay')
+  await page.waitForTimeout(2000)
+  await page.click('.modal-actions .btn-primary')
   await page.waitForSelector('.dashboard-message')
   return page.textContent('.dashboard-message')
 }
@@ -259,12 +262,18 @@ export async function adminSelectCandidates(page, count = 1) {
 
 export async function adminSubmitReview(page) {
   await page.click('button:has-text("Submit Review")')
+  await page.waitForSelector('.modal-overlay')
+  await page.waitForTimeout(2000)
+  await page.click('.modal-actions .btn-primary')
   await page.waitForSelector('.feedback-msg')
   return page.textContent('.feedback-msg')
 }
 
 export async function selectMentor(page) {
   await page.click('button:has-text("Select This Mentor")')
+  await page.waitForSelector('.modal-overlay')
+  await page.waitForTimeout(2000)
+  await page.click('.modal-actions .btn-primary')
   await page.waitForSelector('.dashboard-message')
   return page.textContent('.dashboard-message')
 }
