@@ -7,6 +7,7 @@ import Landing from './pages/Landing.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import MatchDetail from './pages/MatchDetail.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
+import About from './pages/About.jsx'
 import NotFound from './pages/NotFound.jsx'
 
 class ErrorBoundary extends React.Component {
@@ -36,6 +37,7 @@ export default function App() {
     <ErrorBoundary>
       <Routes>
         <Route path="/" element={!isLoaded ? null : isSignedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
+        <Route path="/about" element={<About />} />
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/matches/:matchId" element={<RequireAuth><MatchDetail /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminPanel /></RequireAdmin></RequireAuth>} />

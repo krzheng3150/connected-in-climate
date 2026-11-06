@@ -77,13 +77,40 @@ h1, h2, h3, h4, h5, h6 {
 .landing {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 3rem 1.25rem 2rem;
+  padding: 1rem 1.25rem 2rem;
   text-align: center;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 2rem;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+.landing-nav-brand {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+.landing-nav-brand:hover { color: var(--accent); }
+.landing-nav-link {
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+.landing-nav-link:hover, .landing-nav-link.active {
+  color: var(--accent);
+  background: var(--accent-light);
 }
 
 .landing-hero h1 {
