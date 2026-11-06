@@ -108,14 +108,17 @@ h1, h2, h3, h4, h5, h6 {
 
 .landing-quote {
   font-style: italic;
-  font-size: 1.0625rem;
+  font-size: 1.25rem;
   line-height: 1.6;
   color: var(--accent-secondary);
-  padding: 1.25rem 1.5rem;
-  border-left: 3px solid var(--accent-secondary);
+  padding: 1.5rem 2rem;
+  border-top: 2px solid var(--accent-secondary);
+  border-bottom: 2px solid var(--accent-secondary);
+  border-left: none;
+  border-right: none;
   background: var(--accent-secondary-light);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  text-align: left;
+  border-radius: var(--radius);
+  text-align: center;
 }
 
 .landing-intro {

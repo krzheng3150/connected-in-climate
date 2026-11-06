@@ -13,10 +13,10 @@ export default function About() {
           in the climate sector and access to an engaging, highly connected network.
         </p>
         <p>
-          The current job market throws one challenge after another at us and can be dehumanizing.
-          Our goal with Connected in Climate is to help you navigate those challenges by connecting
-          you with trusted professionals across climate, clean energy, and sustainability &ndash;
-          getting you one step closer to finding your next meaningful role.
+          The job market can be challenging and even feel defeating at times. Our goal with Connected
+          in Climate is to support you in overcoming those challenges by connecting you with trusted
+          professionals across climate, clean energy, and sustainability &ndash; getting you one step
+          closer to finding your next meaningful role.
         </p>
       </div>
     </div>

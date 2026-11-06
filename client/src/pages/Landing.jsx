@@ -10,7 +10,7 @@ const FEATURES = [
   {
     icon: '\u{1F331}',
     title: 'Intentional Connections',
-    description: 'A supportive job search community—you’re not alone in this',
+    description: "A supportive job search community — we’re all in this together",
   },
   {
     icon: '\u{1F3AF}',
