@@ -75,7 +75,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Landing page ──────────────────────────────────────────────── */
 .landing {
-  max-width: 540px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 3rem 1.25rem 2rem;
   text-align: center;
@@ -117,13 +117,13 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.7;
   color: var(--fg);
   text-align: center;
-  max-width: 600px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
 .landing-story {
   text-align: center;
-  max-width: 600px;
+  max-width: 900px;
   margin: 0 auto;
 }
 .landing-story h2 {
