@@ -98,6 +98,14 @@ async function teardown() {
     await new Promise(r => setTimeout(r, 1000))
   }
 
+  console.log('Cleaning up Google Drive test folders...')
+  try {
+    const { cleanupDriveFolders } = await import('./cleanup-drive-lib.js')
+    const { deleted } = await cleanupDriveFolders({ silent: true })
+    if (deleted > 0) console.log(`  Removed ${deleted} Drive folder(s)`)
+    else console.log('  No Drive folders to clean up')
+  } catch { console.log('  Skipped (Google OAuth not configured)') }
+
   console.log('Wiping database...')
   run('docker compose down -v 2>/dev/null || true', { stdio: 'pipe' })
   console.log('Done.\n')

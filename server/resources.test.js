@@ -17,6 +17,12 @@ let templateFolderId, outputFolderId, createdFolderId
 const cleanup = []
 
 before(async () => {
+  // Clean up orphans from prior crashed runs
+  try {
+    const { cleanupDriveFolders } = await import('../scripts/cleanup-drive-lib.js')
+    await cleanupDriveFolders({ silent: true })
+  } catch { /* ignore if OAuth not configured */ }
+
   const auth = getOAuth()
   drive = google.drive({ version: 'v3', auth })
   docs = google.docs({ version: 'v1', auth })

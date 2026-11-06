@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 //
 // Clean up Google Drive folders created by tests/demos.
-// Finds folders in the output directory AND orphaned TEST_ folders.
 //
 // Usage:
 //   node --env-file=.env scripts/cleanup-drive.js          # dry run (list only)
@@ -20,29 +19,12 @@ auth.setCredentials({ refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN })
 
 const drive = google.drive({ version: 'v3', auth })
 
-async function deleteRecursive(folderId) {
-  const children = await drive.files.list({
-    q: `'${folderId}' in parents and trashed = false`,
-    fields: 'files(id,mimeType)',
-  })
-  for (const child of children.data.files) {
-    if (child.mimeType === 'application/vnd.google-apps.folder') {
-      await deleteRecursive(child.id)
-    } else {
-      await drive.files.delete({ fileId: child.id })
-    }
-  }
-  await drive.files.delete({ fileId: folderId })
-}
-
-// 1. Folders in the output directory (match resource folders from tests/demos)
 const outputResult = await drive.files.list({
   q: `'${OUTPUT_FOLDER_ID}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
   fields: 'files(id,name,createdTime)',
   orderBy: 'createdTime desc',
 })
 
-// 2. Orphaned TEST_ folders from integration tests (template/output folders at root)
 const orphanResult = await drive.files.list({
   q: "name contains 'TEST_' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
   fields: 'files(id,name,createdTime)',
@@ -77,13 +59,6 @@ if (!doDelete) {
   process.exit(0)
 }
 
-console.log(`\nDeleting ${allFolders.length} folder(s)...`)
-for (const f of allFolders) {
-  try {
-    await deleteRecursive(f.id)
-    console.log(`  Deleted: ${f.name}`)
-  } catch (err) {
-    console.error(`  Failed to delete ${f.name}: ${err.message}`)
-  }
-}
-console.log('Done.')
+const { cleanupDriveFolders } = await import('./cleanup-drive-lib.js')
+const { deleted } = await cleanupDriveFolders()
+console.log(`\nDeleted ${deleted} folder(s).`)
