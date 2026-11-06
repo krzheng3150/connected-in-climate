@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
 import { SignIn } from '@clerk/react'
+import NavBar from '../components/NavBar.jsx'
 
 const FEATURES = [
   {
@@ -32,10 +32,7 @@ function FeatureCard({ icon, title, description }) {
 export default function Landing() {
   return (
     <div className="landing">
-      <nav className="landing-nav">
-        <Link to="/" className="landing-nav-brand">Connected in Climate</Link>
-        <Link to="/about" className="landing-nav-link">About Us</Link>
-      </nav>
+      <NavBar />
 
       <div className="landing-hero">
         <h1>Connected in Climate</h1>

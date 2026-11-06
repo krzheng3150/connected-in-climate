@@ -1,15 +1,12 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { useClerk } from '@clerk/react'
-import { useNavigate } from 'react-router-dom'
 import MenteeDashboard from './MenteeDashboard.jsx'
 import MentorDashboard from './MentorDashboard.jsx'
 import ApplicationForm from '../components/ApplicationForm.jsx'
+import NavBar from '../components/NavBar.jsx'
 
 export default function Dashboard() {
   const { user, hasProfile, loading, error, refreshProfile } = useAuth()
-  const { signOut } = useClerk()
-  const navigate = useNavigate()
   const [view, setView] = useState(user?.is_mentee ? 'mentee' : 'mentor')
   const [editing, setEditing] = useState(false)
 
@@ -29,16 +26,7 @@ export default function Dashboard() {
   if (!hasProfile) {
     return (
       <div className="page">
-        <header className="page-header">
-          <h1>Connected in Climate</h1>
-          <div className="user-info">
-            <span>{user?.email}</span>
-            {user?.is_admin && (
-              <button className="btn-link" onClick={() => navigate('/admin')}>Admin</button>
-            )}
-            <button className="btn-link" onClick={() => signOut()}>Sign out</button>
-          </div>
-        </header>
+        <NavBar />
         <main className="page-body">
           <ApplicationForm />
         </main>
@@ -48,16 +36,7 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Connected in Climate</h1>
-        <div className="user-info">
-          <span>{user.name}</span>
-          {user.is_admin && (
-            <button className="btn-link" onClick={() => navigate('/admin')}>Admin</button>
-          )}
-          <button className="btn-link" onClick={() => signOut()}>Sign out</button>
-        </div>
-      </header>
+      <NavBar />
 
       <main className="page-body">
         {editing && (

@@ -1,12 +1,9 @@
-import { Link } from 'react-router-dom'
+import NavBar from '../components/NavBar.jsx'
 
 export default function About() {
   return (
     <div className="landing">
-      <nav className="landing-nav">
-        <Link to="/" className="landing-nav-brand">Connected in Climate</Link>
-        <Link to="/about" className="landing-nav-link active">About Us</Link>
-      </nav>
+      <NavBar />
 
       <div className="landing-story" style={{ paddingTop: '1rem' }}>
         <h2>Our Story</h2>

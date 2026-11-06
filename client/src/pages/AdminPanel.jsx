@@ -1,14 +1,13 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ProfileDetail } from '../components/ProfileFields.jsx'
 import ConfirmationModal from '../components/ConfirmationModal.jsx'
+import NavBar from '../components/NavBar.jsx'
 
 const TABS = ['Pending', 'Profiles', 'Search', 'Feedback', 'Blocks']
 
 export default function AdminPanel() {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [tab, setTab] = useState('Pending')
 
   const adminHeaders = {
@@ -18,10 +17,7 @@ export default function AdminPanel() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Admin Panel</h1>
-        <button className="btn-link" onClick={() => navigate('/dashboard')}>&larr; Dashboard</button>
-      </header>
+      <NavBar />
 
       <div className="role-tabs" style={{ marginTop: '1rem' }}>
         {TABS.map(t => (
