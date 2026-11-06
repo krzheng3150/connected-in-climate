@@ -20,9 +20,7 @@ function getClients() {
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
     const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
     const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN
-    if (!clientId || !clientSecret || !refreshToken) {
-      throw new Error('GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REFRESH_TOKEN are required')
-    }
+    if (!clientId || !clientSecret || !refreshToken) return null
 
     const auth = new google.auth.OAuth2(clientId, clientSecret)
     auth.setCredentials({ refresh_token: refreshToken })
@@ -97,7 +95,12 @@ export async function createMatchResources({ mentorEmail, mentorName, menteeEmai
   const templateId = process.env.RESOURCES_TEMPLATE_FOLDER_ID || TEMPLATE_FOLDER_ID
   const outputId = process.env.RESOURCES_OUTPUT_FOLDER_ID || OUTPUT_FOLDER_ID
 
-  const { drive } = getClients()
+  const clients = getClients()
+  if (!clients) {
+    console.log('[resources] Google OAuth not configured, skipping')
+    return null
+  }
+  const { drive } = clients
   const vars = { mentorName, menteeName, mentorEmail, menteeEmail, matchDate }
   const folderName = `${menteeName} : ${mentorName}`
 
@@ -127,13 +130,10 @@ export async function createMatchResources({ mentorEmail, mentorName, menteeEmai
 }
 
 export function ping() {
-  try {
-    const { drive } = getClients()
-    return drive.files.list({ pageSize: 1 }).then(() => {
-      console.log('[resources] token keep-alive OK')
-    })
-  } catch {
-    return Promise.resolve()
-  }
+  const clients = getClients()
+  if (!clients) return Promise.resolve()
+  return clients.drive.files.list({ pageSize: 1 }).then(() => {
+    console.log('[resources] token keep-alive OK')
+  }).catch(() => {})
 }
 

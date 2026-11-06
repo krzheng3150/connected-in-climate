@@ -37,6 +37,7 @@ before(async () => {
         CHECK (status IN ('CANDIDATE','APPROVED','REJECTED','ACTIVE','STORED','FINISHED')),
       final_score NUMERIC(5,4) NOT NULL, rank INTEGER NOT NULL,
       computation_payload JSONB NOT NULL, code_commit TEXT NOT NULL,
+      resources_folder_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE TABLE IF NOT EXISTS match_actions (
