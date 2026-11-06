@@ -35,12 +35,15 @@ services:
       - key: OPENAI_API_KEY
         scope: RUN_TIME
         type: SECRET # set in DO console
-      - key: GOOGLE_SERVICE_ACCOUNT_KEY
+      - key: GOOGLE_OAUTH_CLIENT_ID
         scope: RUN_TIME
-        type: SECRET # set in DO console — raw JSON of the service account key
-      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        type: SECRET
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
         scope: RUN_TIME
-        value: connected-in-climate-sheets@i-see-493001.iam.gserviceaccount.com # [INSTANCE-SPECIFIC]
+        type: SECRET
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        scope: RUN_TIME
+        type: SECRET
       - key: RESEND_API_KEY
         scope: RUN_TIME
         type: SECRET # set in DO console

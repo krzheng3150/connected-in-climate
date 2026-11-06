@@ -53,7 +53,9 @@ Pushing to `main` triggers the deploy workflow (`.github/workflows/deploy.yml`),
 | `CLERK_SECRET_KEY` | Clerk dashboard → API Keys |
 | `RESEND_API_KEY` | Resend dashboard → API Keys |
 | `OPENAI_API_KEY` | OpenAI dashboard → API Keys |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | Google Cloud Console → Service Accounts → Keys (raw JSON) |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud Console → APIs & Services → Credentials (OAuth 2.0 Desktop client) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Same OAuth client as above |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | One-time consent flow via `scripts/google-oauth-setup.js` |
 
 Non-secret env vars (Clerk publishable key, admin emails, etc.) are set directly in `.do/app.yaml`.
 

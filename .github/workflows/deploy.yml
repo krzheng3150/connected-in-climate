@@ -19,14 +19,16 @@ jobs:
 
       - name: Inject secrets into app spec
         run: |
-          for key in CLERK_SECRET_KEY RESEND_API_KEY OPENAI_API_KEY GOOGLE_SERVICE_ACCOUNT_KEY; do
+          for key in CLERK_SECRET_KEY RESEND_API_KEY OPENAI_API_KEY GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET GOOGLE_OAUTH_REFRESH_TOKEN; do
             yq -i "(.services[0].envs[] | select(.key == \"$key\")).value = strenv($key)" .do/app.yaml
           done
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
 
       - name: Deploy to DigitalOcean App Platform
         uses: digitalocean/app_action/deploy@v2
