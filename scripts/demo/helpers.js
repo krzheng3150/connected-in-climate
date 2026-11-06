@@ -238,7 +238,7 @@ export async function adminExpandProfiles(page) {
 }
 
 export async function adminExpandRawPayload(page) {
-  await page.click('button:has-text("Show raw payload")')
+  await page.click('button:has-text("View Submission")')
   await page.waitForSelector('.admin-json')
 }
 

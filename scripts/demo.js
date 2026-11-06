@@ -25,6 +25,11 @@ async function waitForPostgres(timeoutMs = 30000) {
         'docker compose exec -T db pg_isready -U postgres',
         { cwd: root, stdio: 'pipe' },
       )
+      // pg_isready can pass before init scripts finish; verify with a real query
+      execSync(
+        'docker compose exec -T db psql -U postgres -d connected_in_climate -c "SELECT 1" 2>&1',
+        { cwd: root, stdio: 'pipe' },
+      )
       return
     } catch { /* not ready yet */ }
     await new Promise(r => setTimeout(r, 1000))

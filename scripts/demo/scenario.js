@@ -163,7 +163,15 @@ export default async function runScenario(page) {
     const hasButton = await verifyResourcesButton(page)
     console.log(`  "Open Resources Folder" button visible: ${hasButton}`)
     if (hasButton) {
-      await pause(page, 2000)
+      // Click the button — opens Google Drive in a new tab
+      const [newPage] = await Promise.all([
+        page.context().waitForEvent('page'),
+        page.click('a.btn-primary:has-text("Open Resources Folder")'),
+      ])
+      console.log(`  Opened Google Drive tab: ${newPage.url()}`)
+      await pause(newPage, 3000)
+      await newPage.close()
+      console.log('  Closed Google Drive tab')
     }
     await closeAllPanels(page)
   } else {
@@ -214,7 +222,7 @@ export default async function runScenario(page) {
   await adminExpandProfiles(page)
   await pause(page, 2000)
 
-  console.log('  Showing raw payload...')
+  console.log('  Viewing submission data...')
   await adminExpandRawPayload(page)
   await pause(page, 2000)
 

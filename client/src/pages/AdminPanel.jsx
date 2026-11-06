@@ -646,8 +646,8 @@ function ScoreBreakdown({ payload }) {
       )}
 
       <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-        <button className="btn-link" onClick={() => setShowRaw(!showRaw)}>
-          {showRaw ? 'Hide raw payload' : 'Show raw payload'}
+        <button className="btn-secondary" onClick={() => setShowRaw(!showRaw)}>
+          {showRaw ? 'Hide Submission' : 'View Submission'}
         </button>
         {showRaw && <pre className="admin-json">{JSON.stringify(payload, null, 2)}</pre>}
       </div>
