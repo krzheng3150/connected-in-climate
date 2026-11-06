@@ -91,6 +91,10 @@ export default async function runScenario(page) {
   await adminExpandScores(page)
   await pause(page, 2000)
 
+  console.log('  Viewing submission data...')
+  await adminExpandRawPayload(page)
+  await pause(page, 3000)
+
   console.log('  Selecting top 2 candidates...')
   const selected = await adminSelectCandidates(page, 2)
   console.log(`  Selected ${selected} candidates`)
@@ -224,7 +228,7 @@ export default async function runScenario(page) {
 
   console.log('  Viewing submission data...')
   await adminExpandRawPayload(page)
-  await pause(page, 2000)
+  await pause(page, 3000)
 
   // Check feedback tab
   console.log('  Checking feedback tab...')

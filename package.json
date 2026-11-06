@@ -28,7 +28,9 @@
     "import:dry": "node --env-file=.env scripts/import.js --dry-run",
     "sheet:create": "node --env-file=.env scripts/create-sheet.js",
     "demo": "node --env-file=.env scripts/demo.js",
-    "demo:headless": "node --env-file=.env scripts/demo.js --headless"
+    "demo:headless": "node --env-file=.env scripts/demo.js --headless",
+    "drive:cleanup": "node --env-file=.env scripts/cleanup-drive.js",
+    "drive:cleanup:delete": "node --env-file=.env scripts/cleanup-drive.js --delete"
   },
   "dependencies": {
     "@clerk/express": "^2.1.87",

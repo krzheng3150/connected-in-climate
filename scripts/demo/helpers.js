@@ -238,8 +238,13 @@ export async function adminExpandProfiles(page) {
 }
 
 export async function adminExpandRawPayload(page) {
-  await page.click('button:has-text("View Submission")')
+  const btn = await page.waitForSelector('button:has-text("View Submission")', { timeout: 5000 })
+  await btn.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(500)
+  await btn.click()
   await page.waitForSelector('.admin-json')
+  const json = await page.$('.admin-json')
+  await json.scrollIntoViewIfNeeded()
 }
 
 export async function adminSelectCandidates(page, count = 1) {
