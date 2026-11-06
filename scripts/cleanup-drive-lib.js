@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 
 const OUTPUT_FOLDER_ID = process.env.RESOURCES_OUTPUT_FOLDER_ID || '18abmqQpxuEJdkYoHax2IZdLbVDYTVE__'
+const TEMPLATE_FOLDER_ID = process.env.RESOURCES_TEMPLATE_FOLDER_ID || '1-H8jxZtsVjiSUY9xTdIoVdMD6O3pGJM8'
 
 function getDrive() {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
@@ -12,7 +13,18 @@ function getDrive() {
   return google.drive({ version: 'v3', auth })
 }
 
+async function isInsideTemplate(drive, folderId) {
+  try {
+    const res = await drive.files.get({ fileId: folderId, fields: 'parents' })
+    const parents = res.data.parents || []
+    return parents.includes(TEMPLATE_FOLDER_ID) || folderId === TEMPLATE_FOLDER_ID
+  } catch { return false }
+}
+
 async function deleteRecursive(drive, folderId) {
+  if (folderId === TEMPLATE_FOLDER_ID || await isInsideTemplate(drive, folderId)) {
+    throw new Error(`Refusing to delete ${folderId} — it belongs to the template folder`)
+  }
   const children = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
     fields: 'files(id,mimeType)',
@@ -45,6 +57,7 @@ export async function cleanupDriveFolders({ silent = false } = {}) {
   })
 
   const allFolders = [...outputResult.data.files, ...orphanResult.data.files]
+    .filter(f => f.id !== TEMPLATE_FOLDER_ID && f.id !== OUTPUT_FOLDER_ID)
   if (allFolders.length === 0) return { deleted: 0 }
 
   let deleted = 0
