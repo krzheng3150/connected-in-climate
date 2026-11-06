@@ -13,6 +13,7 @@ import {
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
+  waitForResourcesFolder, verifyResourcesButton,
   pause,
 } from './helpers.js'
 
@@ -150,6 +151,24 @@ export default async function runScenario(page) {
   if (!matchInfo) throw new Error('No active match found')
   console.log(`  Mentor email: ${matchInfo.mentorEmail}`)
   await closeAllPanels(page)
+
+  // ── Step 7b: Shared resources folder ──
+  console.log('\n── Step 7b: Shared resources folder ──')
+  console.log('  Waiting for resources folder to be created...')
+  const folderUrl = await waitForResourcesFolder(page, MENTEE_EMAIL, matchInfo.matchId)
+  if (folderUrl) {
+    console.log(`  Resources folder: ${folderUrl}`)
+    await openMatchPanel(page)
+    await page.waitForTimeout(1000)
+    const hasButton = await verifyResourcesButton(page)
+    console.log(`  "Open Resources Folder" button visible: ${hasButton}`)
+    if (hasButton) {
+      await pause(page, 2000)
+    }
+    await closeAllPanels(page)
+  } else {
+    console.log('  Resources folder not created (Google OAuth may not be configured)')
+  }
 
   // ── Step 8: Mentor views the same match ──
   console.log('\n── Step 8: Mentor views the same match ──')

@@ -270,6 +270,30 @@ export async function adminSearchFeedback(page, email) {
   await page.waitForTimeout(1000)
 }
 
+// ── Resources ─────────────────────────────────────────────────────
+
+export async function waitForResourcesFolder(page, email, matchId, timeoutMs = 30000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const url = await page.evaluate(async ({ email, matchId }) => {
+      const res = await fetch(`/api/matches/${matchId}?email=${encodeURIComponent(email)}`, {
+        headers: { 'x-user-email': email },
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      return data.resources_folder_url || null
+    }, { email, matchId })
+    if (url) return url
+    await page.waitForTimeout(2000)
+  }
+  return null
+}
+
+export async function verifyResourcesButton(page) {
+  const btn = await page.$('a.btn-primary:has-text("Open Resources Folder")')
+  return !!btn
+}
+
 // ── Utilities ──────────────────────────────────────────────────────
 
 export async function pause(page, ms = 1000) {

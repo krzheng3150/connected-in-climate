@@ -29,6 +29,7 @@ app.use((req, res, next) => {
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1')
+    import('./resources.js').then(m => m.ping()).catch(() => {})
     res.json({ ok: true })
   } catch (err) {
     console.error('[health] DB check failed:', err.message)
