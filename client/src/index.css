@@ -85,6 +85,11 @@ h1, h2, h3, h4, h5, h6 {
   gap: 2rem;
 }
 
+.nav-brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--fg);
+}
 .nav-user-name { color: var(--muted); }
 
 .landing-hero h1 {

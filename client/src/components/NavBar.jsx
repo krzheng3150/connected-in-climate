@@ -9,6 +9,7 @@ export default function NavBar() {
 
   return (
     <header className="page-header">
+      <span className="nav-brand">Connected in Climate</span>
       <div className="user-info">
         <Link to="/" className="btn-link">Home</Link>
         <Link to="/about" className="btn-link">About Us</Link>
