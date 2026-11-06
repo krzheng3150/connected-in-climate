@@ -112,6 +112,32 @@ h1, h2, h3, h4, h5, h6 {
   text-align: left;
 }
 
+.landing-intro {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--fg);
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.landing-story {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.landing-story h2 {
+  font-size: 1.25rem;
+  color: var(--fg);
+  margin-bottom: 0.75rem;
+}
+.landing-story p {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
 .landing-features {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
