@@ -34,12 +34,12 @@ const MULTI_SELECT = [
 ]
 
 const TOPIC_FIELDS_MENTOR = [
-  { key: 'top_strengths', label: 'Topics You Can Mentor On (pick your top 3–5)' },
+  { key: 'top_strengths', label: 'Pick the top 3–5 topics you can mentor on' },
   { key: 'general_topics', label: 'Other Topics You\'re Comfortable With' },
 ]
 
 const TOPIC_FIELDS_MENTEE = [
-  { key: 'top_topics', label: 'Topics You Want Help With (pick your top 3–5)' },
+  { key: 'top_topics', label: 'Pick the top 3–5 Topics You Want Help With' },
 ]
 
 function isMentor(role) { return role === 'mentor' || role === 'both' }
@@ -265,30 +265,58 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
     <div className="application-form">
       <h2>Tell Us More</h2>
       <p className="placeholder-text" style={{ marginBottom: '1rem' }}>
-        Please write in your own words — we want to hear your genuine thoughts and goals.
+        Please keep responses to less than 200 words. We ask that you do not use AI or any LLMs
+        to respond to this question. We want to hear in your own words, genuine thoughts, and
+        goals! Feel free to be informal with your language.
       </p>
       {isMentee(form.role) && (
-        <div className="form-group">
-          <label>Statement of Intent *</label>
-          <textarea
-            rows={4}
-            value={form.statement_of_intent || ''}
-            onChange={e => set('statement_of_intent', e.target.value)}
-            placeholder="What are you hoping to get out of this mentorship? What are your goals?"
-          />
-        </div>
+        <>
+          <div className="form-group">
+            <label>In your own words, what are you hoping to gain from this mentorship? What are three things that are important to you in a potential mentor? *</label>
+            <textarea
+              rows={4}
+              value={form.statement_of_intent || ''}
+              onChange={e => set('statement_of_intent', e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>If applicable, please list or provide links to any relevant climate/sustainability/environmental projects, case studies, capstone projects, etc. that you have worked on</label>
+            <textarea
+              rows={3}
+              value={form.relevant_projects || ''}
+              onChange={e => set('relevant_projects', e.target.value)}
+            />
+          </div>
+        </>
       )}
       {isMentor(form.role) && (
-        <div className="form-group">
-          <label>Motivation *</label>
-          <textarea
-            rows={4}
-            value={form.motivation || ''}
-            onChange={e => set('motivation', e.target.value)}
-            placeholder="Why do you want to mentor? What experience and perspective do you bring?"
-          />
-        </div>
+        <>
+          <div className="form-group">
+            <label>In your own words, why do you want to be a mentor? What do you think is your greatest strength you bring to mentoring? *</label>
+            <textarea
+              rows={4}
+              value={form.motivation || ''}
+              onChange={e => set('motivation', e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Current job market trends suggest it takes about 3–12 months to find a job in climate. How would you help someone who is dealing with a long job search?</label>
+            <textarea
+              rows={4}
+              value={form.eq_response || ''}
+              onChange={e => set('eq_response', e.target.value)}
+            />
+          </div>
+        </>
       )}
+      <div className="form-group">
+        <label>Anything else you would like us to know or consider in matching you with a {isMentor(form.role) ? 'mentee' : 'mentor'}?</label>
+        <textarea
+          rows={3}
+          value={form.additional_info || ''}
+          onChange={e => set('additional_info', e.target.value)}
+        />
+      </div>
       <div className="form-group">
         <label>Fun Fact</label>
         <input type="text" value={form.fun_fact || ''} onChange={e => set('fun_fact', e.target.value)} placeholder="Something interesting about you" />
@@ -303,6 +331,17 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
           <input type="url" value={form.scheduling_link || ''} onChange={e => set('scheduling_link', e.target.value)} placeholder="e.g. https://calendly.com/yourname" />
         </div>
       )}
+      <div className="form-group" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+        <label>
+          Please confirm you can commit to meeting regularly with your selected {isMentor(form.role) ? 'mentee' : 'mentor'} (i.e. once per week or once biweekly). Type your name below as confirmation.
+        </label>
+        <input
+          type="text"
+          value={form.commitment_name || ''}
+          onChange={e => set('commitment_name', e.target.value)}
+          placeholder="Type your full name"
+        />
+      </div>
       {errorsForStep(3).map((msg, i) => <p key={i} className="form-error">{msg}</p>)}
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions">

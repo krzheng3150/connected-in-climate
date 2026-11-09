@@ -112,6 +112,7 @@ export const FIELDS = {
   international_experience: {
     lived_abroad: 'Yes, I have lived and worked in a country that is not my home country.',
     multi_country: 'Yes, I have worked in multiple countries.',
+    study_abroad: 'Yes, I have studied abroad.',
     none: 'No, I do not have experience working in other countries.',
   },
   nonprofit_board_experience: {

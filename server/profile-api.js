@@ -28,6 +28,7 @@ const ENUM_FIELD_MAP = {
 const FREE_TEXT_FIELDS = new Set([
   'preferred_name', 'pronouns', 'location', 'organization', 'timezone', 'scheduling_link',
   'motivation', 'statement_of_intent', 'fun_fact',
+  'relevant_projects', 'eq_response', 'additional_info', 'commitment_name',
 ])
 
 const ARRAY_FREE_TEXT_FIELDS = new Set([
@@ -42,6 +43,10 @@ const MAX_TEXT_LENGTH = {
   pronouns: 100,
   location: 200,
   organization: 200,
+  relevant_projects: 2000,
+  eq_response: 2000,
+  additional_info: 2000,
+  commitment_name: 200,
 }
 
 // ── TF-IDF (same algorithm as import.js) ─────────────────────────
