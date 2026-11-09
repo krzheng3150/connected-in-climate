@@ -19,7 +19,12 @@ export async function getAuthEmail(req) {
   }
   if (process.env.NODE_ENV !== 'production') {
     const header = req.headers['x-user-email']
-    if (header) return header.toLowerCase().trim()
+    if (header) {
+      const email = header.toLowerCase().trim()
+      const adminList = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase())
+      if (adminList.includes(email)) return null
+      return email
+    }
   }
   return null
 }

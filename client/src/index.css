@@ -1334,3 +1334,40 @@ h1, h2, h3, h4, h5, h6 {
 .hiw-apply-link a:hover {
   color: var(--accent-hover);
 }
+
+/* ── Test mode login ──────────────────────────────────────────── */
+
+.test-login-wrapper {
+  max-width: 420px;
+  margin: 0 auto;
+}
+.test-login-form {
+  text-align: left;
+  background: var(--surface);
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.test-login-form label {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.test-login-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.test-login-divider::before,
+.test-login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}

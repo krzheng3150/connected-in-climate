@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { SignIn } from '@clerk/react'
 import NavBar from '../components/NavBar.jsx'
 import HowItWorksPanel from '../components/HowItWorksPanel.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { TEST_MODE } from '../config.js'
 
 const FEATURES = [
   {
@@ -34,11 +37,29 @@ function FeatureCard({ icon, title, description }) {
 export default function Landing() {
   const [hiwOpen, setHiwOpen] = useState(false)
   const [hiwRole, setHiwRole] = useState(null)
+  const [email, setEmail] = useState('')
+  const [testError, setTestError] = useState(null)
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
+  const { testLogin, error: authError } = useAuth()
+  const navigate = useNavigate()
+
+  const isAdminError = authError && authError.includes('admin')
+  const showAdmin = showAdminLogin || isAdminError
 
   function openHiw(role) {
     setHiwRole(role)
     setHiwOpen(true)
   }
+
+  function handleTestLogin(e) {
+    e.preventDefault()
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed || !trimmed.includes('@')) return
+    setTestError(null)
+    testLogin(trimmed)
+    navigate('/dashboard')
+  }
+
 
   return (
     <div className="landing">
@@ -78,16 +99,51 @@ export default function Landing() {
 
       <hr className="landing-divider" />
 
-      <div className="clerk-signin-wrapper">
-        <SignIn
-          routing="hash"
-          appearance={{
-            elements: {
-              rootBox: { width: '100%', maxWidth: '420px', margin: '0 auto' },
-            },
-          }}
-        />
-      </div>
+      {TEST_MODE ? (
+        <div className="test-login-wrapper">
+          <form onSubmit={handleTestLogin} className="test-login-form">
+            <label>Enter your email to get started</label>
+            <div className="input-row">
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+              <button type="submit" className="btn-primary">Go</button>
+            </div>
+            {(testError || authError) && <p className="form-error">{testError || authError}</p>}
+          </form>
+          {showAdmin && (
+            <>
+              <div className="test-login-divider">
+                <span>admin sign-in</span>
+              </div>
+              <div className="clerk-signin-wrapper">
+                <SignIn
+                  routing="hash"
+                  appearance={{
+                    elements: {
+                      rootBox: { width: '100%', maxWidth: '420px', margin: '0 auto' },
+                    },
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="clerk-signin-wrapper">
+          <SignIn
+            routing="hash"
+            appearance={{
+              elements: {
+                rootBox: { width: '100%', maxWidth: '420px', margin: '0 auto' },
+              },
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

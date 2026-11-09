@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth as useClerkAuth } from '@clerk/react'
+import { TEST_MODE } from './config.js'
 import RequireAuth from './components/RequireAuth.jsx'
 import RequireAdmin from './components/RequireAdmin.jsx'
 import Landing from './pages/Landing.jsx'
@@ -32,11 +33,13 @@ class ErrorBoundary extends React.Component {
 
 export default function App() {
   const { isSignedIn, isLoaded } = useClerkAuth()
+  const testEmail = TEST_MODE && (() => { try { return sessionStorage.getItem('test_email') } catch { return null } })()
+  const loggedIn = TEST_MODE ? (!!testEmail || isSignedIn) : isSignedIn
 
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/" element={!isLoaded ? null : isSignedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
+        <Route path="/" element={!isLoaded && !TEST_MODE ? null : loggedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
         <Route path="/about" element={<About />} />
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/matches/:matchId" element={<RequireAuth><MatchDetail /></RequireAuth>} />
