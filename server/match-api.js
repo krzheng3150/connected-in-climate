@@ -57,7 +57,7 @@ router.post('/run', async (req, res, next) => {
     }
 
     const menteeRow = await pool.query(
-      'SELECT email, name, role, payload, embedding::text FROM user_profiles WHERE email = $1',
+      'SELECT email, name, role, payload, embedding::text, status FROM user_profiles WHERE email = $1',
       [normalEmail],
     )
     if (menteeRow.rows.length === 0) {
@@ -67,12 +67,15 @@ router.post('/run', async (req, res, next) => {
     if (!isMentee(menteeProfile.role)) {
       return res.status(400).json({ error: 'user is not a mentee' })
     }
+    if (menteeProfile.status !== 'APPROVED') {
+      return res.status(400).json({ error: 'Your application is still under review.' })
+    }
     const mentee = profileFromRow(menteeProfile)
 
     const mentorRows = await pool.query(
       `SELECT email, name, role, payload, embedding::text
        FROM user_profiles
-       WHERE role IN ('mentor', 'both') AND email != $1`,
+       WHERE role IN ('mentor', 'both') AND email != $1 AND status = 'APPROVED'`,
       [mentee.email],
     )
     const mentors = mentorRows.rows.map(profileFromRow)

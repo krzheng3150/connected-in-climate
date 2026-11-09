@@ -97,7 +97,7 @@ export default function MenteeDashboard() {
 
   return (
     <div className="mentee-dashboard">
-      {noRun && (
+      {noRun && user.status === 'APPROVED' && (
         <>
           <div className="dashboard-actions">
             <button className="btn-primary" onClick={() => setConfirmFind(true)} disabled={finding}>

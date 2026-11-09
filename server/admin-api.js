@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { pool } from './db.js'
 import { getAuthEmail } from './auth.js'
-import { notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
+import { notifyMatchActive, notifyMenteeMatchesReady, notifyApplicantApproved } from './email.js'
 import { createMatchResources } from './resources.js'
 
 const router = Router()
@@ -29,11 +29,42 @@ router.use(requireAdmin)
 router.get('/applications', async (_req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT email, name, role, payload, embedding IS NOT NULL AS has_embedding,
+      `SELECT email, name, role, payload, status, embedding IS NOT NULL AS has_embedding,
               created_at, updated_at
        FROM user_profiles ORDER BY created_at DESC`,
     )
     res.json({ profiles: result.rows })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── POST /api/admin/applications/:email/approve ───────────────────────
+
+router.post('/applications/:email/approve', async (req, res, next) => {
+  try {
+    const email = req.params.email.toLowerCase().trim()
+    const result = await pool.query(
+      'SELECT email, name, status FROM user_profiles WHERE email = $1',
+      [email],
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'profile not found' })
+    }
+    if (result.rows[0].status === 'APPROVED') {
+      return res.json({ ok: true, message: 'already approved' })
+    }
+
+    await pool.query(
+      `UPDATE user_profiles SET status = 'APPROVED', updated_at = now() WHERE email = $1`,
+      [email],
+    )
+
+    const { name } = result.rows[0]
+    notifyApplicantApproved(email, name)
+
+    console.log(`[admin] approved application: email=${email} by=${req.adminEmail}`)
+    res.json({ ok: true })
   } catch (err) {
     next(err)
   }

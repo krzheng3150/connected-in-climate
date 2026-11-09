@@ -13,6 +13,8 @@ export async function login(page, email) {
     route.continue({ headers })
   }
   await page.route('**/api/**', activeRouteHandler)
+  await page.goto(BASE_URL + '/')
+  await page.evaluate(e => sessionStorage.setItem('test_email', e), email)
   await page.goto(BASE_URL + '/dashboard')
   await page.waitForSelector('.page-header, .page-body', { timeout: 10000 })
 }
@@ -144,6 +146,26 @@ export async function editProfile(page, { name }) {
   })
 
   await page.waitForSelector('.application-form', { state: 'hidden', timeout: 15000 })
+}
+
+// ── Pending Banner ────────────────────────────────────────────────
+
+export async function verifyPendingBanner(page) {
+  const banner = await page.waitForSelector('.pending-banner', { timeout: 5000 })
+  return banner.textContent()
+}
+
+// ── Admin: Approve Application ───────────────────────────────────
+
+export async function adminApproveApplication(page, name) {
+  await page.waitForSelector('.admin-card', { timeout: 10000 })
+  const card = await page.$(`.admin-card:has-text("${name}")`)
+  if (!card) throw new Error(`No application card found for "${name}"`)
+  const btn = await card.$('.btn-primary:has-text("Approve")')
+  if (!btn) throw new Error(`No Approve button found for "${name}"`)
+  await btn.click()
+  await page.waitForSelector('.feedback-msg', { timeout: 5000 })
+  return page.textContent('.feedback-msg')
 }
 
 // ── Mentee Actions ─────────────────────────────────────────────────

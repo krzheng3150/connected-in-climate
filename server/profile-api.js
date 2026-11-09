@@ -3,8 +3,12 @@ import { pool } from './db.js'
 import { getAuthEmail } from './auth.js'
 import { FIELDS, normalize, normalizeArray } from './field-registry.js'
 import { isMentor, isMentee } from './roles.js'
+import { notifyAdminsNewApplication } from './email.js'
 
 const router = Router()
+
+const AUTO_APPROVE_MENTOR = false
+const AUTO_APPROVE_MENTEE = false
 
 const EMBEDDING_DIMENSIONS = 1536
 
@@ -192,13 +196,24 @@ router.post('/', async (req, res, next) => {
     const { errors, name, role, payload } = validateProfile(req.body)
     if (errors.length) return res.status(400).json({ errors })
 
+    const autoApprove = (isMentor(role) && AUTO_APPROVE_MENTOR) || (isMentee(role) && AUTO_APPROVE_MENTEE)
+    const status = autoApprove ? 'APPROVED' : 'PENDING'
+
     await pool.query(
-      `INSERT INTO user_profiles (email, name, role, payload, embedding, updated_at)
-       VALUES ($1, $2, $3, $4, $5::vector, now())`,
-      [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload)],
+      `INSERT INTO user_profiles (email, name, role, payload, embedding, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5::vector, $6, now())`,
+      [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload), status],
     )
 
-    console.log(`[profile] created: email=${email} role=${role} name="${name}"`)
+    console.log(`[profile] created: email=${email} role=${role} name="${name}" status=${status}`)
+
+    if (status === 'PENDING') {
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
+      if (adminEmails.length > 0) {
+        notifyAdminsNewApplication(adminEmails, name, email, role)
+      }
+    }
+
     res.status(201).json({ ok: true })
   } catch (err) {
     next(err)

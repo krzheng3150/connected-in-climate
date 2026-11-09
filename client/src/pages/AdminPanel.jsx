@@ -4,7 +4,7 @@ import { ProfileDetail } from '../components/ProfileFields.jsx'
 import ConfirmationModal from '../components/ConfirmationModal.jsx'
 import NavBar from '../components/NavBar.jsx'
 
-const TABS = ['Pending', 'Profiles', 'Search', 'Feedback', 'Blocks']
+const TABS = ['Applications', 'Pending', 'Profiles', 'Search', 'Feedback', 'Blocks']
 
 export default function AdminPanel() {
   const { user } = useAuth()
@@ -28,12 +28,107 @@ export default function AdminPanel() {
       </div>
 
       <main className="page-body" style={{ paddingTop: '1rem' }}>
+        {tab === 'Applications' && <ApplicationsTab headers={adminHeaders} />}
         {tab === 'Pending' && <PendingTab headers={adminHeaders} />}
         {tab === 'Profiles' && <ProfilesTab headers={adminHeaders} />}
         {tab === 'Search' && <SearchTab headers={adminHeaders} />}
         {tab === 'Feedback' && <FeedbackTab headers={adminHeaders} />}
         {tab === 'Blocks' && <BlocksTab headers={adminHeaders} />}
       </main>
+    </div>
+  )
+}
+
+// ── Applications Tab ─────────────────────────────────────────────
+
+function ApplicationsTab({ headers }) {
+  const [profiles, setProfiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [actionMsg, setActionMsg] = useState(null)
+  const [expanded, setExpanded] = useState(new Set())
+
+  const loadProfiles = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/applications', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setProfiles(data.profiles.filter(p => p.status === 'PENDING'))
+      } else {
+        setError('Failed to load applications.')
+      }
+    } catch {
+      setError('Could not reach the server.')
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadProfiles() }, [loadProfiles])
+
+  async function handleApprove(email, name) {
+    setActionMsg(null)
+    try {
+      const res = await fetch(`/api/admin/applications/${encodeURIComponent(email)}/approve`, {
+        method: 'POST',
+        headers,
+      })
+      if (res.ok) {
+        setActionMsg(`Approved ${name} (${email})`)
+        loadProfiles()
+      } else {
+        const data = await res.json()
+        setActionMsg(data.error || 'Failed to approve.')
+      }
+    } catch {
+      setActionMsg('Could not reach the server.')
+    }
+  }
+
+  function toggleExpand(email) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
+      return next
+    })
+  }
+
+  if (loading) return <p className="placeholder-text">Loading applications...</p>
+  if (error) return <p className="form-error">{error}</p>
+
+  return (
+    <div className="admin-section">
+      {actionMsg && <p className="feedback-msg">{actionMsg}</p>}
+      {profiles.length === 0 && (
+        <p className="placeholder-text">No pending applications.</p>
+      )}
+      {profiles.length > 0 && (
+        <h3>Pending Applications ({profiles.length})</h3>
+      )}
+      {profiles.map(p => {
+        const date = new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        return (
+          <div key={p.email} className="admin-card" style={{ padding: '1rem' }}>
+            <div className="admin-card-header">
+              <strong>{p.name}</strong>
+              <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
+                {p.email} &middot; <span className="role-badge">{p.role}</span> &middot; {date}
+              </span>
+            </div>
+            <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>
+              <button className="btn-link" onClick={() => toggleExpand(p.email)}>
+                {expanded.has(p.email) ? 'Hide profile' : 'Show profile'}
+              </button>
+              <button className="btn-primary" onClick={() => handleApprove(p.email, p.name)}>
+                Approve
+              </button>
+            </div>
+            {expanded.has(p.email) && <ProfileDetail payload={p.payload} />}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -337,6 +432,7 @@ function ProfilesTab({ headers }) {
               <th>Email</th>
               <th>Name</th>
               <th>Role</th>
+              <th>Status</th>
               {payloadCols.map(k => <th key={k}>{k}</th>)}
               <th>Embedding</th>
               <th>Created</th>
@@ -349,6 +445,7 @@ function ProfilesTab({ headers }) {
                 <td>{p.email}</td>
                 <td>{p.name}</td>
                 <td><span className="role-badge">{p.role}</span></td>
+                <td><span className={`badge ${p.status === 'APPROVED' ? 'badge-done' : 'badge-next'}`}>{p.status}</span></td>
                 {payloadCols.map(k => (
                   <td key={k} title={formatCell(p.payload?.[k])}>{formatCell(p.payload?.[k])}</td>
                 ))}

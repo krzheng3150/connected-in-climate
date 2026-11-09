@@ -51,7 +51,7 @@ app.get('/api/profiles/me', async (req, res, next) => {
     if (!email) return res.status(401).json({ error: 'not authenticated' })
     const normalEmail = email.toLowerCase().trim()
     const result = await pool.query(
-      'SELECT email, name, role, payload FROM user_profiles WHERE email = $1',
+      'SELECT email, name, role, payload, status FROM user_profiles WHERE email = $1',
       [normalEmail],
     )
     const isAdmin = getAdminEmails().has(normalEmail)
@@ -65,6 +65,7 @@ app.get('/api/profiles/me', async (req, res, next) => {
         preferred_name: null,
         is_admin: isAdmin,
         has_profile: false,
+        status: null,
       })
     }
     const row = result.rows[0]
@@ -78,6 +79,7 @@ app.get('/api/profiles/me', async (req, res, next) => {
       payload: row.payload,
       is_admin: isAdmin,
       has_profile: true,
+      status: row.status,
     })
   } catch (err) {
     next(err)

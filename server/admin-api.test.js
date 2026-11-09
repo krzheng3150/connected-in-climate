@@ -17,8 +17,10 @@ before(async () => {
       email TEXT PRIMARY KEY, name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('mentor','mentee','both')),
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      status TEXT NOT NULL DEFAULT 'APPROVED',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
@@ -190,6 +192,43 @@ describe('GET /api/admin/profiles', () => {
 
   it('returns 404 for unknown email', async () => {
     const { status } = await get('/api/admin/profiles?email=nobody@test.com', admin)
+    assert.equal(status, 404)
+  })
+})
+
+// ── GET /api/admin/applications ────────────────────────────────────
+
+describe('GET /api/admin/applications', () => {
+  it('returns profiles with status field', async () => {
+    const { status, data } = await get('/api/admin/applications', admin)
+    assert.equal(status, 200)
+    assert.ok(data.profiles.length >= 1)
+    assert.ok(data.profiles[0].status)
+  })
+})
+
+// ── POST /api/admin/applications/:email/approve ───────────────────
+
+describe('POST /api/admin/applications/:email/approve', () => {
+  it('approves a pending profile', async () => {
+    await pool.query(`UPDATE user_profiles SET status = 'PENDING' WHERE email = 'mentor@test.com'`)
+
+    const { status, data } = await post('/api/admin/applications/mentor@test.com/approve', {}, admin)
+    assert.equal(status, 200)
+    assert.equal(data.ok, true)
+
+    const result = await pool.query('SELECT status FROM user_profiles WHERE email = $1', ['mentor@test.com'])
+    assert.equal(result.rows[0].status, 'APPROVED')
+  })
+
+  it('returns ok for already-approved profile', async () => {
+    const { status, data } = await post('/api/admin/applications/mentor@test.com/approve', {}, admin)
+    assert.equal(status, 200)
+    assert.equal(data.message, 'already approved')
+  })
+
+  it('returns 404 for unknown email', async () => {
+    const { status } = await post('/api/admin/applications/nobody@test.com/approve', {}, admin)
     assert.equal(status, 404)
   })
 })

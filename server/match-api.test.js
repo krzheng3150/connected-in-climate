@@ -18,8 +18,10 @@ before(async () => {
       email TEXT PRIMARY KEY, name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('mentor','mentee','both')),
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      status TEXT NOT NULL DEFAULT 'APPROVED',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
@@ -422,5 +424,34 @@ describe('No mentors available', () => {
     assert.equal(status, 200)
     assert.equal(data.run, null)
     assert.ok(data.message.includes('No mentors'))
+  })
+})
+
+// ── Profile approval gating ───────────────────────────────────────
+
+describe('Profile approval gating', () => {
+  it('returns 400 for PENDING mentee', async () => {
+    await pool.query(`UPDATE user_profiles SET status = 'PENDING' WHERE email = 'mentee2@test.com'`)
+    const { status, data } = await post('/api/matches/run', { email: 'mentee2@test.com' })
+    assert.equal(status, 400)
+    assert.ok(data.error.includes('under review'))
+    await pool.query(`UPDATE user_profiles SET status = 'APPROVED' WHERE email = 'mentee2@test.com'`)
+  })
+
+  it('excludes PENDING mentors from matching pool', async () => {
+    // Reset state: cancel runs, clear active matches, restore capacities
+    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee2@test.com'`)
+    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee2@test.com'`)
+    await pool.query(`UPDATE user_profiles SET payload = jsonb_set(payload, '{max_capacity}', '2') WHERE email = 'mentor1@test.com'`)
+    await pool.query(`UPDATE user_profiles SET payload = jsonb_set(payload, '{max_capacity}', '1') WHERE email = 'mentor2@test.com'`)
+
+    await pool.query(`UPDATE user_profiles SET status = 'PENDING' WHERE email = 'mentor1@test.com'`)
+
+    const { status, data } = await post('/api/matches/run', { email: 'mentee2@test.com' })
+    assert.equal(status, 200)
+    assert.ok(data.run)
+    assert.equal(data.total_scored, 1)
+
+    await pool.query(`UPDATE user_profiles SET status = 'APPROVED' WHERE email = 'mentor1@test.com'`)
   })
 })

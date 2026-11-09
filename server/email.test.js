@@ -6,7 +6,7 @@ import express from 'express'
 import { pool } from './db.js'
 import matchRouter from './match-api.js'
 import adminRouter from './admin-api.js'
-import { _testGetSent, _testClear } from './email.js'
+import { _testGetSent, _testClear, notifyAdminsNewApplication, notifyApplicantApproved } from './email.js'
 
 let server, baseUrl
 
@@ -17,8 +17,10 @@ before(async () => {
       email TEXT PRIMARY KEY, name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('mentor','mentee','both')),
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      status TEXT NOT NULL DEFAULT 'APPROVED',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
@@ -127,6 +129,44 @@ async function post(path, body, headers = {}) {
 }
 
 const admin = { 'x-user-email': 'admin@test.com' }
+
+// ── New application → admin notification ──────────────────────────
+
+describe('Email: new application submitted', () => {
+  beforeEach(() => _testClear())
+
+  it('notifies admins about a new application', () => {
+    notifyAdminsNewApplication(['admin@test.com'], 'New Person', 'new@test.com', 'mentee')
+
+    const sent = _testGetSent()
+    assert.equal(sent.length, 1)
+    assert.equal(sent[0].to, 'admin@test.com')
+    assert.ok(sent[0].subject.includes('New Person'))
+    assert.ok(sent[0].subject.includes('mentee'))
+  })
+
+  it('notifies multiple admins', () => {
+    notifyAdminsNewApplication(['admin1@test.com', 'admin2@test.com'], 'New Person', 'new@test.com', 'mentor')
+
+    const sent = _testGetSent()
+    assert.equal(sent.length, 2)
+  })
+})
+
+// ── Application approved → applicant notification ─────────────────
+
+describe('Email: application approved', () => {
+  beforeEach(() => _testClear())
+
+  it('notifies applicant when approved', () => {
+    notifyApplicantApproved('new@test.com', 'New Person')
+
+    const sent = _testGetSent()
+    assert.equal(sent.length, 1)
+    assert.equal(sent[0].to, 'new@test.com')
+    assert.ok(sent[0].subject.includes('approved'))
+  })
+})
 
 // ── POST /api/matches/run → admin notification ───────────────────
 

@@ -15,8 +15,10 @@ before(async () => {
       email TEXT PRIMARY KEY, name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('mentor','mentee','both')),
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      status TEXT NOT NULL DEFAULT 'APPROVED',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
   `)
 
   const app = express()
@@ -59,7 +61,7 @@ function patch(body, email = 'new@test.com') {
 
 async function getProfile(email) {
   const result = await pool.query(
-    'SELECT email, name, role, payload, embedding IS NOT NULL AS has_embedding FROM user_profiles WHERE email = $1',
+    'SELECT email, name, role, payload, embedding IS NOT NULL AS has_embedding, status FROM user_profiles WHERE email = $1',
     [email],
   )
   return result.rows[0] || null
@@ -97,6 +99,7 @@ describe('POST /api/profiles', () => {
     assert.equal(row.payload.statement_of_intent, 'I want to learn about climate policy.')
     assert.equal(row.payload.career_level, 'entry')
     assert.equal(row.has_embedding, true)
+    assert.equal(row.status, 'PENDING')
   })
 
   it('creates a mentor profile', async () => {
@@ -109,6 +112,7 @@ describe('POST /api/profiles', () => {
     assert.equal(row.role, 'mentor')
     assert.equal(row.payload.motivation, 'I want to share my climate finance experience.')
     assert.equal(row.has_embedding, true)
+    assert.equal(row.status, 'PENDING')
   })
 
   it('returns 401 without auth', async () => {
@@ -371,6 +375,16 @@ describe('PATCH /api/profiles', () => {
     const row = await getProfile('new@test.com')
     assert.equal(row.payload.preferred_name, 'Jane')
     assert.equal(row.payload.fun_fact, 'I climb mountains.')
+  })
+
+  it('does not change status on update', async () => {
+    await post(VALID_MENTEE)
+    const before = await getProfile('new@test.com')
+    assert.equal(before.status, 'PENDING')
+
+    await patch({ ...VALID_MENTEE, name: 'Jane Updated' })
+    const after = await getProfile('new@test.com')
+    assert.equal(after.status, 'PENDING')
   })
 
   it('updates updated_at timestamp', async () => {

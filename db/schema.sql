@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS match_runs (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
+
 CREATE INDEX IF NOT EXISTS idx_match_runs_mentee ON match_runs(mentee_email, status);
 
 CREATE TABLE IF NOT EXISTS matches (

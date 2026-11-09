@@ -36,6 +36,29 @@ function wrap(body) {
   `
 }
 
+export function notifyAdminsNewApplication(adminEmails, name, email, role) {
+  const subject = `New application: ${name} (${role})`
+  const html = wrap(`
+    <p><strong>${name}</strong> (${email}) has submitted a <strong>${role}</strong> application and is waiting for approval.</p>
+    <p><a href="${APP_URL}/admin" style="color: #2d6a4f;">Review applications →</a></p>
+  `)
+  for (const addr of adminEmails) {
+    send(addr, subject, html)
+  }
+}
+
+export function notifyApplicantApproved(email, name) {
+  send(
+    email,
+    'Your Connected in Climate application has been approved!',
+    wrap(`
+      <p>Hi ${name},</p>
+      <p>Great news — your application has been approved! You can now log in and get started.</p>
+      <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">Go to your dashboard →</a></p>
+    `),
+  )
+}
+
 export function notifyAdminsNewRun(adminEmails, menteeName, menteeEmail) {
   const subject = `New match run: ${menteeName} is pending review`
   const html = wrap(`

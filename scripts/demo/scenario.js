@@ -10,6 +10,7 @@ import {
   openMatchPanel, getPartnerName, closeAllPanels,
   openPickDetail, getOpenPanelCount,
   submitFeedback, getFeedbackCount, fillApplication, editProfile,
+  verifyPendingBanner, adminApproveApplication,
   adminSearchProfile, adminSwitchTab, adminExpandScores,
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
@@ -29,6 +30,8 @@ export default async function runScenario(page) {
   if (!menteeWelcome.includes(NEW_MENTEE_NAME)) {
     throw new Error(`Expected welcome for ${NEW_MENTEE_NAME}, got: ${menteeWelcome}`)
   }
+  const menteeBanner = await verifyPendingBanner(page)
+  console.log(`  Pending banner: "${menteeBanner.trim().substring(0, 60)}..."`)
   console.log('  Editing profile...')
   await editProfile(page, { name: NEW_MENTEE_EDITED_NAME })
   await page.waitForTimeout(1000)
@@ -52,6 +55,8 @@ export default async function runScenario(page) {
   if (!mentorWelcome.includes(NEW_MENTOR_NAME)) {
     throw new Error(`Expected welcome for ${NEW_MENTOR_NAME}, got: ${mentorWelcome}`)
   }
+  const mentorBanner = await verifyPendingBanner(page)
+  console.log(`  Pending banner: "${mentorBanner.trim().substring(0, 60)}..."`)
   console.log('  Editing profile...')
   await editProfile(page, { name: NEW_MENTOR_EDITED_NAME })
   await page.waitForTimeout(1000)
@@ -60,6 +65,24 @@ export default async function runScenario(page) {
   if (!editedMentorWelcome.includes(NEW_MENTOR_EDITED_NAME)) {
     throw new Error(`Expected welcome for ${NEW_MENTOR_EDITED_NAME}, got: ${editedMentorWelcome}`)
   }
+  await signOut(page)
+  console.log('  Signed out.')
+  await pause(page)
+
+  // ── Step 2b: Admin approves new applications ──
+  console.log('\n── Step 2b: Admin approves new applications ──')
+  await login(page, ADMIN_EMAIL)
+  await goToAdmin(page)
+  await adminSwitchTab(page, 'Applications')
+  await pause(page, 1500)
+  console.log('  Approving new mentee...')
+  const approveMentee = await adminApproveApplication(page, NEW_MENTEE_EDITED_NAME)
+  console.log(`  ${approveMentee}`)
+  await pause(page, 1000)
+  console.log('  Approving new mentor...')
+  const approveMentor = await adminApproveApplication(page, NEW_MENTOR_EDITED_NAME)
+  console.log(`  ${approveMentor}`)
+  await pause(page, 1000)
   await signOut(page)
   console.log('  Signed out.')
   await pause(page)
