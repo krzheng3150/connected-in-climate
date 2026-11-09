@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { LABELS } from './ProfileFields.jsx'
+import HowItWorksPanel from './HowItWorksPanel.jsx'
 
 const ROLE_OPTIONS = [
   { id: 'mentee', label: 'Mentee', desc: 'I\'m looking for a mentor in climate.' },
@@ -98,6 +99,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
+  const [hiwOpen, setHiwOpen] = useState(false)
 
   const STEP_FIELDS = {
     0: ['role'],
@@ -179,7 +181,11 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
           <button className="btn-primary" disabled={!form.role} onClick={() => setStep(1)}>
             Next
           </button>
+          <button className="btn-secondary" onClick={() => setHiwOpen(true)}>
+            See How It Works
+          </button>
         </div>
+        <HowItWorksPanel open={hiwOpen} onClose={() => setHiwOpen(false)} initialRole={form.role} />
       </div>
     )
   }

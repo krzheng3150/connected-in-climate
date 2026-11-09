@@ -1116,3 +1116,221 @@ h1, h2, h3, h4, h5, h6 {
 }
 .admin-table tbody tr:hover { background: var(--accent-light); }
 .admin-table td:first-child { font-family: monospace; font-size: 0.75rem; }
+
+/* ── How It Works ─────────────────────────────────────────────── */
+
+.hiw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hiw-drawer {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  animation: hiw-slide-in 0.25s ease-out;
+}
+
+@keyframes hiw-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.hiw-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.hiw-drawer-header h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+}
+.hiw-drawer-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+}
+.hiw-drawer-close:hover {
+  color: var(--fg);
+}
+
+.hiw-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.hiw-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.hiw-panel-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--fg);
+  transition: background 0.15s;
+}
+.hiw-panel-toggle:hover {
+  background: var(--accent-light);
+}
+.hiw-panel-toggle.open {
+  border-bottom: 1px solid var(--border);
+}
+
+.hiw-panel-label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.hiw-panel-icon {
+  font-size: 1.25rem;
+}
+.hiw-panel-chevron {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.hiw-panel-body {
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
+/* ── Timeline steps ───────────────────────────────────────────── */
+
+.hiw-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.hiw-step {
+  display: flex;
+  gap: 1rem;
+}
+
+.hiw-step-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+}
+
+.hiw-step-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  background: var(--accent-light);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hiw-step-line {
+  width: 2px;
+  flex: 1;
+  background: var(--border);
+  min-height: 1rem;
+}
+
+.hiw-step-content {
+  padding-bottom: 1.5rem;
+}
+.hiw-step:last-child .hiw-step-content {
+  padding-bottom: 0;
+}
+
+.hiw-step-content h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  line-height: 2.5rem;
+}
+
+.hiw-step-content p {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* ── Teaser card (Landing, etc.) ──────────────────────────────── */
+
+.hiw-teaser {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.hiw-teaser h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.hiw-teaser p {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+.hiw-teaser-links {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.hiw-teaser-btn {
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 0.5rem 1.25rem;
+  display: inline-block;
+}
+
+.hiw-apply-link {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-top: 1rem;
+}
+.hiw-apply-link a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hiw-apply-link a:hover {
+  color: var(--accent-hover);
+}

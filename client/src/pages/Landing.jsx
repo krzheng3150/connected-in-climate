@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { SignIn } from '@clerk/react'
 import NavBar from '../components/NavBar.jsx'
+import HowItWorksPanel from '../components/HowItWorksPanel.jsx'
 
 const FEATURES = [
   {
@@ -30,6 +32,14 @@ function FeatureCard({ icon, title, description }) {
 }
 
 export default function Landing() {
+  const [hiwOpen, setHiwOpen] = useState(false)
+  const [hiwRole, setHiwRole] = useState(null)
+
+  function openHiw(role) {
+    setHiwRole(role)
+    setHiwOpen(true)
+  }
+
   return (
     <div className="landing">
       <NavBar />
@@ -54,6 +64,17 @@ export default function Landing() {
           <FeatureCard key={f.title} {...f} />
         ))}
       </div>
+
+      <div className="hiw-teaser">
+        <h3>How Connected in Climate Works</h3>
+        <p>See the step-by-step process from application to mentorship.</p>
+        <div className="hiw-teaser-links">
+          <button className="btn-secondary hiw-teaser-btn" onClick={() => openHiw('mentee')}>I'm a Mentee</button>
+          <button className="btn-secondary hiw-teaser-btn" onClick={() => openHiw('mentor')}>I'm a Mentor</button>
+        </div>
+      </div>
+
+      <HowItWorksPanel open={hiwOpen} onClose={() => setHiwOpen(false)} initialRole={hiwRole} />
 
       <hr className="landing-divider" />
 
