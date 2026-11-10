@@ -228,6 +228,34 @@ async function upsertProfiles(client, profiles) {
   return stats
 }
 
+const TOP_CANDIDATES = 5
+
+// Desired lifecycle state per mentee, processed in this order.
+// The algorithm runs with accumulating state — earlier active matches
+// affect capacity/eligibility for later runs, just like production.
+const MENTEE_LIFECYCLE = [
+  { email: 'mentee2@example.com', state: 'FINISHED', daysAgo: 30 },
+  { email: 'mentee6@example.com', state: 'ACTIVE', daysAgo: 14 },
+  { email: 'mentee8@example.com', state: 'ACTIVE', daysAgo: 7 },
+  { email: 'mentee3@example.com', state: 'ACTIVE', daysAgo: 5 },
+  { email: 'mentee4@example.com', state: 'AWAITING_MENTEE', daysAgo: 2 },
+  { email: 'mentee1@example.com', state: 'PENDING_REVIEW', daysAgo: 0 },
+  { email: 'mentee5@example.com', state: 'PENDING_REVIEW', daysAgo: 0 },
+  { email: 'mentee7@example.com', state: 'PENDING_REVIEW', daysAgo: 0 },
+  { email: 'both2@example.com',   state: 'PENDING_REVIEW', daysAgo: 0 },
+]
+
+const FEEDBACK = {
+  'mentee2@example.com': [
+    { from: 'mentee', rating: 5, text: 'Priya was incredibly helpful with navigating international climate finance. Her COP negotiation experience gave me a perspective I could not have gotten anywhere else.' },
+    { from: 'mentor', rating: 4, text: 'Marcus is driven and prepared. He came to every session with thoughtful questions. Will go far in this space.' },
+  ],
+}
+
+const BLOCK_LIST = [
+  { mentor: 'mentor3@example.com', mentee: 'mentee7@example.com', reason: 'Mentee requested a different mentor focus area' },
+]
+
 async function seedMatchLifecycle(client, profiles) {
   const existing = (await client.query(
     "SELECT run_id FROM match_runs WHERE code_commit = 'seed' LIMIT 1",
@@ -237,142 +265,120 @@ async function seedMatchLifecycle(client, profiles) {
     return
   }
 
-  const profileMap = new Map(profiles.map(p => [p.email, p]))
-
-  // ── 1. Finished match: Marcus Rivera ↔ Priya Sharma ──────────────
-  const mentee1 = profileMap.get('mentee2@example.com')
-  const mentor1 = profileMap.get('mentor2@example.com')
-
-  if (!mentee1 || !mentor1) {
-    console.log('  Skipping finished match — profiles not found')
-    return
-  }
-
   const allProfiles = profiles.map(p => ({
     email: p.email, name: p.name, role: p.role,
     payload: p.payload, embedding: p.embedding,
   }))
   const mentors = allProfiles.filter(p => isMentor(p.role))
 
-  const { results: results1 } = rankMentors(
-    allProfiles.find(p => p.email === mentee1.email),
-    mentors, [], [],
-    { algorithm_version: 'seed', reliability_multiplier: 1.0 },
-  )
+  // Accumulating state — grows as matches are "completed"
+  const activeMatches = []
+  const blockList = BLOCK_LIST.map(b => ({ mentor_email: b.mentor, mentee_email: b.mentee }))
 
-  if (results1.length === 0) {
-    console.log('  Skipping match lifecycle — no ranked results for Marcus')
-    return
-  }
+  for (const { email, state, daysAgo } of MENTEE_LIFECYCLE) {
+    const mentee = allProfiles.find(p => p.email === email)
+    if (!mentee || !isMentee(mentee.role)) continue
 
-  const priyaResult = results1.find(r => r.mentor_snapshot.email === mentor1.email) || results1[0]
-  const runId1 = (await client.query(
-    `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit, reviewed_by, reviewed_at)
-     VALUES ($1, 'ACTIVE', $2, $3, 'seed', 'admin@example.com', now() - interval '14 days')
-     RETURNING run_id`,
-    [mentee1.email, Math.min(5, results1.length), results1.length],
-  )).rows[0].run_id
-
-  const matchId1 = (await client.query(
-    `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit)
-     VALUES ($1, $2, $3, 'FINISHED', $4, $5, $6, 'seed')
-     RETURNING match_id`,
-    [runId1, mentor1.email, mentee1.email, priyaResult.scores.final, priyaResult.rank, JSON.stringify(priyaResult)],
-  )).rows[0].match_id
-
-  await client.query(
-    `INSERT INTO match_actions (match_id, actor_email, action_type) VALUES ($1, $2, 'SELECT')`,
-    [matchId1, mentee1.email],
-  )
-  await client.query(
-    `INSERT INTO feedbacks (match_id, submitter_email, rating, text)
-     VALUES ($1, $2, 5, 'Priya was incredibly helpful with navigating international climate finance. Her COP negotiation experience gave me a perspective I could not have gotten anywhere else.')`,
-    [matchId1, mentee1.email],
-  )
-  await client.query(
-    `INSERT INTO feedbacks (match_id, submitter_email, rating, text)
-     VALUES ($1, $2, 4, 'Marcus is driven and prepared. He came to every session with thoughtful questions. Will go far in this space.')`,
-    [matchId1, mentor1.email],
-  )
-  console.log(`  Finished match: Marcus ↔ Priya (${matchId1})`)
-
-  // ── 2. Active match: Fatima Al-Hassan ↔ Amara Okafor ─────────────
-  const mentee2 = profileMap.get('mentee6@example.com')
-  const mentor2 = profileMap.get('mentor4@example.com')
-
-  if (mentee2 && mentor2) {
-    const { results: results2 } = rankMentors(
-      allProfiles.find(p => p.email === mentee2.email),
-      mentors, [], [],
+    const { results } = rankMentors(
+      mentee, mentors, activeMatches, blockList,
       { algorithm_version: 'seed', reliability_multiplier: 1.0 },
     )
 
-    const amaraResult = results2.find(r => r.mentor_snapshot.email === mentor2.email) || results2[0]
-    if (amaraResult) {
-      const runId2 = (await client.query(
-        `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit, reviewed_by, reviewed_at)
-         VALUES ($1, 'ACTIVE', $2, $3, 'seed', 'admin@example.com', now() - interval '3 days')
-         RETURNING run_id`,
-        [mentee2.email, Math.min(5, results2.length), results2.length],
-      )).rows[0].run_id
+    if (results.length === 0) {
+      console.log(`  ${mentee.name}: no eligible mentors — skipped`)
+      continue
+    }
 
-      const matchId2 = (await client.query(
+    const candidateCount = Math.min(TOP_CANDIDATES, results.length)
+    const isReviewed = state !== 'PENDING_REVIEW'
+    const runStatus = state === 'PENDING_REVIEW' ? 'PENDING_REVIEW'
+      : state === 'AWAITING_MENTEE' ? 'AWAITING_MENTEE'
+      : 'ACTIVE'
+
+    const runId = (await client.query(
+      `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit,
+        reviewed_by, reviewed_at)
+       VALUES ($1, $2, $3, $4, 'seed',
+        ${isReviewed ? "'admin@example.com'" : 'NULL'},
+        ${isReviewed ? `now() - interval '${daysAgo} days'` : 'NULL'})
+       RETURNING run_id`,
+      [email, runStatus, candidateCount, results.length],
+    )).rows[0].run_id
+
+    // Pick the #1 result as the "winner" for resolved runs
+    const winner = results[0]
+
+    for (const result of results) {
+      let matchStatus
+      if (state === 'PENDING_REVIEW') {
+        matchStatus = result.rank <= candidateCount ? 'CANDIDATE' : 'STORED'
+      } else if (state === 'AWAITING_MENTEE') {
+        // Admin approved top 2, rest rejected
+        if (result.rank <= 2) matchStatus = 'APPROVED'
+        else if (result.rank <= candidateCount) matchStatus = 'REJECTED'
+        else matchStatus = 'STORED'
+      } else {
+        // ACTIVE or FINISHED — winner is active/finished, runner-up rejected
+        if (result.mentor_snapshot.email === winner.mentor_snapshot.email) {
+          matchStatus = state === 'FINISHED' ? 'FINISHED' : 'ACTIVE'
+        } else if (result.rank <= candidateCount) {
+          matchStatus = 'REJECTED'
+        } else {
+          matchStatus = 'STORED'
+        }
+      }
+
+      const matchId = (await client.query(
         `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit)
-         VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6, 'seed')
-         RETURNING match_id`,
-        [runId2, mentor2.email, mentee2.email, amaraResult.scores.final, amaraResult.rank, JSON.stringify(amaraResult)],
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'seed') RETURNING match_id`,
+        [runId, result.mentor_snapshot.email, email, matchStatus,
+         result.scores.final, result.rank, JSON.stringify(result)],
       )).rows[0].match_id
 
-      await client.query(
-        `INSERT INTO match_actions (match_id, actor_email, action_type) VALUES ($1, $2, 'SELECT')`,
-        [matchId2, mentee2.email],
-      )
-      console.log(`  Active match: Fatima ↔ Amara (${matchId2})`)
+      // SELECT action for the winner
+      if (matchStatus === 'ACTIVE' || matchStatus === 'FINISHED') {
+        await client.query(
+          `INSERT INTO match_actions (match_id, actor_email, action_type) VALUES ($1, $2, 'SELECT')`,
+          [matchId, email],
+        )
+
+        // Track as active so subsequent runs see it
+        activeMatches.push({
+          mentor_email: result.mentor_snapshot.email,
+          mentee_email: email,
+          status: matchStatus === 'FINISHED' ? 'FINISHED' : 'ACTIVE',
+        })
+
+        // Feedback for finished matches
+        const fb = FEEDBACK[email]
+        if (fb && matchStatus === 'FINISHED') {
+          for (const f of fb) {
+            const submitter = f.from === 'mentee' ? email : result.mentor_snapshot.email
+            await client.query(
+              `INSERT INTO feedbacks (match_id, submitter_email, rating, text) VALUES ($1, $2, $3, $4)`,
+              [matchId, submitter, f.rating, f.text],
+            )
+          }
+        }
+      }
     }
+
+    const mentorName = winner.mentor_snapshot.name ?? winner.mentor_snapshot.email
+    const label = state === 'PENDING_REVIEW' ? `Pending review — ${candidateCount} candidates, ${results.length} scored`
+      : state === 'AWAITING_MENTEE' ? `Awaiting mentee — 2 approved of ${candidateCount} candidates`
+      : `${state} — ${mentee.name} ↔ ${mentorName} (#1 of ${results.length})`
+    console.log(`  ${mentee.name}: ${label}`)
   }
 
-  // ── 3. Active match: Wei Zhang at capacity ───────────────────────
-  const mentee3 = profileMap.get('mentee8@example.com')
-  const mentor3 = profileMap.get('mentor5@example.com')
-
-  if (mentee3 && mentor3) {
-    const { results: results3 } = rankMentors(
-      allProfiles.find(p => p.email === mentee3.email),
-      mentors, [], [],
-      { algorithm_version: 'seed', reliability_multiplier: 1.0 },
+  // Block entries
+  for (const b of BLOCK_LIST) {
+    await client.query(
+      `INSERT INTO rejections (mentor_email, mentee_email, reason, created_by)
+       VALUES ($1, $2, $3, 'admin@example.com') ON CONFLICT DO NOTHING`,
+      [b.mentor, b.mentee, b.reason],
     )
-
-    const weiResult = results3.find(r => r.mentor_snapshot.email === mentor3.email) || results3[0]
-    if (weiResult) {
-      const runId3 = (await client.query(
-        `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit, reviewed_by, reviewed_at)
-         VALUES ($1, 'ACTIVE', $2, $3, 'seed', 'admin@example.com', now() - interval '7 days')
-         RETURNING run_id`,
-        [mentee3.email, Math.min(5, results3.length), results3.length],
-      )).rows[0].run_id
-
-      const matchId3 = (await client.query(
-        `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit)
-         VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6, 'seed')
-         RETURNING match_id`,
-        [runId3, mentor3.email, mentee3.email, weiResult.scores.final, weiResult.rank, JSON.stringify(weiResult)],
-      )).rows[0].match_id
-
-      await client.query(
-        `INSERT INTO match_actions (match_id, actor_email, action_type) VALUES ($1, $2, 'SELECT')`,
-        [matchId3, mentee3.email],
-      )
-      console.log(`  Active match: Aisha ↔ Wei (${matchId3}) — Wei now at capacity`)
-    }
+    console.log(`  Block: ${b.mentor} ↛ ${b.mentee}`)
   }
-
-  // ── 4. Block entry ───────────────────────────────────────────────
-  await client.query(
-    `INSERT INTO rejections (mentor_email, mentee_email, reason, created_by)
-     VALUES ('mentor3@example.com', 'mentee7@example.com', 'Mentee requested a different mentor focus area', 'admin@example.com')
-     ON CONFLICT DO NOTHING`,
-  )
-  console.log('  Block: Jordan Lee ↛ Tomás Reyes')
 }
 
 // ── Main ───────────────────────────────────────────────────────────

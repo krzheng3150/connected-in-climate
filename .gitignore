@@ -5,3 +5,4 @@ client/dist
 # Real profile data (sample is tracked, real imports are not)
 scripts/profiles*.csv
 scripts/profiles*.json
+db-export-*.json

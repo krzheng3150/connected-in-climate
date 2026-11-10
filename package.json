@@ -25,6 +25,8 @@
     "test:resources": "node --env-file=.env --test server/resources.test.js",
     "test:all": "node --test server/field-registry.test.js server/matching.test.js && npm run test:api && npm run test:auth && npm run test:profile && npm run test:email",
     "seed": "node --env-file=.env scripts/seed.js",
+    "db:wipe": "node --env-file=.env scripts/db-wipe.js",
+    "db:restore": "node --env-file=.env scripts/db-restore.js",
     "import": "node --env-file=.env scripts/import.js",
     "import:dry": "node --env-file=.env scripts/import.js --dry-run",
     "sheet:create": "node --env-file=.env scripts/create-sheet.js",
