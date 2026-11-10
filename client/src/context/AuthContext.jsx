@@ -74,7 +74,7 @@ export function AuthProvider({ children }) {
       hasLoaded.current = true
       setLoading(false)
     }
-  }, [getToken, testEmail, testLogout])
+  }, [getToken, isSignedIn, testEmail, testLogout])
 
   useEffect(() => {
     if (!AUTH_ENABLED && testEmail) {
