@@ -76,22 +76,6 @@ export default function Dashboard() {
         {!editing && <>
         <h2>Welcome, {user.preferred_name || user.name}</h2>
 
-        {menteePending && view === 'mentee' && (
-          <div className="pending-banner">
-            <strong>Your mentee application is under review.</strong>
-            <p>An admin will review your application soon. You can still edit your profile while you wait.</p>
-          </div>
-        )}
-
-        {mentorPending && view === 'mentor' && (
-          <div className="pending-banner">
-            <strong>Your mentor application is under review.</strong>
-            <p>An admin will review your application soon. You can still edit your profile while you wait.</p>
-          </div>
-        )}
-
-        <button className="btn-link" onClick={() => setEditing(true)}>Edit Profile</button>
-
         {hasMentorApp && hasMenteeApp && (
           <div className="role-tabs">
             <button
@@ -108,6 +92,22 @@ export default function Dashboard() {
             </button>
           </div>
         )}
+
+        {menteePending && view === 'mentee' && (
+          <div className="pending-banner">
+            <strong>Your mentee application is under review.</strong>
+            <p>An admin will review your application soon. You can still edit your profile while you wait.</p>
+          </div>
+        )}
+
+        {mentorPending && view === 'mentor' && (
+          <div className="pending-banner">
+            <strong>Your mentor application is under review.</strong>
+            <p>An admin will review your application soon. You can still edit your profile while you wait.</p>
+          </div>
+        )}
+
+        <button className="btn-link" onClick={() => setEditing(true)}>Edit Profile</button>
 
         {!hasMentorApp && !hasMenteeApp && user.is_admin && (
           <p className="placeholder-text">You're signed in as an admin. Use the Admin link above to manage the platform.</p>
