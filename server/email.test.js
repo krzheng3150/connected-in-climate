@@ -21,11 +21,23 @@ before(async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
+    CREATE TABLE IF NOT EXISTS mentor_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS mentee_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
       status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
-        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED')),
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED')),
       top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
       code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -61,42 +73,78 @@ before(async () => {
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
 
   const profiles = [
-    ['mentor1@test.com', 'Mentor One', 'mentor', {
-      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-      top_strengths: ['Topic A', 'Topic B'], general_topics: ['Topic C'],
-      motivation: 'Helping.', max_capacity: 2,
-      location: 'SF, CA', locations_open_to: ['SF, CA', 'Remote'],
-    }],
-    ['mentor2@test.com', 'Mentor Two', 'mentor', {
-      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-      top_strengths: ['Topic X'], general_topics: [],
-      motivation: 'Policy.', max_capacity: 1,
-      location: 'DC',
-    }],
-    ['mentee1@test.com', 'Mentee One', 'mentee', {
-      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-      top_topics: ['Topic A', 'Topic C'], statement_of_intent: 'Transition.',
-      w_horiz: 3, w_vert: 3, w_sector: 3,
-      location: 'SF, CA', geo_match_preference: true,
-    }],
-    ['mentee2@test.com', 'Mentee Two', 'mentee', {
-      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-      top_topics: ['Topic X'], statement_of_intent: 'Policy.',
-      w_horiz: 1, w_vert: 5, w_sector: 3,
-      location: 'DC', geo_match_preference: false,
-    }],
+    {
+      email: 'mentor1@test.com', name: 'Mentor One', role: 'mentor',
+      shared: {
+        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+        location: 'SF, CA', locations_open_to: ['SF, CA', 'Remote'],
+      },
+      mentorPayload: {
+        top_strengths: ['Topic A', 'Topic B'], general_topics: ['Topic C'],
+        motivation: 'Helping.', max_capacity: 2,
+      },
+    },
+    {
+      email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
+      shared: {
+        career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+        location: 'DC',
+      },
+      mentorPayload: {
+        top_strengths: ['Topic X'], general_topics: [],
+        motivation: 'Policy.', max_capacity: 1,
+      },
+    },
+    {
+      email: 'mentee1@test.com', name: 'Mentee One', role: 'mentee',
+      shared: {
+        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+        w_horiz: 3, w_vert: 3, w_sector: 3,
+        location: 'SF, CA', geo_match_preference: true,
+      },
+      menteePayload: {
+        top_topics: ['Topic A', 'Topic C'], statement_of_intent: 'Transition.',
+      },
+    },
+    {
+      email: 'mentee2@test.com', name: 'Mentee Two', role: 'mentee',
+      shared: {
+        career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+        w_horiz: 1, w_vert: 5, w_sector: 3,
+        location: 'DC', geo_match_preference: false,
+      },
+      menteePayload: {
+        top_topics: ['Topic X'], statement_of_intent: 'Policy.',
+      },
+    },
   ]
 
-  for (const [email, name, role, payload] of profiles) {
+  for (const p of profiles) {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, role=EXCLUDED.role, payload=EXCLUDED.payload`,
-      [email, name, role, JSON.stringify(payload)],
+      [p.email, p.name, p.role, JSON.stringify(p.shared)],
     )
+    if (p.mentorPayload) {
+      await pool.query(
+        `INSERT INTO mentor_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+         ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+        [p.email, JSON.stringify(p.mentorPayload)],
+      )
+    }
+    if (p.menteePayload) {
+      await pool.query(
+        `INSERT INTO mentee_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+         ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+        [p.email, JSON.stringify(p.menteePayload)],
+      )
+    }
   }
 
   const app = express()
@@ -114,6 +162,8 @@ after(async () => {
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()
@@ -187,7 +237,7 @@ describe('Email: match run created', () => {
 
   it('does not send email when no mentors are available', async () => {
     await pool.query(
-      `UPDATE user_profiles SET payload = jsonb_set(payload, '{max_capacity}', '0') WHERE role = 'mentor'`,
+      `UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '0')`,
     )
     await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee2@test.com'`)
 
@@ -198,10 +248,10 @@ describe('Email: match run created', () => {
     assert.equal(sent.length, 0)
 
     await pool.query(
-      `UPDATE user_profiles SET payload = jsonb_set(payload, '{max_capacity}', '2') WHERE email = 'mentor1@test.com'`,
+      `UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '2') WHERE email = 'mentor1@test.com'`,
     )
     await pool.query(
-      `UPDATE user_profiles SET payload = jsonb_set(payload, '{max_capacity}', '1') WHERE email = 'mentor2@test.com'`,
+      `UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '1') WHERE email = 'mentor2@test.com'`,
     )
   })
 })

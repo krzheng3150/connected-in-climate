@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process'
 import { Router } from 'express'
 import { pool } from './db.js'
 import { rankMentors } from './matching.js'
-import { isMentee } from './roles.js'
+import { isMentor, isMentee } from './roles.js'
 import { notifyAdminsNewRun, notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
 import { createMatchResources } from './resources.js'
 import { AUTO_APPROVE_MATCHES, AUTO_APPROVE_MATCH_COUNT, MENTORSHIP_DURATION_DAYS, requiresReview } from './flags.js'
@@ -58,28 +58,43 @@ router.post('/run', async (req, res, next) => {
     }
 
     const menteeRow = await pool.query(
-      'SELECT email, name, role, payload, embedding::text, status FROM user_profiles WHERE email = $1',
+      `SELECT p.email, p.name, p.payload AS shared_payload,
+              ma.payload AS mentee_payload, ma.embedding::text, ma.status
+       FROM user_profiles p
+       JOIN mentee_applications ma ON ma.email = p.email
+       WHERE p.email = $1`,
       [normalEmail],
     )
     if (menteeRow.rows.length === 0) {
-      return res.status(404).json({ error: 'profile not found' })
+      return res.status(404).json({ error: 'mentee application not found' })
     }
     const menteeProfile = menteeRow.rows[0]
-    if (!isMentee(menteeProfile.role)) {
-      return res.status(400).json({ error: 'user is not a mentee' })
-    }
     if (menteeProfile.status !== 'APPROVED') {
       return res.status(400).json({ error: 'Your application is still under review.' })
     }
-    const mentee = profileFromRow(menteeProfile)
+    const mentee = {
+      email: menteeProfile.email,
+      name: menteeProfile.name,
+      role: 'mentee',
+      payload: { ...menteeProfile.shared_payload, ...menteeProfile.mentee_payload },
+      embedding: menteeProfile.embedding ? parseEmbedding(menteeProfile.embedding) : null,
+    }
 
     const mentorRows = await pool.query(
-      `SELECT email, name, role, payload, embedding::text
-       FROM user_profiles
-       WHERE role IN ('mentor', 'both') AND email != $1 AND status = 'APPROVED'`,
+      `SELECT p.email, p.name, p.payload AS shared_payload,
+              mta.payload AS mentor_payload, mta.embedding::text
+       FROM user_profiles p
+       JOIN mentor_applications mta ON mta.email = p.email
+       WHERE mta.status = 'APPROVED' AND p.email != $1`,
       [mentee.email],
     )
-    const mentors = mentorRows.rows.map(profileFromRow)
+    const mentors = mentorRows.rows.map(r => ({
+      email: r.email,
+      name: r.name,
+      role: 'mentor',
+      payload: { ...r.shared_payload, ...r.mentor_payload },
+      embedding: r.embedding ? parseEmbedding(r.embedding) : null,
+    }))
 
     const inProgressMatches = (await pool.query(
       `SELECT mentor_email, mentee_email, status FROM matches
@@ -253,10 +268,12 @@ router.get('/run/current', async (req, res, next) => {
       const matchResult = await pool.query(
         `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
                 m.rank, m.created_at, m.activated_at, m.end_date,
-                mentor.name AS mentor_name, mentor.payload AS mentor_payload,
+                mentor.name AS mentor_name,
+                mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload,
                 mentee.name AS mentee_name
          FROM matches m
          JOIN user_profiles mentor ON mentor.email = m.mentor_email
+         LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
          JOIN user_profiles mentee ON mentee.email = m.mentee_email
          WHERE m.run_id = $1 AND m.status = $2
          ORDER BY m.final_score DESC`,
@@ -321,11 +338,15 @@ router.get('/', async (req, res, next) => {
     const result = await pool.query(
       `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
               m.rank, m.created_at, m.activated_at, m.end_date,
-              mentor.name AS mentor_name, mentor.payload AS mentor_payload,
-              mentee.name AS mentee_name, mentee.payload AS mentee_payload
+              mentor.name AS mentor_name,
+              mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload,
+              mentee.name AS mentee_name,
+              mentee.payload || COALESCE(ma.payload, '{}') AS mentee_payload
        FROM matches m
        JOIN user_profiles mentor ON mentor.email = m.mentor_email
+       LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
        JOIN user_profiles mentee ON mentee.email = m.mentee_email
+       LEFT JOIN mentee_applications ma ON ma.email = m.mentee_email
        WHERE (m.mentee_email = $1 OR m.mentor_email = $1)
          AND m.status = 'ACTIVE'
        ORDER BY m.created_at DESC`,
@@ -365,11 +386,15 @@ router.get('/past', async (req, res, next) => {
     const result = await pool.query(
       `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
               m.rank, m.created_at, m.activated_at, m.end_date,
-              mentor.name AS mentor_name, mentor.payload AS mentor_payload,
-              mentee.name AS mentee_name, mentee.payload AS mentee_payload
+              mentor.name AS mentor_name,
+              mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload,
+              mentee.name AS mentee_name,
+              mentee.payload || COALESCE(ma.payload, '{}') AS mentee_payload
        FROM matches m
        JOIN user_profiles mentor ON mentor.email = m.mentor_email
+       LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
        JOIN user_profiles mentee ON mentee.email = m.mentee_email
+       LEFT JOIN mentee_applications ma ON ma.email = m.mentee_email
        WHERE (m.mentee_email = $1 OR m.mentor_email = $1)
          AND m.status = 'FINISHED'
        ORDER BY m.end_date DESC NULLS LAST`,
@@ -410,11 +435,15 @@ router.get('/:match_id', async (req, res, next) => {
     const result = await pool.query(
       `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
               m.rank, m.created_at, m.activated_at, m.end_date, m.resources_folder_url,
-              mentor.name AS mentor_name, mentor.payload AS mentor_payload,
-              mentee.name AS mentee_name, mentee.payload AS mentee_payload
+              mentor.name AS mentor_name,
+              mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload,
+              mentee.name AS mentee_name,
+              mentee.payload || COALESCE(ma.payload, '{}') AS mentee_payload
        FROM matches m
        JOIN user_profiles mentor ON mentor.email = m.mentor_email
+       LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
        JOIN user_profiles mentee ON mentee.email = m.mentee_email
+       LEFT JOIN mentee_applications ma ON ma.email = m.mentee_email
        WHERE m.match_id = $1`,
       [match_id],
     )

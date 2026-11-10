@@ -10,6 +10,18 @@ const EMBEDDING_DIMENSIONS = 1536
 
 const STABLE_COLUMNS = new Set(['email', 'name', 'role'])
 
+const MENTOR_PAYLOAD_FIELDS = new Set([
+  'motivation', 'eq_response', 'scheduling_link', 'commitment_name',
+  'management_experience', 'business_experience', 'international_experience',
+  'nonprofit_board_experience', 'freelance_experience',
+  'top_strengths', 'general_topics', 'max_capacity',
+])
+
+const MENTEE_PAYLOAD_FIELDS = new Set([
+  'statement_of_intent', 'relevant_projects', 'commitment_name',
+  'employment_situation', 'top_topics',
+])
+
 const ARRAY_FIELDS = new Set([
   'career_areas', 'climate_areas', 'sectors',
   'top_strengths', 'general_topics', 'top_topics',
@@ -295,23 +307,37 @@ function computeEmbeddings(texts) {
 
 // ── DB upsert ───────────────────────────────────────────────────────
 
+function splitPayload(payload, role) {
+  const shared = {}
+  const mentorPayload = {}
+  const menteePayload = {}
+  for (const [key, val] of Object.entries(payload)) {
+    if (MENTOR_PAYLOAD_FIELDS.has(key) && isMentor(role)) {
+      mentorPayload[key] = val
+    } else if (MENTEE_PAYLOAD_FIELDS.has(key) && isMentee(role)) {
+      menteePayload[key] = val
+    } else {
+      shared[key] = val
+    }
+  }
+  return { shared, mentorPayload, menteePayload }
+}
+
 async function upsertProfiles(pool, profiles) {
   const client = await pool.connect()
   const stats = { created: [], updated: [], unchanged: [] }
   try {
     await client.query('BEGIN')
 
-    const existingEmails = new Set()
     const existingRows = await client.query('SELECT email, name, role, payload FROM user_profiles')
     const existingMap = new Map()
     for (const row of existingRows.rows) {
-      existingEmails.add(row.email)
       existingMap.set(row.email, row)
     }
 
     for (const p of profiles) {
-      const embeddingLiteral = p.embedding ? `[${p.embedding.join(',')}]` : null
       const existing = existingMap.get(p.email)
+      const { shared, mentorPayload, menteePayload } = splitPayload(p.payload, p.role)
 
       if (existing) {
         const payloadChanged = JSON.stringify(existing.payload) !== JSON.stringify(p.payload)
@@ -327,16 +353,41 @@ async function upsertProfiles(pool, profiles) {
       }
 
       await client.query(
-        `INSERT INTO user_profiles (email, name, role, payload, embedding, updated_at)
-         VALUES ($1, $2, $3, $4, $5::vector, now())
+        `INSERT INTO user_profiles (email, name, role, payload, updated_at)
+         VALUES ($1, $2, $3, $4, now())
          ON CONFLICT (email) DO UPDATE SET
            name = EXCLUDED.name,
            role = EXCLUDED.role,
            payload = EXCLUDED.payload,
-           embedding = EXCLUDED.embedding,
            updated_at = now()`,
-        [p.email, p.name, p.role, JSON.stringify(p.payload), embeddingLiteral],
+        [p.email, p.name, p.role, JSON.stringify(shared)],
       )
+
+      if (isMentor(p.role)) {
+        const mentorEmbed = p.mentorEmbedding ? `[${p.mentorEmbedding.join(',')}]` : null
+        await client.query(
+          `INSERT INTO mentor_applications (email, status, payload, embedding, updated_at)
+           VALUES ($1, 'APPROVED', $2, $3::vector, now())
+           ON CONFLICT (email) DO UPDATE SET
+             payload = EXCLUDED.payload,
+             embedding = EXCLUDED.embedding,
+             updated_at = now()`,
+          [p.email, JSON.stringify(mentorPayload), mentorEmbed],
+        )
+      }
+
+      if (isMentee(p.role)) {
+        const menteeEmbed = p.menteeEmbedding ? `[${p.menteeEmbedding.join(',')}]` : null
+        await client.query(
+          `INSERT INTO mentee_applications (email, status, payload, embedding, updated_at)
+           VALUES ($1, 'APPROVED', $2, $3::vector, now())
+           ON CONFLICT (email) DO UPDATE SET
+             payload = EXCLUDED.payload,
+             embedding = EXCLUDED.embedding,
+             updated_at = now()`,
+          [p.email, JSON.stringify(menteePayload), menteeEmbed],
+        )
+      }
     }
     await client.query('COMMIT')
   } catch (err) {
@@ -406,13 +457,19 @@ if (dryRun) {
 }
 
 console.log('\nComputing TF-IDF embeddings locally...')
-const texts = valid.map(p => p.embeddingText)
-const embeddings = computeEmbeddings(texts)
+const mentorTexts = valid.map(p => isMentor(p.role) ? p.payload.motivation : null)
+const menteeTexts = valid.map(p => isMentee(p.role) ? p.payload.statement_of_intent : null)
+const allTexts = [...mentorTexts, ...menteeTexts].filter(Boolean)
+const allEmbeddings = computeEmbeddings(allTexts)
+let ei = 0
+const mentorEmbeddings = mentorTexts.map(t => t ? allEmbeddings[ei++] : null)
+const menteeEmbeddings = menteeTexts.map(t => t ? allEmbeddings[ei++] : null)
 for (let i = 0; i < valid.length; i++) {
-  valid[i].embedding = embeddings[i]
+  valid[i].mentorEmbedding = mentorEmbeddings[i]
+  valid[i].menteeEmbedding = menteeEmbeddings[i]
 }
-const nonNull = embeddings.filter(Boolean).length
-console.log(`Computed ${nonNull} embeddings (${EMBEDDING_DIMENSIONS} dimensions each, ${embeddings.length - nonNull} skipped)`)
+const nonNull = allEmbeddings.filter(Boolean).length
+console.log(`Computed ${nonNull} embeddings (${EMBEDDING_DIMENSIONS} dimensions each)`)
 
 console.log('\nUpserting into database...')
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })

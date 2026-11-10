@@ -20,6 +20,18 @@ before(async () => {
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS mentor_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS mentee_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
@@ -75,26 +87,53 @@ before(async () => {
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
 
   const profiles = [
-    ['mentor@test.com', 'Mentor', 'mentor', {
-      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-      top_strengths: ['Topic A'], general_topics: [],
-      motivation: 'Helping.', max_capacity: 2, location: 'SF, CA',
-    }],
-    ['mentee@test.com', 'Mentee', 'mentee', {
-      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-      top_topics: ['Topic A'], statement_of_intent: 'Transition.',
-      w_horiz: 1, w_vert: 1, w_sector: 1, location: 'SF, CA', geo_match_preference: false,
-    }],
+    {
+      email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
+      shared: {
+        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+        location: 'SF, CA',
+      },
+      mentorPayload: {
+        top_strengths: ['Topic A'], general_topics: [],
+        motivation: 'Helping.', max_capacity: 2,
+      },
+    },
+    {
+      email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
+      shared: {
+        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+        w_horiz: 1, w_vert: 1, w_sector: 1, location: 'SF, CA', geo_match_preference: false,
+      },
+      menteePayload: {
+        top_topics: ['Topic A'], statement_of_intent: 'Transition.',
+      },
+    },
   ]
-  for (const [email, name, role, payload] of profiles) {
+  for (const p of profiles) {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload) VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, role=EXCLUDED.role, payload=EXCLUDED.payload`,
-      [email, name, role, JSON.stringify(payload)],
+      [p.email, p.name, p.role, JSON.stringify(p.shared)],
     )
+    if (p.mentorPayload) {
+      await pool.query(
+        `INSERT INTO mentor_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+         ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+        [p.email, JSON.stringify(p.mentorPayload)],
+      )
+    }
+    if (p.menteePayload) {
+      await pool.query(
+        `INSERT INTO mentee_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+         ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+        [p.email, JSON.stringify(p.menteePayload)],
+      )
+    }
   }
 
   const app = express()
@@ -129,6 +168,8 @@ after(async () => {
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()

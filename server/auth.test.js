@@ -19,11 +19,23 @@ before(async () => {
       payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS mentor_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS mentee_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
       status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
-        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED')),
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED')),
       top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
       code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -66,12 +78,19 @@ before(async () => {
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
 
   await pool.query(
     `INSERT INTO user_profiles (email, name, role, payload) VALUES ($1, $2, $3, $4)
      ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, role=EXCLUDED.role, payload=EXCLUDED.payload`,
     ['user@test.com', 'Test User', 'mentee', JSON.stringify({ career_areas: ['Engineering'] })],
+  )
+  await pool.query(
+    `INSERT INTO mentee_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+     ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+    ['user@test.com', JSON.stringify({})],
   )
 
   const app = express()
@@ -109,6 +128,8 @@ after(async () => {
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
   await pool.query('DELETE FROM rejections')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()

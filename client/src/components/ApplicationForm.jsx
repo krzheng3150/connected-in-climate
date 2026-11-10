@@ -42,9 +42,6 @@ const TOPIC_FIELDS_MENTEE = [
   { key: 'top_topics', label: 'Pick the top 3–5 Topics You Want Help With' },
 ]
 
-function isMentor(role) { return role === 'mentor' || role === 'both' }
-function isMentee(role) { return role === 'mentee' || role === 'both' }
-
 function SelectField({ field, value, onChange }) {
   const options = LABELS[field.key]
   if (!options) return null
@@ -87,19 +84,31 @@ function MultiSelectField({ field, value = [], onChange }) {
   )
 }
 
-export default function ApplicationForm({ existingProfile, onCancel }) {
+// forRole: when adding a second application, the role is pre-set
+// existingProfile: when editing an existing application
+export default function ApplicationForm({ existingProfile, forRole, onCancel }) {
   const isEdit = Boolean(existingProfile)
+  const isSecondApp = Boolean(forRole)
   const { user, refreshProfile } = useAuth()
-  const [step, setStep] = useState(isEdit ? 1 : 0)
+  const skipRoleStep = isEdit || isSecondApp
+  const [step, setStep] = useState(skipRoleStep ? 1 : 0)
   const [form, setForm] = useState(() => {
-    if (!existingProfile) return { role: null, name: '' }
-    const { name, role, payload = {} } = existingProfile
-    return { role, name, ...payload }
+    if (existingProfile) {
+      const { name, role, payload = {} } = existingProfile
+      return { role, name, ...payload }
+    }
+    if (forRole) {
+      return { role: forRole, name: user?.name || '' }
+    }
+    return { role: null, name: '' }
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [hiwOpen, setHiwOpen] = useState(false)
+
+  const isMentor = form.role === 'mentor'
+  const isMentee = form.role === 'mentee'
 
   const STEP_FIELDS = {
     0: ['role'],
@@ -150,7 +159,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         return
       }
       await refreshProfile()
-      if (isEdit && onCancel) onCancel()
+      if ((isEdit || isSecondApp) && onCancel) onCancel()
     } catch (err) {
       console.error('[ApplicationForm] Network error:', err)
       setError('Could not reach the server.')
@@ -194,36 +203,40 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
   if (step === 1) {
     const singleFields = [
       ...SHARED_SINGLE,
-      ...(isMentor(form.role) ? MENTOR_SINGLE : []),
-      ...(isMentee(form.role) ? MENTEE_SINGLE : []),
+      ...(isMentor ? MENTOR_SINGLE : []),
+      ...(isMentee ? MENTEE_SINGLE : []),
     ]
     return (
       <div className="application-form">
-        <h2>Your Background</h2>
-        <div className="form-group">
-          <label>Full Name *</label>
-          <input type="text" value={form.name || ''} onChange={e => set('name', e.target.value)} placeholder="Your full name" />
-        </div>
-        <div className="form-group">
-          <label>Preferred Name</label>
-          <input type="text" value={form.preferred_name || ''} onChange={e => set('preferred_name', e.target.value)} placeholder="What should we call you?" />
-        </div>
-        <div className="form-group">
-          <label>Pronouns</label>
-          <input type="text" value={form.pronouns || ''} onChange={e => set('pronouns', e.target.value)} placeholder="e.g. she/her, he/him, they/them" />
-        </div>
-        <div className="form-group">
-          <label>Organization</label>
-          <input type="text" value={form.organization || ''} onChange={e => set('organization', e.target.value)} placeholder="Where do you work?" />
-        </div>
-        <div className="form-group">
-          <label>Location</label>
-          <input type="text" value={form.location || ''} onChange={e => set('location', e.target.value)} placeholder="City, Country" />
-        </div>
-        <div className="form-group">
-          <label>Timezone</label>
-          <input type="text" value={form.timezone || ''} onChange={e => set('timezone', e.target.value)} placeholder="e.g. EST, PST, GMT+1" />
-        </div>
+        <h2>{isSecondApp ? `Apply as ${isMentor ? 'Mentor' : 'Mentee'}` : 'Your Background'}</h2>
+        {!isSecondApp && (
+          <>
+            <div className="form-group">
+              <label>Full Name *</label>
+              <input type="text" value={form.name || ''} onChange={e => set('name', e.target.value)} placeholder="Your full name" />
+            </div>
+            <div className="form-group">
+              <label>Preferred Name</label>
+              <input type="text" value={form.preferred_name || ''} onChange={e => set('preferred_name', e.target.value)} placeholder="What should we call you?" />
+            </div>
+            <div className="form-group">
+              <label>Pronouns</label>
+              <input type="text" value={form.pronouns || ''} onChange={e => set('pronouns', e.target.value)} placeholder="e.g. she/her, he/him, they/them" />
+            </div>
+            <div className="form-group">
+              <label>Organization</label>
+              <input type="text" value={form.organization || ''} onChange={e => set('organization', e.target.value)} placeholder="Where do you work?" />
+            </div>
+            <div className="form-group">
+              <label>Location</label>
+              <input type="text" value={form.location || ''} onChange={e => set('location', e.target.value)} placeholder="City, Country" />
+            </div>
+            <div className="form-group">
+              <label>Timezone</label>
+              <input type="text" value={form.timezone || ''} onChange={e => set('timezone', e.target.value)} placeholder="e.g. EST, PST, GMT+1" />
+            </div>
+          </>
+        )}
         {singleFields.map(f => (
           <SelectField key={f.key} field={f} value={form[f.key]} onChange={set} />
         ))}
@@ -231,8 +244,10 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         <div className="form-actions">
           {isEdit
             ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
-            : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
-          <button className="btn-primary" disabled={!form.name?.trim() || !form.career_level} onClick={() => setStep(2)}>Next</button>
+            : isSecondApp
+              ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+              : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
+          <button className="btn-primary" disabled={!isSecondApp && (!form.name?.trim() || !form.career_level)} onClick={() => setStep(2)}>Next</button>
         </div>
       </div>
     )
@@ -240,8 +255,8 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
 
   // ── Step 2: Multi-selects (areas, topics) ──
   if (step === 2) {
-    const topicFields = isMentor(form.role) ? TOPIC_FIELDS_MENTOR : []
-    const menteeTopics = isMentee(form.role) ? TOPIC_FIELDS_MENTEE : []
+    const topicFields = isMentor ? TOPIC_FIELDS_MENTOR : []
+    const menteeTopics = isMentee ? TOPIC_FIELDS_MENTEE : []
     return (
       <div className="application-form">
         <h2>Your Interests</h2>
@@ -269,7 +284,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         to respond to these questions. We want to hear your genuine thoughts and goals in your
         own words! Feel free to be informal with your language.
       </p>
-      {isMentee(form.role) && (
+      {isMentee && (
         <>
           <div className="form-group">
             <label>In your own words, what are you hoping to gain from this mentorship? What are three things that are important to you in a potential mentor? *</label>
@@ -289,7 +304,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
           </div>
         </>
       )}
-      {isMentor(form.role) && (
+      {isMentor && (
         <>
           <div className="form-group">
             <label>In your own words, why do you want to be a mentor? What do you think is your greatest strength you bring to mentoring? *</label>
@@ -310,7 +325,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         </>
       )}
       <div className="form-group">
-        <label>Anything else you would like us to know or consider in matching you with a {isMentor(form.role) ? 'mentee' : 'mentor'}?</label>
+        <label>Anything else you would like us to know or consider in matching you with a {isMentor ? 'mentee' : 'mentor'}?</label>
         <textarea
           rows={3}
           value={form.additional_info || ''}
@@ -321,11 +336,13 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
         <label>Fun Fact</label>
         <input type="text" value={form.fun_fact || ''} onChange={e => set('fun_fact', e.target.value)} placeholder="Something interesting about you" />
       </div>
-      <div className="form-group">
-        <label>LinkedIn URL</label>
-        <input type="url" value={form.links?.linkedin || ''} onChange={e => set('links', { ...form.links, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." />
-      </div>
-      {isMentor(form.role) && (
+      {!isSecondApp && (
+        <div className="form-group">
+          <label>LinkedIn URL</label>
+          <input type="url" value={form.links?.linkedin || ''} onChange={e => set('links', { ...form.links, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." />
+        </div>
+      )}
+      {isMentor && (
         <div className="form-group">
           <label>Scheduling Link</label>
           <input type="url" value={form.scheduling_link || ''} onChange={e => set('scheduling_link', e.target.value)} placeholder="e.g. https://calendly.com/yourname" />
@@ -333,7 +350,7 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
       )}
       <div className="form-group" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
         <label>
-          Please confirm you can commit to meeting regularly with your selected {isMentor(form.role) ? 'mentee' : 'mentor'} (i.e. once per week or once biweekly). Type your name below as confirmation.
+          Please confirm you can commit to meeting regularly with your selected {isMentor ? 'mentee' : 'mentor'} (i.e. once per week or once biweekly). Type your name below as confirmation.
         </label>
         <input
           type="text"

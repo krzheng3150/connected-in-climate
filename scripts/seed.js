@@ -63,6 +63,34 @@ function computeEmbeddings(texts) {
 
 // ── DB operations ──────────────────────────────────────────────────
 
+const MENTOR_PAYLOAD_FIELDS = new Set([
+  'motivation', 'eq_response', 'scheduling_link', 'commitment_name',
+  'management_experience', 'business_experience', 'international_experience',
+  'nonprofit_board_experience', 'freelance_experience',
+  'top_strengths', 'general_topics', 'max_capacity',
+])
+
+const MENTEE_PAYLOAD_FIELDS = new Set([
+  'statement_of_intent', 'relevant_projects', 'commitment_name',
+  'employment_situation', 'top_topics',
+])
+
+function splitPayload(payload, role) {
+  const shared = {}
+  const mentorPayload = {}
+  const menteePayload = {}
+  for (const [key, val] of Object.entries(payload)) {
+    if (MENTOR_PAYLOAD_FIELDS.has(key) && isMentor(role)) {
+      mentorPayload[key] = val
+    } else if (MENTEE_PAYLOAD_FIELDS.has(key) && isMentee(role)) {
+      menteePayload[key] = val
+    } else {
+      shared[key] = val
+    }
+  }
+  return { shared, mentorPayload, menteePayload }
+}
+
 async function upsertProfiles(client, profiles, pendingEmails) {
   const stats = { created: 0, updated: 0, pending: 0 }
   const existing = new Set(
@@ -70,24 +98,52 @@ async function upsertProfiles(client, profiles, pendingEmails) {
   )
 
   for (const p of profiles) {
-    const embeddingLiteral = p.embedding ? `[${p.embedding.join(',')}]` : null
     const status = pendingEmails.has(p.email) ? 'PENDING' : 'APPROVED'
     if (existing.has(p.email)) stats.updated++
     else stats.created++
     if (status === 'PENDING') stats.pending++
 
+    const { shared, mentorPayload, menteePayload } = splitPayload(p.payload, p.role)
+
     await client.query(
-      `INSERT INTO user_profiles (email, name, role, payload, embedding, status, updated_at)
-       VALUES ($1, $2, $3, $4, $5::vector, $6, now())
+      `INSERT INTO user_profiles (email, name, role, payload, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5, now())
        ON CONFLICT (email) DO UPDATE SET
          name = EXCLUDED.name,
          role = EXCLUDED.role,
          payload = EXCLUDED.payload,
-         embedding = EXCLUDED.embedding,
          status = EXCLUDED.status,
          updated_at = now()`,
-      [p.email, p.name, p.role, JSON.stringify(p.payload), embeddingLiteral, status],
+      [p.email, p.name, p.role, JSON.stringify(shared), status],
     )
+
+    if (isMentor(p.role)) {
+      const mentorEmbed = p.mentorEmbedding ? `[${p.mentorEmbedding.join(',')}]` : null
+      await client.query(
+        `INSERT INTO mentor_applications (email, status, payload, embedding, updated_at)
+         VALUES ($1, $2, $3, $4::vector, now())
+         ON CONFLICT (email) DO UPDATE SET
+           status = EXCLUDED.status,
+           payload = EXCLUDED.payload,
+           embedding = EXCLUDED.embedding,
+           updated_at = now()`,
+        [p.email, status, JSON.stringify(mentorPayload), mentorEmbed],
+      )
+    }
+
+    if (isMentee(p.role)) {
+      const menteeEmbed = p.menteeEmbedding ? `[${p.menteeEmbedding.join(',')}]` : null
+      await client.query(
+        `INSERT INTO mentee_applications (email, status, payload, embedding, updated_at)
+         VALUES ($1, $2, $3, $4::vector, now())
+         ON CONFLICT (email) DO UPDATE SET
+           status = EXCLUDED.status,
+           payload = EXCLUDED.payload,
+           embedding = EXCLUDED.embedding,
+           updated_at = now()`,
+        [p.email, status, JSON.stringify(menteePayload), menteeEmbed],
+      )
+    }
   }
   return stats
 }
@@ -236,10 +292,19 @@ console.log(`${profiles.length} profiles (${mentorCount} mentors, ${menteeCount}
 console.log(`${lifecycle.length} lifecycle entries, ${pendingEmails.size} pending applications`)
 
 console.log('\nComputing TF-IDF embeddings...')
-const texts = profiles.map(p => p.embeddingText)
-const embeddings = computeEmbeddings(texts)
-for (let i = 0; i < profiles.length; i++) profiles[i].embedding = embeddings[i]
-console.log(`Computed ${embeddings.filter(Boolean).length} embeddings`)
+const mentorTexts = profiles.map(p => isMentor(p.role) ? p.payload.motivation : null)
+const menteeTexts = profiles.map(p => isMentee(p.role) ? p.payload.statement_of_intent : null)
+const allTexts = [...mentorTexts, ...menteeTexts].filter(Boolean)
+const allEmbeddings = computeEmbeddings(allTexts)
+let ei = 0
+const mentorEmbeddings = mentorTexts.map(t => t ? allEmbeddings[ei++] : null)
+const menteeEmbeddings = menteeTexts.map(t => t ? allEmbeddings[ei++] : null)
+for (let i = 0; i < profiles.length; i++) {
+  profiles[i].mentorEmbedding = mentorEmbeddings[i]
+  profiles[i].menteeEmbedding = menteeEmbeddings[i]
+  profiles[i].embedding = mentorEmbeddings[i] || menteeEmbeddings[i]
+}
+console.log(`Computed ${allEmbeddings.filter(Boolean).length} embeddings`)
 
 const isProd = process.env.NODE_ENV === 'production'
 function connectionString() {

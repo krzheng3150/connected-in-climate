@@ -21,6 +21,18 @@ before(async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
+    CREATE TABLE IF NOT EXISTS mentor_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS mentee_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS match_runs (
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
@@ -76,32 +88,64 @@ before(async () => {
   await pool.query('DELETE FROM rejections')
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
 
   const profiles = [
-    ['mentor@test.com', 'Mentor', 'mentor', {
-      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-      top_strengths: ['Topic A'], general_topics: [],
-      motivation: 'Helping.', max_capacity: 2, location: 'SF, CA',
-      preferred_name: 'M', pronouns: 'they/them',
-    }],
-    ['mentor2@test.com', 'Mentor Two', 'mentor', {
-      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-      top_strengths: ['Topic X'], general_topics: [],
-      motivation: 'Policy.', max_capacity: 1, location: 'DC',
-    }],
-    ['mentee@test.com', 'Mentee', 'mentee', {
-      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-      top_topics: ['Topic A'], statement_of_intent: 'Transition.',
-      w_horiz: 1, w_vert: 1, w_sector: 1, location: 'SF, CA', geo_match_preference: false,
-    }],
+    {
+      email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
+      shared: {
+        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+        location: 'SF, CA', preferred_name: 'M', pronouns: 'they/them',
+      },
+      mentorPayload: {
+        top_strengths: ['Topic A'], general_topics: [],
+        motivation: 'Helping.', max_capacity: 2,
+      },
+    },
+    {
+      email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
+      shared: {
+        career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+        location: 'DC',
+      },
+      mentorPayload: {
+        top_strengths: ['Topic X'], general_topics: [],
+        motivation: 'Policy.', max_capacity: 1,
+      },
+    },
+    {
+      email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
+      shared: {
+        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+        w_horiz: 1, w_vert: 1, w_sector: 1, location: 'SF, CA', geo_match_preference: false,
+      },
+      menteePayload: {
+        top_topics: ['Topic A'], statement_of_intent: 'Transition.',
+      },
+    },
   ]
-  for (const [email, name, role, payload] of profiles) {
+  for (const p of profiles) {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload) VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, role=EXCLUDED.role, payload=EXCLUDED.payload`,
-      [email, name, role, JSON.stringify(payload)],
+      [p.email, p.name, p.role, JSON.stringify(p.shared)],
     )
+    if (p.mentorPayload) {
+      await pool.query(
+        `INSERT INTO mentor_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+         ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+        [p.email, JSON.stringify(p.mentorPayload)],
+      )
+    }
+    if (p.menteePayload) {
+      await pool.query(
+        `INSERT INTO mentee_applications (email, status, payload) VALUES ($1, 'APPROVED', $2)
+         ON CONFLICT (email) DO UPDATE SET payload=EXCLUDED.payload`,
+        [p.email, JSON.stringify(p.menteePayload)],
+      )
+    }
   }
 
   const app = express()
@@ -124,6 +168,8 @@ after(async () => {
   await pool.query('DELETE FROM rejections')
   await pool.query('DELETE FROM matches')
   await pool.query('DELETE FROM match_runs')
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()
@@ -217,18 +263,18 @@ describe('GET /api/admin/applications', () => {
 // ── POST /api/admin/applications/:email/approve ───────────────────
 
 describe('POST /api/admin/applications/:email/approve', () => {
-  it('approves a pending profile', async () => {
-    await pool.query(`UPDATE user_profiles SET status = 'PENDING' WHERE email = 'mentor@test.com'`)
+  it('approves a pending application', async () => {
+    await pool.query(`UPDATE mentor_applications SET status = 'PENDING' WHERE email = 'mentor@test.com'`)
 
     const { status, data } = await post('/api/admin/applications/mentor@test.com/approve', {}, admin)
     assert.equal(status, 200)
     assert.equal(data.ok, true)
 
-    const result = await pool.query('SELECT status FROM user_profiles WHERE email = $1', ['mentor@test.com'])
+    const result = await pool.query('SELECT status FROM mentor_applications WHERE email = $1', ['mentor@test.com'])
     assert.equal(result.rows[0].status, 'APPROVED')
   })
 
-  it('returns ok for already-approved profile', async () => {
+  it('returns ok for already-approved application', async () => {
     const { status, data } = await post('/api/admin/applications/mentor@test.com/approve', {}, admin)
     assert.equal(status, 200)
     assert.equal(data.message, 'already approved')

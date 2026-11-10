@@ -25,46 +25,77 @@ async function requireAdmin(req, res, next) {
 router.use(requireAdmin)
 
 // ── GET /api/admin/applications ────────────────────────────────────
-// All profiles, raw, for the admin table view.
+// All applications (both mentor and mentee) for the admin table view.
 
 router.get('/applications', async (_req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT email, name, role, payload, status, embedding IS NOT NULL AS has_embedding,
-              created_at, updated_at
-       FROM user_profiles ORDER BY created_at DESC`,
+    const mentorApps = await pool.query(
+      `SELECT p.email, p.name, 'mentor' AS role,
+              p.payload || mta.payload AS payload,
+              mta.status, mta.embedding IS NOT NULL AS has_embedding,
+              mta.created_at, mta.updated_at
+       FROM mentor_applications mta
+       JOIN user_profiles p ON p.email = mta.email
+       ORDER BY mta.created_at DESC`,
     )
-    res.json({ profiles: result.rows })
+    const menteeApps = await pool.query(
+      `SELECT p.email, p.name, 'mentee' AS role,
+              p.payload || ma.payload AS payload,
+              ma.status, ma.embedding IS NOT NULL AS has_embedding,
+              ma.created_at, ma.updated_at
+       FROM mentee_applications ma
+       JOIN user_profiles p ON p.email = ma.email
+       ORDER BY ma.created_at DESC`,
+    )
+    const profiles = [...mentorApps.rows, ...menteeApps.rows]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    res.json({ profiles })
   } catch (err) {
     next(err)
   }
 })
 
 // ── POST /api/admin/applications/:email/approve ───────────────────────
+// Body: { role: 'mentor' | 'mentee' } (defaults to whichever has a PENDING app)
 
 router.post('/applications/:email/approve', async (req, res, next) => {
   try {
     const email = req.params.email.toLowerCase().trim()
-    const result = await pool.query(
-      'SELECT email, name, status FROM user_profiles WHERE email = $1',
-      [email],
+    const requestedRole = req.body.role
+
+    const profile = await pool.query(
+      'SELECT email, name FROM user_profiles WHERE email = $1', [email],
     )
-    if (result.rows.length === 0) {
+    if (profile.rows.length === 0) {
       return res.status(404).json({ error: 'profile not found' })
     }
-    if (result.rows[0].status === 'APPROVED') {
+
+    const tables = requestedRole === 'mentor' ? ['mentor_applications']
+      : requestedRole === 'mentee' ? ['mentee_applications']
+      : ['mentor_applications', 'mentee_applications']
+
+    let approved = false
+    for (const table of tables) {
+      const app = await pool.query(
+        `SELECT status FROM ${table} WHERE email = $1`, [email],
+      )
+      if (app.rows.length > 0 && app.rows[0].status === 'PENDING') {
+        await pool.query(
+          `UPDATE ${table} SET status = 'APPROVED', updated_at = now() WHERE email = $1`,
+          [email],
+        )
+        approved = true
+      }
+    }
+
+    if (!approved) {
       return res.json({ ok: true, message: 'already approved' })
     }
 
-    await pool.query(
-      `UPDATE user_profiles SET status = 'APPROVED', updated_at = now() WHERE email = $1`,
-      [email],
-    )
-
-    const { name } = result.rows[0]
+    const { name } = profile.rows[0]
     notifyApplicantApproved(email, name)
 
-    console.log(`[admin] approved application: email=${email} by=${req.adminEmail}`)
+    console.log(`[admin] approved application: email=${email} role=${requestedRole || 'auto'} by=${req.adminEmail}`)
     res.json({ ok: true })
   } catch (err) {
     next(err)
@@ -78,14 +109,34 @@ router.get('/profiles', async (req, res, next) => {
     const { email } = req.query
     if (!email) return res.status(400).json({ error: 'email query param is required' })
 
+    const normalEmail = email.toLowerCase().trim()
     const result = await pool.query(
       'SELECT email, name, role, payload, created_at, updated_at FROM user_profiles WHERE email = $1',
-      [email.toLowerCase().trim()],
+      [normalEmail],
     )
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'profile not found' })
     }
-    res.json({ profile: result.rows[0] })
+    const row = result.rows[0]
+    const mentorApp = (await pool.query(
+      'SELECT payload, status FROM mentor_applications WHERE email = $1', [normalEmail],
+    )).rows[0]
+    const menteeApp = (await pool.query(
+      'SELECT payload, status FROM mentee_applications WHERE email = $1', [normalEmail],
+    )).rows[0]
+
+    res.json({
+      profile: {
+        ...row,
+        payload: {
+          ...row.payload,
+          ...(mentorApp?.payload || {}),
+          ...(menteeApp?.payload || {}),
+        },
+        mentor_status: mentorApp?.status || null,
+        mentee_status: menteeApp?.status || null,
+      },
+    })
   } catch (err) {
     next(err)
   }
@@ -98,9 +149,11 @@ router.get('/pending', async (_req, res, next) => {
   try {
     const runs = await pool.query(
       `SELECT r.run_id, r.mentee_email, r.status, r.top_candidates, r.total_scored,
-              r.created_at, p.name AS mentee_name, p.payload AS mentee_payload
+              r.created_at, p.name AS mentee_name,
+              p.payload || COALESCE(ma.payload, '{}') AS mentee_payload
        FROM match_runs r
        JOIN user_profiles p ON p.email = r.mentee_email
+       LEFT JOIN mentee_applications ma ON ma.email = r.mentee_email
        WHERE r.status = 'PENDING_REVIEW'
        ORDER BY r.created_at ASC`,
     )
@@ -110,9 +163,11 @@ router.get('/pending', async (_req, res, next) => {
       const matches = await pool.query(
         `SELECT m.match_id, m.mentor_email, m.status, m.final_score, m.rank,
                 m.computation_payload, m.created_at,
-                mentor.name AS mentor_name, mentor.payload AS mentor_payload
+                mentor.name AS mentor_name,
+                mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload
          FROM matches m
          JOIN user_profiles mentor ON mentor.email = m.mentor_email
+         LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
          WHERE m.run_id = $1 AND m.status = 'CANDIDATE'
          ORDER BY m.rank ASC`,
         [run.run_id],
@@ -297,6 +352,7 @@ router.get('/matches', async (req, res, next) => {
        ORDER BY m.created_at DESC, m.rank ASC`,
       [normalEmail],
     )
+    // Note: this endpoint returns names only, no payload merging needed
 
     const matches = result.rows.map(row => ({
       match_id: row.match_id,
@@ -324,11 +380,15 @@ router.get('/matches', async (req, res, next) => {
 router.get('/matches/:match_id', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT m.*, mentor.name AS mentor_name, mentor.payload AS mentor_payload,
-              mentee.name AS mentee_name, mentee.payload AS mentee_payload
+      `SELECT m.*, mentor.name AS mentor_name,
+              mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload,
+              mentee.name AS mentee_name,
+              mentee.payload || COALESCE(ma.payload, '{}') AS mentee_payload
        FROM matches m
        JOIN user_profiles mentor ON mentor.email = m.mentor_email
+       LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
        JOIN user_profiles mentee ON mentee.email = m.mentee_email
+       LEFT JOIN mentee_applications ma ON ma.email = m.mentee_email
        WHERE m.match_id = $1`,
       [req.params.match_id],
     )

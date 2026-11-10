@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { pool } from './db.js'
 import { getAuthEmail } from './auth.js'
 import { FIELDS, normalize, normalizeArray } from './field-registry.js'
-import { isMentor, isMentee } from './roles.js'
+import { deriveRole } from './roles.js'
 import { notifyAdminsNewApplication } from './email.js'
 
 import { AUTO_APPROVE_MENTOR, AUTO_APPROVE_MENTEE, requiresReview } from './flags.js'
@@ -10,6 +10,29 @@ import { AUTO_APPROVE_MENTOR, AUTO_APPROVE_MENTEE, requiresReview } from './flag
 const router = Router()
 
 const EMBEDDING_DIMENSIONS = 1536
+
+// Fields that live in user_profiles.payload (shared identity)
+const SHARED_PAYLOAD_FIELDS = new Set([
+  'preferred_name', 'pronouns', 'location', 'organization', 'timezone', 'fun_fact',
+  'career_level', 'education_level', 'years_experience', 'years_climate_experience',
+  'career_areas', 'climate_areas', 'sectors',
+  'certifications', 'interests_hobbies', 'locations_open_to',
+  'additional_info', 'links',
+])
+
+// Fields that live in mentor_applications.payload
+const MENTOR_PAYLOAD_FIELDS = new Set([
+  'motivation', 'eq_response', 'scheduling_link', 'commitment_name',
+  'management_experience', 'business_experience', 'international_experience',
+  'nonprofit_board_experience', 'freelance_experience',
+  'top_strengths', 'general_topics', 'max_capacity',
+])
+
+// Fields that live in mentee_applications.payload
+const MENTEE_PAYLOAD_FIELDS = new Set([
+  'statement_of_intent', 'relevant_projects', 'commitment_name',
+  'employment_situation', 'top_topics',
+])
 
 const ENUM_SINGLE_FIELDS = new Set([
   'education_level', 'career_level', 'years_experience', 'years_climate_experience',
@@ -88,19 +111,30 @@ function computeSingleEmbedding(text) {
   return Array.from(vec)
 }
 
+function buildEmbedding(appType, payload) {
+  const embeddingText = appType === 'mentee' ? payload.statement_of_intent : payload.motivation
+  try {
+    const embedding = computeSingleEmbedding(embeddingText)
+    return embedding ? `[${embedding.join(',')}]` : null
+  } catch (err) {
+    console.error(`[profile] embedding failed for ${appType}:`, err.message || err)
+    return null
+  }
+}
+
 // ── Validation ────────────────────────────────────────────────────
 
-function validateProfile(body) {
+function validateFields(body) {
   const errors = []
   const { role, name, ...fields } = body
 
   if (!name || !String(name).trim()) errors.push({ field: 'name', message: 'Name is required.' })
-  if (!['mentor', 'mentee', 'both'].includes(role)) errors.push({ field: 'role', message: 'Role must be mentor, mentee, or both.' })
+  if (!['mentor', 'mentee'].includes(role)) errors.push({ field: 'role', message: 'Role must be mentor or mentee.' })
 
-  if (isMentee(role) && !fields.statement_of_intent?.trim()) {
+  if (role === 'mentee' && !fields.statement_of_intent?.trim()) {
     errors.push({ field: 'statement_of_intent', message: 'Statement of intent is required for mentees.' })
   }
-  if (isMentor(role) && !fields.motivation?.trim()) {
+  if (role === 'mentor' && !fields.motivation?.trim()) {
     errors.push({ field: 'motivation', message: 'Motivation is required for mentors.' })
   }
   if (!fields.career_level) {
@@ -113,7 +147,7 @@ function validateProfile(body) {
     errors.push({ field: 'career_areas', message: 'At least one career area is required.' })
   }
 
-  const payload = {}
+  const allPayload = {}
   const links = {}
 
   for (const [key, val] of Object.entries(fields)) {
@@ -137,7 +171,7 @@ function validateProfile(body) {
       if (result && typeof result === 'object' && result.unknown) {
         errors.push({ field: key, message: `Invalid value for ${key}: "${val}"` })
       } else if (result) {
-        payload[key] = result
+        allPayload[key] = result
       }
     } else if (ENUM_ARRAY_FIELDS.has(key)) {
       const items = Array.isArray(val) ? val : [val]
@@ -145,7 +179,7 @@ function validateProfile(body) {
       if (FIELDS[registryField]) {
         const { values, warnings } = normalizeArray(registryField, items)
         for (const w of warnings) errors.push({ field: key, message: `Invalid value for ${key}: "${w.value}"` })
-        if (values.length) payload[key] = [...new Set(values)]
+        if (values.length) allPayload[key] = [...new Set(values)]
       }
     } else if (FREE_TEXT_FIELDS.has(key)) {
       const text = String(val).trim()
@@ -154,27 +188,27 @@ function validateProfile(body) {
         errors.push({ field: key, message: `${key} must be ${max} characters or fewer.` })
         continue
       }
-      payload[key] = text
+      allPayload[key] = text
     } else if (ARRAY_FREE_TEXT_FIELDS.has(key)) {
       const items = Array.isArray(val) ? val : String(val).split(/[|\n;]/).map(s => s.trim()).filter(Boolean)
-      if (items.length) payload[key] = items
+      if (items.length) allPayload[key] = items
     }
   }
 
-  if (Object.keys(links).length) payload.links = links
+  if (Object.keys(links).length) allPayload.links = links
 
-  return { errors, name: String(name).trim(), role, payload }
-}
-
-function buildEmbedding(role, payload) {
-  const embeddingText = isMentee(role) ? payload.statement_of_intent : payload.motivation
-  try {
-    const embedding = computeSingleEmbedding(embeddingText)
-    return embedding ? `[${embedding.join(',')}]` : null
-  } catch (err) {
-    console.error(`[profile] embedding failed for role=${role}:`, err.message || err)
-    return null
+  const rolePayloadFields = role === 'mentor' ? MENTOR_PAYLOAD_FIELDS : MENTEE_PAYLOAD_FIELDS
+  const sharedPayload = {}
+  const rolePayload = {}
+  for (const [key, val] of Object.entries(allPayload)) {
+    if (rolePayloadFields.has(key)) {
+      rolePayload[key] = val
+    } else {
+      sharedPayload[key] = val
+    }
   }
+
+  return { errors, name: String(name).trim(), role, sharedPayload, rolePayload }
 }
 
 // ── POST /api/profiles ────────────────────────────────────────────
@@ -184,29 +218,73 @@ router.post('/', async (req, res, next) => {
     const email = await getAuthEmail(req)
     if (!email) return res.status(401).json({ error: 'not authenticated' })
 
-    const existing = await pool.query(
-      'SELECT email FROM user_profiles WHERE email = $1',
-      [email],
-    )
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'Profile already exists.' })
-    }
-
-    const { errors, name, role, payload } = validateProfile(req.body)
+    const { errors, name, role, sharedPayload, rolePayload } = validateFields(req.body)
     if (errors.length) return res.status(400).json({ errors })
 
-    const autoApprove = ((isMentor(role) && AUTO_APPROVE_MENTOR) || (isMentee(role) && AUTO_APPROVE_MENTEE)) && !requiresReview(email)
-    const status = autoApprove ? 'APPROVED' : 'PENDING'
+    const appTable = role === 'mentor' ? 'mentor_applications' : 'mentee_applications'
 
-    await pool.query(
-      `INSERT INTO user_profiles (email, name, role, payload, embedding, status, updated_at)
-       VALUES ($1, $2, $3, $4, $5::vector, $6, now())`,
-      [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload), status],
+    const existingApp = await pool.query(
+      `SELECT email FROM ${appTable} WHERE email = $1`,
+      [email],
     )
+    if (existingApp.rows.length > 0) {
+      return res.status(409).json({ error: `You already have a ${role} application.` })
+    }
 
-    console.log(`[profile] created: email=${email} role=${role} name="${name}" status=${status}`)
+    const autoApprove = ((role === 'mentor' && AUTO_APPROVE_MENTOR) || (role === 'mentee' && AUTO_APPROVE_MENTEE)) && !requiresReview(email)
+    const appStatus = autoApprove ? 'APPROVED' : 'PENDING'
+    const embedding = buildEmbedding(role, rolePayload)
 
-    if (status === 'PENDING') {
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      const existingProfile = await client.query(
+        'SELECT email FROM user_profiles WHERE email = $1',
+        [email],
+      )
+
+      if (existingProfile.rows.length === 0) {
+        const derivedRole = role
+        await client.query(
+          `INSERT INTO user_profiles (email, name, role, payload, status, updated_at)
+           VALUES ($1, $2, $3, $4, $5, now())`,
+          [email, name, derivedRole, JSON.stringify(sharedPayload), appStatus],
+        )
+      } else {
+        const otherTable = role === 'mentor' ? 'mentee_applications' : 'mentor_applications'
+        const otherApp = (await client.query(
+          `SELECT email FROM ${otherTable} WHERE email = $1`, [email],
+        )).rows[0]
+        const newRole = deriveRole(
+          role === 'mentor' || !!otherApp,
+          role === 'mentee' || !!otherApp,
+        )
+        await client.query(
+          `UPDATE user_profiles SET name = $2, role = $3, payload = payload || $4,
+                  updated_at = now()
+           WHERE email = $1`,
+          [email, name, newRole, JSON.stringify(sharedPayload)],
+        )
+      }
+
+      await client.query(
+        `INSERT INTO ${appTable} (email, status, payload, embedding, updated_at)
+         VALUES ($1, $2, $3, $4::vector, now())`,
+        [email, appStatus, JSON.stringify(rolePayload), embedding],
+      )
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+
+    console.log(`[profile] created ${role} application: email=${email} name="${name}" status=${appStatus}`)
+
+    if (appStatus === 'PENDING') {
       const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
       if (adminEmails.length > 0) {
         notifyAdminsNewApplication(adminEmails, name, email, role)
@@ -234,17 +312,44 @@ router.patch('/', async (req, res, next) => {
       return res.status(404).json({ error: 'Profile not found.' })
     }
 
-    const { errors, name, role, payload } = validateProfile(req.body)
+    const { errors, name, role, sharedPayload, rolePayload } = validateFields(req.body)
     if (errors.length) return res.status(400).json({ errors })
 
-    await pool.query(
-      `UPDATE user_profiles SET name = $2, role = $3, payload = $4,
-              embedding = $5::vector, updated_at = now()
-       WHERE email = $1`,
-      [email, name, role, JSON.stringify(payload), buildEmbedding(role, payload)],
+    const appTable = role === 'mentor' ? 'mentor_applications' : 'mentee_applications'
+    const existingApp = await pool.query(
+      `SELECT email FROM ${appTable} WHERE email = $1`, [email],
     )
+    if (existingApp.rows.length === 0) {
+      return res.status(404).json({ error: `No ${role} application found.` })
+    }
 
-    console.log(`[profile] updated: email=${email} role=${role} name="${name}"`)
+    const embedding = buildEmbedding(role, rolePayload)
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      await client.query(
+        `UPDATE user_profiles SET name = $2, payload = $3, updated_at = now()
+         WHERE email = $1`,
+        [email, name, JSON.stringify(sharedPayload)],
+      )
+
+      await client.query(
+        `UPDATE ${appTable} SET payload = $2, embedding = $3::vector, updated_at = now()
+         WHERE email = $1`,
+        [email, JSON.stringify(rolePayload), embedding],
+      )
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+
+    console.log(`[profile] updated ${role} application: email=${email} name="${name}"`)
     res.json({ ok: true })
   } catch (err) {
     next(err)

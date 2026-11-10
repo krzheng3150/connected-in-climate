@@ -2,11 +2,35 @@
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Stable columns for querying; dynamic profile fields live in the JSONB payload.
+-- Shared identity: one row per person, regardless of role(s).
 CREATE TABLE IF NOT EXISTS user_profiles (
   email       TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
   role        TEXT NOT NULL CHECK (role IN ('mentor', 'mentee', 'both')),
+  payload     JSONB NOT NULL DEFAULT '{}',
+  embedding   vector(1536),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
+
+-- ── Role-specific application tables ──────────────────────────────
+-- Each has its own status, payload (role-specific fields), and embedding.
+-- A user who is both mentor and mentee has one row in each table.
+
+CREATE TABLE IF NOT EXISTS mentor_applications (
+  email       TEXT PRIMARY KEY REFERENCES user_profiles(email),
+  status      TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED')),
+  payload     JSONB NOT NULL DEFAULT '{}',
+  embedding   vector(1536),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mentee_applications (
+  email       TEXT PRIMARY KEY REFERENCES user_profiles(email),
+  status      TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED')),
   payload     JSONB NOT NULL DEFAULT '{}',
   embedding   vector(1536),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -25,8 +49,6 @@ CREATE TABLE IF NOT EXISTS match_runs (
   reviewed_at     TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
 
 -- Add FINISHED to match_runs status (idempotent: drop old, add new)
 DO $$ BEGIN

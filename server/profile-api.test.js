@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import express from 'express'
 import { clerkMiddleware } from '@clerk/express'
 import { pool } from './db.js'
-import { getAuthEmail } from './auth.js'
 import profileRouter from './profile-api.js'
 
 let server, baseUrl
@@ -19,6 +18,18 @@ before(async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
+    CREATE TABLE IF NOT EXISTS mentor_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS mentee_applications (
+      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
+      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `)
 
   const app = express()
@@ -32,12 +43,16 @@ before(async () => {
 })
 
 after(async () => {
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
   server?.close()
   await pool.end()
 })
 
 beforeEach(async () => {
+  await pool.query('DELETE FROM mentee_applications')
+  await pool.query('DELETE FROM mentor_applications')
   await pool.query('DELETE FROM user_profiles')
 })
 
@@ -61,7 +76,23 @@ function patch(body, email = 'new@test.com') {
 
 async function getProfile(email) {
   const result = await pool.query(
-    'SELECT email, name, role, payload, embedding IS NOT NULL AS has_embedding, status FROM user_profiles WHERE email = $1',
+    'SELECT email, name, role, payload, status FROM user_profiles WHERE email = $1',
+    [email],
+  )
+  return result.rows[0] || null
+}
+
+async function getMentorApp(email) {
+  const result = await pool.query(
+    'SELECT email, status, payload, embedding IS NOT NULL AS has_embedding FROM mentor_applications WHERE email = $1',
+    [email],
+  )
+  return result.rows[0] || null
+}
+
+async function getMenteeApp(email) {
+  const result = await pool.query(
+    'SELECT email, status, payload, embedding IS NOT NULL AS has_embedding FROM mentee_applications WHERE email = $1',
     [email],
   )
   return result.rows[0] || null
@@ -88,31 +119,34 @@ const VALID_MENTOR = {
 // ── POST /api/profiles (create) ────────────────────────────────────
 
 describe('POST /api/profiles', () => {
-  it('creates a mentee profile', async () => {
+  it('creates a mentee application', async () => {
     const { status, data } = await post(VALID_MENTEE)
     assert.equal(status, 201)
     assert.equal(data.ok, true)
 
-    const row = await getProfile('new@test.com')
-    assert.equal(row.name, 'Jane Doe')
-    assert.equal(row.role, 'mentee')
-    assert.equal(row.payload.statement_of_intent, 'I want to learn about climate policy.')
-    assert.equal(row.payload.career_level, 'entry')
-    assert.equal(row.has_embedding, true)
-    assert.equal(row.status, 'PENDING')
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.name, 'Jane Doe')
+    assert.equal(profile.role, 'mentee')
+
+    const app = await getMenteeApp('new@test.com')
+    assert.equal(app.status, 'PENDING')
+    assert.equal(app.payload.statement_of_intent, 'I want to learn about climate policy.')
+    assert.equal(app.has_embedding, true)
   })
 
-  it('creates a mentor profile', async () => {
+  it('creates a mentor application', async () => {
     const { status, data } = await post(VALID_MENTOR)
     assert.equal(status, 201)
     assert.equal(data.ok, true)
 
-    const row = await getProfile('new@test.com')
-    assert.equal(row.name, 'Alex Chen')
-    assert.equal(row.role, 'mentor')
-    assert.equal(row.payload.motivation, 'I want to share my climate finance experience.')
-    assert.equal(row.has_embedding, true)
-    assert.equal(row.status, 'PENDING')
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.name, 'Alex Chen')
+    assert.equal(profile.role, 'mentor')
+
+    const app = await getMentorApp('new@test.com')
+    assert.equal(app.status, 'PENDING')
+    assert.equal(app.payload.motivation, 'I want to share my climate finance experience.')
+    assert.equal(app.has_embedding, true)
   })
 
   it('returns 401 without auth', async () => {
@@ -120,11 +154,26 @@ describe('POST /api/profiles', () => {
     assert.equal(status, 401)
   })
 
-  it('returns 409 if profile already exists', async () => {
+  it('returns 409 if application already exists', async () => {
     await post(VALID_MENTEE)
     const { status, data } = await post({ ...VALID_MENTEE, name: 'Duplicate' })
     assert.equal(status, 409)
-    assert.match(data.error, /already exists/i)
+    assert.match(data.error, /already/i)
+  })
+
+  it('allows second application for other role', async () => {
+    await post(VALID_MENTEE)
+    const { status, data } = await post(VALID_MENTOR)
+    assert.equal(status, 201)
+    assert.equal(data.ok, true)
+
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.role, 'both')
+
+    const mentorApp = await getMentorApp('new@test.com')
+    assert.ok(mentorApp)
+    const menteeApp = await getMenteeApp('new@test.com')
+    assert.ok(menteeApp)
   })
 
   it('rejects missing name', async () => {
@@ -151,7 +200,7 @@ describe('POST /api/profiles', () => {
     assert.ok(data.errors.some(e => e.field === 'motivation'))
   })
 
-  it('stores free text fields in payload', async () => {
+  it('stores shared fields in user_profiles and role fields in application', async () => {
     await post({
       ...VALID_MENTEE,
       preferred_name: 'JD',
@@ -160,32 +209,35 @@ describe('POST /api/profiles', () => {
       organization: 'ClimateOrg',
       fun_fact: 'I climb mountains.',
     })
-    const row = await getProfile('new@test.com')
-    assert.equal(row.payload.preferred_name, 'JD')
-    assert.equal(row.payload.pronouns, 'she/her')
-    assert.equal(row.payload.location, 'NYC')
-    assert.equal(row.payload.organization, 'ClimateOrg')
-    assert.equal(row.payload.fun_fact, 'I climb mountains.')
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.preferred_name, 'JD')
+    assert.equal(profile.payload.pronouns, 'she/her')
+    assert.equal(profile.payload.location, 'NYC')
+    assert.equal(profile.payload.organization, 'ClimateOrg')
+    assert.equal(profile.payload.fun_fact, 'I climb mountains.')
+
+    const app = await getMenteeApp('new@test.com')
+    assert.equal(app.payload.statement_of_intent, 'I want to learn about climate policy.')
   })
 
-  it('stores multi-select arrays in payload', async () => {
+  it('stores multi-select arrays in shared payload', async () => {
     await post({
       ...VALID_MENTEE,
       climate_areas: ['ai_climate', 'adaptation'],
       sectors: ['nonprofit'],
     })
-    const row = await getProfile('new@test.com')
-    assert.ok(row.payload.climate_areas.length >= 1)
-    assert.ok(row.payload.sectors.length >= 1)
+    const profile = await getProfile('new@test.com')
+    assert.ok(profile.payload.climate_areas.length >= 1)
+    assert.ok(profile.payload.sectors.length >= 1)
   })
 
-  it('stores links in payload', async () => {
+  it('stores links in shared payload', async () => {
     await post({
       ...VALID_MENTEE,
       links: { linkedin: 'https://linkedin.com/in/test' },
     })
-    const row = await getProfile('new@test.com')
-    assert.equal(row.payload.links.linkedin, 'https://linkedin.com/in/test')
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.links.linkedin, 'https://linkedin.com/in/test')
   })
 
   it('rejects javascript: URL in links', async () => {
@@ -217,7 +269,6 @@ describe('POST /api/profiles', () => {
   it('rejects text exceeding max length', async () => {
     const { status, data } = await post({
       ...VALID_MENTEE,
-      motivation: 'x'.repeat(2001),
       statement_of_intent: 'x'.repeat(2001),
     })
     assert.equal(status, 400)
@@ -237,8 +288,8 @@ describe('POST /api/profiles', () => {
       ...VALID_MENTEE,
       career_areas: ['consulting', 'consulting', 'engineering'],
     })
-    const row = await getProfile('new@test.com')
-    assert.deepEqual(row.payload.career_areas, ['consulting', 'engineering'])
+    const profile = await getProfile('new@test.com')
+    assert.deepEqual(profile.payload.career_areas, ['consulting', 'engineering'])
   })
 
   it('rejects missing career_level', async () => {
@@ -278,29 +329,23 @@ describe('POST /api/profiles', () => {
     assert.ok(data.errors.some(e => e.field === 'career_level'))
   })
 
-  it('computes embedding from statement_of_intent for mentees', async () => {
+  it('computes embedding for mentee application', async () => {
     await post(VALID_MENTEE)
-    const result = await pool.query(
-      'SELECT embedding IS NOT NULL AS has_embedding FROM user_profiles WHERE email = $1',
-      ['new@test.com'],
-    )
-    assert.equal(result.rows[0].has_embedding, true)
+    const app = await getMenteeApp('new@test.com')
+    assert.equal(app.has_embedding, true)
   })
 
-  it('computes embedding from motivation for mentors', async () => {
+  it('computes embedding for mentor application', async () => {
     await post(VALID_MENTOR)
-    const result = await pool.query(
-      'SELECT embedding IS NOT NULL AS has_embedding FROM user_profiles WHERE email = $1',
-      ['new@test.com'],
-    )
-    assert.equal(result.rows[0].has_embedding, true)
+    const app = await getMentorApp('new@test.com')
+    assert.equal(app.has_embedding, true)
   })
 })
 
 // ── PATCH /api/profiles (update) ───────────────────────────────────
 
 describe('PATCH /api/profiles', () => {
-  it('updates an existing profile', async () => {
+  it('updates an existing mentee application', async () => {
     await post(VALID_MENTEE)
     const { status, data } = await patch({
       ...VALID_MENTEE,
@@ -310,9 +355,10 @@ describe('PATCH /api/profiles', () => {
     assert.equal(status, 200)
     assert.equal(data.ok, true)
 
-    const row = await getProfile('new@test.com')
-    assert.equal(row.name, 'Jane Updated')
-    assert.equal(row.payload.statement_of_intent, 'Updated goals for climate work.')
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.name, 'Jane Updated')
+    const app = await getMenteeApp('new@test.com')
+    assert.equal(app.payload.statement_of_intent, 'Updated goals for climate work.')
   })
 
   it('returns 404 if no profile exists', async () => {
@@ -336,7 +382,7 @@ describe('PATCH /api/profiles', () => {
   it('recomputes embedding on update', async () => {
     await post(VALID_MENTEE)
     const before = await pool.query(
-      'SELECT embedding::text FROM user_profiles WHERE email = $1',
+      'SELECT embedding::text FROM mentee_applications WHERE email = $1',
       ['new@test.com'],
     )
     await patch({
@@ -344,24 +390,20 @@ describe('PATCH /api/profiles', () => {
       statement_of_intent: 'Completely different text about renewable energy and carbon markets.',
     })
     const after = await pool.query(
-      'SELECT embedding::text FROM user_profiles WHERE email = $1',
+      'SELECT embedding::text FROM mentee_applications WHERE email = $1',
       ['new@test.com'],
     )
     assert.notEqual(before.rows[0].embedding, after.rows[0].embedding)
   })
 
-  it('updates role from mentee to mentor', async () => {
+  it('returns 404 if no application for that role', async () => {
     await post(VALID_MENTEE)
-    const { status } = await patch(VALID_MENTOR)
-    assert.equal(status, 200)
-
-    const row = await getProfile('new@test.com')
-    assert.equal(row.role, 'mentor')
-    assert.equal(row.name, 'Alex Chen')
-    assert.equal(row.payload.motivation, 'I want to share my climate finance experience.')
+    const { status, data } = await patch(VALID_MENTOR)
+    assert.equal(status, 404)
+    assert.match(data.error, /no mentor application/i)
   })
 
-  it('updates payload fields without losing unrelated data', async () => {
+  it('updates shared payload fields', async () => {
     await post({
       ...VALID_MENTEE,
       preferred_name: 'JD',
@@ -372,31 +414,31 @@ describe('PATCH /api/profiles', () => {
       preferred_name: 'Jane',
       fun_fact: 'I climb mountains.',
     })
-    const row = await getProfile('new@test.com')
-    assert.equal(row.payload.preferred_name, 'Jane')
-    assert.equal(row.payload.fun_fact, 'I climb mountains.')
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.preferred_name, 'Jane')
+    assert.equal(profile.payload.fun_fact, 'I climb mountains.')
   })
 
-  it('does not change status on update', async () => {
+  it('does not change application status on update', async () => {
     await post(VALID_MENTEE)
-    const before = await getProfile('new@test.com')
+    const before = await getMenteeApp('new@test.com')
     assert.equal(before.status, 'PENDING')
 
     await patch({ ...VALID_MENTEE, name: 'Jane Updated' })
-    const after = await getProfile('new@test.com')
+    const after = await getMenteeApp('new@test.com')
     assert.equal(after.status, 'PENDING')
   })
 
   it('updates updated_at timestamp', async () => {
     await post(VALID_MENTEE)
     const before = await pool.query(
-      'SELECT updated_at FROM user_profiles WHERE email = $1',
+      'SELECT updated_at FROM mentee_applications WHERE email = $1',
       ['new@test.com'],
     )
     await new Promise(r => setTimeout(r, 50))
     await patch({ ...VALID_MENTEE, name: 'Time Check' })
     const after = await pool.query(
-      'SELECT updated_at FROM user_profiles WHERE email = $1',
+      'SELECT updated_at FROM mentee_applications WHERE email = $1',
       ['new@test.com'],
     )
     assert.ok(after.rows[0].updated_at > before.rows[0].updated_at)

@@ -9,7 +9,7 @@ import actionRouter from './action-api.js'
 import feedbackRouter from './feedback-api.js'
 import adminRouter from './admin-api.js'
 import profileRouter from './profile-api.js'
-import { isMentor, isMentee } from './roles.js'
+import { deriveRole } from './roles.js'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -50,11 +50,12 @@ app.get('/api/profiles/me', async (req, res, next) => {
     const email = await getAuthEmail(req)
     if (!email) return res.status(401).json({ error: 'not authenticated' })
     const normalEmail = email.toLowerCase().trim()
+    const isAdmin = getAdminEmails().has(normalEmail)
+
     const result = await pool.query(
-      'SELECT email, name, role, payload, status FROM user_profiles WHERE email = $1',
+      'SELECT email, name, payload FROM user_profiles WHERE email = $1',
       [normalEmail],
     )
-    const isAdmin = getAdminEmails().has(normalEmail)
     if (result.rows.length === 0) {
       return res.json({
         email: normalEmail,
@@ -65,21 +66,44 @@ app.get('/api/profiles/me', async (req, res, next) => {
         preferred_name: null,
         is_admin: isAdmin,
         has_profile: false,
-        status: null,
+        mentor_status: null,
+        mentee_status: null,
       })
     }
+
     const row = result.rows[0]
+    const mentorApp = (await pool.query(
+      'SELECT status, payload FROM mentor_applications WHERE email = $1', [normalEmail],
+    )).rows[0] || null
+    const menteeApp = (await pool.query(
+      'SELECT status, payload FROM mentee_applications WHERE email = $1', [normalEmail],
+    )).rows[0] || null
+
+    const hasMentorApp = !!mentorApp
+    const hasMenteeApp = !!menteeApp
+    const role = deriveRole(hasMentorApp, hasMenteeApp)
+    const isMentor = mentorApp?.status === 'APPROVED'
+    const isMentee = menteeApp?.status === 'APPROVED'
+
+    const mergedPayload = {
+      ...row.payload,
+      ...(mentorApp?.payload || {}),
+      ...(menteeApp?.payload || {}),
+    }
+
     res.json({
       email: row.email,
       name: row.name,
-      role: row.role,
-      is_mentor: isMentor(row.role),
-      is_mentee: isMentee(row.role),
+      role,
+      is_mentor: isMentor,
+      is_mentee: isMentee,
       preferred_name: row.payload?.preferred_name || null,
-      payload: row.payload,
+      payload: mergedPayload,
       is_admin: isAdmin,
       has_profile: true,
-      status: row.status,
+      mentor_status: mentorApp?.status || null,
+      mentee_status: menteeApp?.status || null,
+      status: isMentor || isMentee ? 'APPROVED' : (mentorApp?.status || menteeApp?.status || 'PENDING'),
     })
   } catch (err) {
     next(err)
