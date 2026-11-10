@@ -4,7 +4,7 @@ import { SignIn } from '@clerk/react'
 import NavBar from '../components/NavBar.jsx'
 import HowItWorksPanel from '../components/HowItWorksPanel.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { TEST_MODE } from '../config.js'
+import { AUTH_ENABLED } from '../config.js'
 
 const FEATURES = [
   {
@@ -99,7 +99,7 @@ export default function Landing() {
 
       <hr className="landing-divider" />
 
-      {TEST_MODE ? (
+      {!AUTH_ENABLED ? (
         <div className="test-login-wrapper">
           <form onSubmit={handleTestLogin} className="test-login-form">
             <label>Enter your email to get started</label>

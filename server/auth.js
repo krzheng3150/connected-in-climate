@@ -1,9 +1,8 @@
 import { getAuth, clerkClient } from '@clerk/express'
 
-/**
- * Extract verified email from Clerk session, or fall back to x-user-email
- * header in non-production (for tests).
- */
+// true = all users must sign in via Clerk. false = only admins need Clerk; everyone else uses x-user-email header.
+const AUTH_ENABLED = false
+
 export async function getAuthEmail(req) {
   try {
     const { userId } = getAuth(req)
@@ -17,10 +16,15 @@ export async function getAuthEmail(req) {
   } catch (err) {
     console.error('[auth] Clerk lookup failed:', err.message || err)
   }
-  if (process.env.NODE_ENV !== 'production') {
+  if (!AUTH_ENABLED) {
     const header = req.headers['x-user-email']
     if (header) {
-      return header.toLowerCase().trim()
+      const email = header.toLowerCase().trim()
+      const adminEmails = new Set(
+        (process.env.ADMIN_EMAILS || '').split(',').map(e => e.toLowerCase().trim()).filter(Boolean),
+      )
+      if (adminEmails.has(email)) return null
+      return email
     }
   }
   return null

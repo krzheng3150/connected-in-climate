@@ -8,9 +8,9 @@ import './index.css'
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
-import { TEST_MODE } from './config.js'
+import { AUTH_ENABLED } from './config.js'
 
-if (TEST_MODE) {
+if (!AUTH_ENABLED) {
   const originalFetch = window.fetch
   window.fetch = function (url, opts = {}) {
     if (typeof url === 'string' && url.startsWith('/api/')) {

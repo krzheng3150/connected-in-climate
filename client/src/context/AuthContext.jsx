@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { useUser as useClerkUser, useAuth as useClerkAuth, useClerk } from '@clerk/react'
 
-import { TEST_MODE } from '../config.js'
+import { AUTH_ENABLED } from '../config.js'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
@@ -32,9 +32,9 @@ export function AuthProvider({ children }) {
     setError(null)
     try {
       const headers = { 'Content-Type': 'application/json' }
-      if (TEST_MODE && testEmail) {
+      if (!AUTH_ENABLED && testEmail) {
         headers['x-user-email'] = testEmail
-      } else if (!TEST_MODE || !testEmail) {
+      } else if (AUTH_ENABLED || !testEmail) {
         const token = await getToken()
         if (!token) {
           setProfile(null)
@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
       }
       const res = await fetch(`/api/profiles/me`, { headers })
       if (res.status === 401) {
-        if (TEST_MODE && testEmail) {
+        if (!AUTH_ENABLED && testEmail) {
           setError('This is an admin email. Please sign in below.')
           testLogout()
         }
@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
         return
       }
       const data = await res.json()
-      if (TEST_MODE && !testEmail && isSignedIn && !data.is_admin) {
+      if (!AUTH_ENABLED && !testEmail && isSignedIn && !data.is_admin) {
         signOut()
         setProfile(null)
         setError('This sign-in is for admins only. Please use the email field above.')
@@ -77,7 +77,7 @@ export function AuthProvider({ children }) {
   }, [getToken, testEmail, testLogout])
 
   useEffect(() => {
-    if (TEST_MODE && testEmail) {
+    if (!AUTH_ENABLED && testEmail) {
       fetchProfile()
       return
     }
@@ -90,7 +90,7 @@ export function AuthProvider({ children }) {
     fetchProfile()
   }, [isSignedIn, authLoaded, userLoaded, clerkUser, testEmail, fetchProfile])
 
-  const loggedIn = TEST_MODE ? (!!testEmail || isSignedIn) : isSignedIn
+  const loggedIn = !AUTH_ENABLED ? (!!testEmail || isSignedIn) : isSignedIn
   const user = profile
   const hasProfile = profile?.has_profile !== false
 

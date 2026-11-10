@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useClerk } from '@clerk/react'
 import { useAuth } from '../context/AuthContext.jsx'
 
-import { TEST_MODE } from '../config.js'
+import { AUTH_ENABLED } from '../config.js'
 
 export default function NavBar() {
   const { user, testEmail, testLogout } = useAuth()
@@ -10,7 +10,7 @@ export default function NavBar() {
   const navigate = useNavigate()
 
   function handleSignOut() {
-    if (TEST_MODE && testEmail) {
+    if (!AUTH_ENABLED && testEmail) {
       testLogout()
       navigate('/')
     } else {
