@@ -15,6 +15,8 @@ const TABLES = [
   'matches',
   'match_runs',
   'rejections',
+  'mentee_applications',
+  'mentor_applications',
   'user_profiles',
 ]
 
@@ -108,7 +110,9 @@ for (const table of TABLES) {
   if (counts[table] === 0) continue
   const cols = table === 'user_profiles'
     ? 'email, name, role, payload, embedding::text AS embedding, status, created_at, updated_at'
-    : '*'
+    : (table === 'mentor_applications' || table === 'mentee_applications')
+      ? 'email, status, payload, embedding::text AS embedding, created_at, updated_at'
+      : '*'
   const r = await pool.query(`SELECT ${cols} FROM ${table}`)
   exportData.tables[table] = r.rows
 }
