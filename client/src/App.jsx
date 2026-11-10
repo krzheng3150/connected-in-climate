@@ -39,7 +39,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/" element={!isLoaded && !TEST_MODE ? null : loggedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
+        <Route path="/" element={!isLoaded && !TEST_MODE ? <div className="page"><p>Loading…</p></div> : loggedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
         <Route path="/about" element={<About />} />
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/matches/:matchId" element={<RequireAuth><MatchDetail /></RequireAuth>} />
