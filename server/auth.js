@@ -1,7 +1,5 @@
 import { getAuth, clerkClient } from '@clerk/express'
-
-// true = all users must sign in via Clerk. false = only admins need Clerk; everyone else uses x-user-email header.
-const AUTH_ENABLED = false
+import { AUTH_ENABLED } from './flags.js'
 
 export async function getAuthEmail(req) {
   try {

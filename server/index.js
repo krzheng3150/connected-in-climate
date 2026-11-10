@@ -95,8 +95,13 @@ app.use('/api/admin', adminRouter)
 app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }))
 
 // In production the built React app is served by this same server.
-app.use(express.static(clientDist))
-app.use((_req, res) => res.sendFile(path.join(clientDist, 'index.html')))
+// Hashed assets (JS/CSS) get long cache; index.html always revalidates so
+// deploys never serve a stale shell that points to old bundles.
+app.use(express.static(clientDist, { maxAge: '1y', immutable: true }))
+app.use((_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache')
+  res.sendFile(path.join(clientDist, 'index.html'))
+})
 
 app.use((err, req, res, _next) => {
   console.error(`[error] ${req.method} ${req.path} user=${req.headers['x-user-email'] || 'unknown'}`, err)

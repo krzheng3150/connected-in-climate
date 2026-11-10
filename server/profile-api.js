@@ -5,10 +5,9 @@ import { FIELDS, normalize, normalizeArray } from './field-registry.js'
 import { isMentor, isMentee } from './roles.js'
 import { notifyAdminsNewApplication } from './email.js'
 
-const router = Router()
+import { AUTO_APPROVE_MENTOR, AUTO_APPROVE_MENTEE, requiresReview } from './flags.js'
 
-const AUTO_APPROVE_MENTOR = false
-const AUTO_APPROVE_MENTEE = false
+const router = Router()
 
 const EMBEDDING_DIMENSIONS = 1536
 
@@ -196,7 +195,7 @@ router.post('/', async (req, res, next) => {
     const { errors, name, role, payload } = validateProfile(req.body)
     if (errors.length) return res.status(400).json({ errors })
 
-    const autoApprove = (isMentor(role) && AUTO_APPROVE_MENTOR) || (isMentee(role) && AUTO_APPROVE_MENTEE)
+    const autoApprove = ((isMentor(role) && AUTO_APPROVE_MENTOR) || (isMentee(role) && AUTO_APPROVE_MENTEE)) && !requiresReview(email)
     const status = autoApprove ? 'APPROVED' : 'PENDING'
 
     await pool.query(

@@ -3,8 +3,9 @@ import { Router } from 'express'
 import { pool } from './db.js'
 import { rankMentors } from './matching.js'
 import { isMentee } from './roles.js'
-import { notifyAdminsNewRun, notifyMatchActive } from './email.js'
+import { notifyAdminsNewRun, notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
 import { createMatchResources } from './resources.js'
+import { AUTO_APPROVE_MATCHES, AUTO_APPROVE_MATCH_COUNT, requiresReview } from './flags.js'
 
 const router = Router()
 
@@ -141,17 +142,55 @@ router.post('/run', async (req, res, next) => {
         )
       }
 
+      const shouldAutoApprove = AUTO_APPROVE_MATCHES && !requiresReview(mentee.email)
+      let runStatus = 'PENDING_REVIEW'
+
+      if (shouldAutoApprove) {
+        const approveCount = Math.min(AUTO_APPROVE_MATCH_COUNT, candidateCount)
+        await client.query(
+          `UPDATE matches SET status = 'APPROVED'
+           WHERE run_id = $1 AND status = 'CANDIDATE' AND rank <= $2`,
+          [runId, approveCount],
+        )
+        await client.query(
+          `UPDATE matches SET status = 'REJECTED'
+           WHERE run_id = $1 AND status = 'CANDIDATE' AND rank > $2`,
+          [runId, approveCount],
+        )
+        runStatus = approveCount === 1 ? 'ACTIVE' : 'AWAITING_MENTEE'
+        await client.query(
+          `UPDATE match_runs SET status = $1, reviewed_by = 'auto', reviewed_at = now() WHERE run_id = $2`,
+          [runStatus, runId],
+        )
+
+        if (runStatus === 'ACTIVE') {
+          const activeMatch = finalResults[0]
+          await client.query(
+            `UPDATE matches SET status = 'ACTIVE' WHERE run_id = $1 AND rank = 1`,
+            [runId],
+          )
+          notifyMatchActive(activeMatch.mentor_snapshot.email, activeMatch.mentor_snapshot.name, mentee.email, menteeProfile.name)
+        }
+      }
+
       await client.query('COMMIT')
 
+      if (shouldAutoApprove && runStatus === 'AWAITING_MENTEE') {
+        const approveCount = Math.min(AUTO_APPROVE_MATCH_COUNT, candidateCount)
+        notifyMenteeMatchesReady(mentee.email, menteeProfile.name, approveCount)
+      }
+
       const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
-      if (adminEmails.length > 0) {
+      if (!shouldAutoApprove && adminEmails.length > 0) {
         notifyAdminsNewRun(adminEmails, menteeProfile.name, mentee.email)
       }
 
-      console.log(`[match] run created: mentee=${mentee.email} run_id=${runId} candidates=${candidateCount} total_scored=${finalResults.length}`)
+      console.log(`[match] run created: mentee=${mentee.email} run_id=${runId} status=${runStatus} candidates=${candidateCount} total_scored=${finalResults.length}${shouldAutoApprove ? ' (auto-approved)' : ''}`)
       res.json({
-        run: { run_id: runId, status: 'PENDING_REVIEW' },
-        message: `${candidateCount} mentor candidates are now pending admin review.`,
+        run: { run_id: runId, status: runStatus },
+        message: shouldAutoApprove
+          ? `Your mentor matches are ready! Review them and choose your mentor.`
+          : `${candidateCount} mentor candidates are now pending admin review.`,
         total_scored: finalResults.length,
         candidate_count: candidateCount,
       })
