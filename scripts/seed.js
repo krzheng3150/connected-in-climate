@@ -401,11 +401,15 @@ const embeddings = computeEmbeddings(texts)
 for (let i = 0; i < valid.length; i++) valid[i].embedding = embeddings[i]
 console.log(`Computed ${embeddings.filter(Boolean).length} embeddings`)
 
+const isProd = process.env.NODE_ENV === 'production'
+function connectionString() {
+  const url = new URL(process.env.DATABASE_URL)
+  if (isProd) url.searchParams.delete('sslmode')
+  return url.toString()
+}
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { ca: process.env.CA_CERT, rejectUnauthorized: Boolean(process.env.CA_CERT) }
-    : false,
+  connectionString: connectionString(),
+  ssl: isProd ? { ca: process.env.CA_CERT, rejectUnauthorized: Boolean(process.env.CA_CERT) } : false,
 })
 
 try {
