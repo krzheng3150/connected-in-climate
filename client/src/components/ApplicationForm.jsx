@@ -260,6 +260,9 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
     return (
       <div className="application-form">
         <h2>Your Interests</h2>
+        <p className="placeholder-text" style={{ marginBottom: '0.5rem' }}>
+          Select the areas you're interested in pursuing — not just where you are today.
+        </p>
         {MULTI_SELECT.map(f => (
           <MultiSelectField key={f.key} field={f} value={form[f.key] || []} onChange={set} />
         ))}
@@ -348,9 +351,9 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
           <input type="url" value={form.scheduling_link || ''} onChange={e => set('scheduling_link', e.target.value)} placeholder="e.g. https://calendly.com/yourname" />
         </div>
       )}
-      <div className="form-group" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+      <div className="commitment-block">
         <label>
-          Please confirm you can commit to meeting regularly with your selected {isMentor ? 'mentee' : 'mentor'} (i.e. once per week or once biweekly). Type your name below as confirmation.
+          <strong>Please confirm you can commit to meeting regularly with your selected {isMentor ? 'mentee' : 'mentor'} (i.e. once per week or once biweekly).</strong> Type your name below as confirmation.
         </label>
         <input
           type="text"

@@ -43,7 +43,10 @@ export default function MentorDashboard() {
         <div className="empty-state">
           <p>No mentees matched yet.</p>
           <p className="placeholder-text">
-            When a mentee is matched with you, they'll appear here.
+            Here's how matching works: our team reviews potential matches, then mentees are
+            presented with a shortlist of mentors and have the opportunity to set up brief
+            intro calls before selecting their program mentor. Once a mentee selects you,
+            they'll appear here.
           </p>
         </div>
       ) : (

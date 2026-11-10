@@ -1260,6 +1260,28 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-error { color: var(--error); font-size: 0.9rem; margin-bottom: 0.5rem; }
 
+.commitment-block {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-light);
+}
+.commitment-block label {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+.commitment-block input[type="text"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  background: var(--bg);
+}
+
 /* ── Confirmation Modal ────────────────────────────────────────── */
 
 .modal-overlay {
@@ -1321,6 +1343,11 @@ h1, h2, h3, h4, h5, h6 {
   backdrop-filter: blur(2px);
   display: flex;
   justify-content: flex-end;
+  touch-action: none;
+}
+
+.hiw-drawer {
+  touch-action: auto;
 }
 
 .hiw-drawer {
@@ -1368,6 +1395,8 @@ h1, h2, h3, h4, h5, h6 {
 .hiw-drawer-body {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
