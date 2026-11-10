@@ -16,14 +16,16 @@ export async function getAuthEmail(req) {
   } catch (err) {
     console.error('[auth] Clerk lookup failed:', err.message || err)
   }
-  if (!AUTH_ENABLED) {
+  if (!AUTH_ENABLED || process.env.NODE_ENV !== 'production') {
     const header = req.headers['x-user-email']
     if (header) {
       const email = header.toLowerCase().trim()
-      const adminEmails = new Set(
-        (process.env.ADMIN_EMAILS || '').split(',').map(e => e.toLowerCase().trim()).filter(Boolean),
-      )
-      if (adminEmails.has(email)) return null
+      if (process.env.NODE_ENV === 'production') {
+        const adminEmails = new Set(
+          (process.env.ADMIN_EMAILS || '').split(',').map(e => e.toLowerCase().trim()).filter(Boolean),
+        )
+        if (adminEmails.has(email)) return null
+      }
       return email
     }
   }
