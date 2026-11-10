@@ -31,7 +31,7 @@ services:
         value: ${dev-db-900747.DATABASE_URL} # [INSTANCE-SPECIFIC] matches databases[0].name
       - key: ADMIN_EMAILS
         scope: RUN_TIME
-        value: krzheng3150@gmail.com,cohenca3@gmail.com # [INSTANCE-SPECIFIC] new admin emails
+        value: krzheng3150@gmail.com,cohenca3@gmail.com,info@connectedinclimate.com # [INSTANCE-SPECIFIC] new admin emails
       - key: OPENAI_API_KEY
         scope: RUN_TIME
         type: SECRET # set in DO console
