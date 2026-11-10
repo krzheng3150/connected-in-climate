@@ -40,7 +40,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        <Route path="/" element={!isLoaded && AUTH_ENABLED ? <div className="page"><p>Loading…</p></div> : loggedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/home" element={!isLoaded && AUTH_ENABLED ? <div className="page"><p>Loading…</p></div> : loggedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />} />
         <Route path="/about" element={<About />} />
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/dashboard/past" element={<RequireAuth><PastMentorships /></RequireAuth>} />

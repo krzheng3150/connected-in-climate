@@ -266,8 +266,8 @@ export default function ApplicationForm({ existingProfile, onCancel }) {
       <h2>Tell Us More</h2>
       <p className="placeholder-text" style={{ marginBottom: '1rem' }}>
         Please keep responses to less than 200 words. We ask that you do not use AI or any LLMs
-        to respond to this question. We want to hear in your own words, genuine thoughts, and
-        goals! Feel free to be informal with your language.
+        to respond to these questions. We want to hear your genuine thoughts and goals in your
+        own words! Feel free to be informal with your language.
       </p>
       {isMentee(form.role) && (
         <>
