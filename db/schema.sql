@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS match_runs (
 
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
 
+-- Add FINISHED to match_runs status (idempotent: drop old, add new)
+DO $$ BEGIN
+  ALTER TABLE match_runs DROP CONSTRAINT IF EXISTS match_runs_status_check;
+  ALTER TABLE match_runs ADD CONSTRAINT match_runs_status_check
+    CHECK (status IN ('PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE', 'CANCELLED', 'FINISHED'));
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_match_runs_mentee ON match_runs(mentee_email, status);
 
 CREATE TABLE IF NOT EXISTS matches (
@@ -45,6 +52,8 @@ CREATE TABLE IF NOT EXISTS matches (
 );
 
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS resources_folder_url TEXT;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS end_date TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_matches_mentee ON matches(mentee_email, status);
 CREATE INDEX IF NOT EXISTS idx_matches_mentor ON matches(mentor_email, status);

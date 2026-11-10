@@ -63,6 +63,9 @@ async function setup() {
   console.log('Importing sample data...')
   run('node --env-file=.env scripts/import.js scripts/sample-profiles.csv')
 
+  console.log('Seeding match lifecycle data...')
+  run('node --env-file=.env scripts/seed.js')
+
   console.log('Building client (test mode)...')
   run('VITE_TEST_USER=1 npm run build', { stdio: 'pipe' })
 

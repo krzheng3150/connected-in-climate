@@ -3,6 +3,7 @@ import { pool } from './db.js'
 import { getAuthEmail } from './auth.js'
 import { notifyMatchActive, notifyMenteeMatchesReady, notifyApplicantApproved } from './email.js'
 import { createMatchResources } from './resources.js'
+import { MENTORSHIP_DURATION_DAYS } from './flags.js'
 
 const router = Router()
 
@@ -206,8 +207,10 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
       } else if (approvedSet.size === 1) {
         const activeId = [...approvedSet][0]
         await client.query(
-          `UPDATE matches SET status = 'ACTIVE' WHERE match_id = $1`,
-          [activeId],
+          `UPDATE matches SET status = 'ACTIVE', activated_at = now(),
+                  end_date = now() + make_interval(days => $2)
+           WHERE match_id = $1`,
+          [activeId, MENTORSHIP_DURATION_DAYS],
         )
         runStatus = 'ACTIVE'
       } else {

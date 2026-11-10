@@ -5,7 +5,7 @@ import { rankMentors } from './matching.js'
 import { isMentee } from './roles.js'
 import { notifyAdminsNewRun, notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
 import { createMatchResources } from './resources.js'
-import { AUTO_APPROVE_MATCHES, AUTO_APPROVE_MATCH_COUNT, requiresReview } from './flags.js'
+import { AUTO_APPROVE_MATCHES, AUTO_APPROVE_MATCH_COUNT, MENTORSHIP_DURATION_DAYS, requiresReview } from './flags.js'
 
 const router = Router()
 
@@ -83,7 +83,9 @@ router.post('/run', async (req, res, next) => {
 
     const inProgressMatches = (await pool.query(
       `SELECT mentor_email, mentee_email, status FROM matches
-       WHERE status IN ('ACTIVE', 'CANDIDATE', 'APPROVED')`,
+       WHERE status IN ('ACTIVE', 'CANDIDATE', 'APPROVED')
+          OR (status = 'FINISHED' AND mentee_email = $1)`,
+      [mentee.email],
     )).rows
 
     const blockList = (await pool.query(
@@ -166,8 +168,10 @@ router.post('/run', async (req, res, next) => {
         if (runStatus === 'ACTIVE') {
           const activeMatch = finalResults[0]
           await client.query(
-            `UPDATE matches SET status = 'ACTIVE' WHERE run_id = $1 AND rank = 1`,
-            [runId],
+            `UPDATE matches SET status = 'ACTIVE', activated_at = now(),
+                    end_date = now() + make_interval(days => $2)
+             WHERE run_id = $1 AND rank = 1`,
+            [runId, MENTORSHIP_DURATION_DAYS],
           )
           notifyMatchActive(activeMatch.mentor_snapshot.email, activeMatch.mentor_snapshot.name, mentee.email, menteeProfile.name)
         }
@@ -228,13 +232,27 @@ router.get('/run/current', async (req, res, next) => {
     }
 
     const run = runResult.rows[0]
+
+    if (run.status === 'ACTIVE') {
+      const expired = await pool.query(
+        `SELECT match_id FROM matches
+         WHERE run_id = $1 AND status = 'ACTIVE' AND end_date IS NOT NULL AND end_date < now()`,
+        [run.run_id],
+      )
+      if (expired.rows.length > 0) {
+        await pool.query(`UPDATE matches SET status = 'FINISHED' WHERE run_id = $1 AND status = 'ACTIVE'`, [run.run_id])
+        await pool.query(`UPDATE match_runs SET status = 'FINISHED' WHERE run_id = $1`, [run.run_id])
+        return res.json({ run: null })
+      }
+    }
+
     let matches = []
 
     if (run.status === 'AWAITING_MENTEE' || run.status === 'ACTIVE') {
       const matchStatus = run.status === 'AWAITING_MENTEE' ? 'APPROVED' : 'ACTIVE'
       const matchResult = await pool.query(
         `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
-                m.rank, m.created_at,
+                m.rank, m.created_at, m.activated_at, m.end_date,
                 mentor.name AS mentor_name, mentor.payload AS mentor_payload,
                 mentee.name AS mentee_name
          FROM matches m
@@ -255,6 +273,8 @@ router.get('/run/current', async (req, res, next) => {
         final_score: parseFloat(row.final_score),
         rank: row.rank,
         created_at: row.created_at,
+        activated_at: row.activated_at,
+        end_date: row.end_date,
       }))
     }
 
@@ -282,9 +302,25 @@ router.get('/', async (req, res, next) => {
 
     const normalEmail = email.toLowerCase().trim()
 
+    // Lazy-expire any active matches past their end date
+    await pool.query(
+      `UPDATE matches SET status = 'FINISHED'
+       WHERE (mentee_email = $1 OR mentor_email = $1)
+         AND status = 'ACTIVE' AND end_date IS NOT NULL AND end_date < now()`,
+      [normalEmail],
+    )
+    await pool.query(
+      `UPDATE match_runs SET status = 'FINISHED'
+       WHERE run_id IN (
+         SELECT DISTINCT run_id FROM matches
+         WHERE (mentee_email = $1 OR mentor_email = $1) AND status = 'FINISHED'
+       ) AND status = 'ACTIVE'`,
+      [normalEmail],
+    )
+
     const result = await pool.query(
       `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
-              m.rank, m.created_at,
+              m.rank, m.created_at, m.activated_at, m.end_date,
               mentor.name AS mentor_name, mentor.payload AS mentor_payload,
               mentee.name AS mentee_name, mentee.payload AS mentee_payload
        FROM matches m
@@ -306,6 +342,53 @@ router.get('/', async (req, res, next) => {
       status: row.status,
       final_score: parseFloat(row.final_score),
       created_at: row.created_at,
+      activated_at: row.activated_at,
+      end_date: row.end_date,
+    }))
+
+    res.json({ matches })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── GET /api/matches/past?email= ───────────────────────────────────
+// FINISHED matches for a user (both mentors and mentees).
+
+router.get('/past', async (req, res, next) => {
+  try {
+    const { email } = req.query
+    if (!email) return res.status(400).json({ error: 'email query param is required' })
+
+    const normalEmail = email.toLowerCase().trim()
+
+    const result = await pool.query(
+      `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
+              m.rank, m.created_at, m.activated_at, m.end_date,
+              mentor.name AS mentor_name, mentor.payload AS mentor_payload,
+              mentee.name AS mentee_name, mentee.payload AS mentee_payload
+       FROM matches m
+       JOIN user_profiles mentor ON mentor.email = m.mentor_email
+       JOIN user_profiles mentee ON mentee.email = m.mentee_email
+       WHERE (m.mentee_email = $1 OR m.mentor_email = $1)
+         AND m.status = 'FINISHED'
+       ORDER BY m.end_date DESC NULLS LAST`,
+      [normalEmail],
+    )
+
+    const matches = result.rows.map(row => ({
+      match_id: row.match_id,
+      mentor_email: row.mentor_email,
+      mentor_name: row.mentor_name,
+      mentor_payload: row.mentor_payload,
+      mentee_email: row.mentee_email,
+      mentee_name: row.mentee_name,
+      mentee_payload: row.mentee_payload,
+      status: row.status,
+      final_score: parseFloat(row.final_score),
+      created_at: row.created_at,
+      activated_at: row.activated_at,
+      end_date: row.end_date,
     }))
 
     res.json({ matches })
@@ -326,7 +409,7 @@ router.get('/:match_id', async (req, res, next) => {
 
     const result = await pool.query(
       `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
-              m.rank, m.created_at, m.resources_folder_url,
+              m.rank, m.created_at, m.activated_at, m.end_date, m.resources_folder_url,
               mentor.name AS mentor_name, mentor.payload AS mentor_payload,
               mentee.name AS mentee_name, mentee.payload AS mentee_payload
        FROM matches m
@@ -357,6 +440,8 @@ router.get('/:match_id', async (req, res, next) => {
       status: row.status,
       final_score: parseFloat(row.final_score),
       created_at: row.created_at,
+      activated_at: row.activated_at,
+      end_date: row.end_date,
       your_role: isMenteeViewer ? 'mentee' : 'mentor',
       partner: {
         email: isMenteeViewer ? row.mentor_email : row.mentee_email,
@@ -426,8 +511,10 @@ router.post('/:match_id/select', async (req, res, next) => {
       await client.query('BEGIN')
 
       await client.query(
-        `UPDATE matches SET status = 'ACTIVE' WHERE match_id = $1`,
-        [match_id],
+        `UPDATE matches SET status = 'ACTIVE', activated_at = now(),
+                end_date = now() + make_interval(days => $2)
+         WHERE match_id = $1`,
+        [match_id, MENTORSHIP_DURATION_DAYS],
       )
 
       await client.query(

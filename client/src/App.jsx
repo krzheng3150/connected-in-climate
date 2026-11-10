@@ -6,6 +6,7 @@ import RequireAuth from './components/RequireAuth.jsx'
 import RequireAdmin from './components/RequireAdmin.jsx'
 import Landing from './pages/Landing.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import PastMentorships from './pages/PastMentorships.jsx'
 import MatchDetail from './pages/MatchDetail.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
 import About from './pages/About.jsx'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/" element={!isLoaded && AUTH_ENABLED ? <div className="page"><p>Loading…</p></div> : loggedIn ? <Navigate to="/dashboard" replace /> : <Landing />} />
         <Route path="/about" element={<About />} />
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        <Route path="/dashboard/past" element={<RequireAuth><PastMentorships /></RequireAuth>} />
         <Route path="/matches/:matchId" element={<RequireAuth><MatchDetail /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminPanel /></RequireAdmin></RequireAuth>} />
         <Route path="*" element={<NotFound />} />

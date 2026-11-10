@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import MenteeDashboard from './MenteeDashboard.jsx'
 import MentorDashboard from './MentorDashboard.jsx'
@@ -86,6 +87,10 @@ export default function Dashboard() {
         {view === 'mentee' && user.is_mentee && <MenteeDashboard />}
 
         {view === 'mentor' && user.is_mentor && <MentorDashboard />}
+
+        <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+          <Link to="/dashboard/past" className="btn-link">Past Mentorships</Link>
+        </div>
         </>}
       </main>
     </div>

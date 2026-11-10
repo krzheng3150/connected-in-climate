@@ -14,10 +14,15 @@ export const AUTO_APPROVE_MENTEE = true
 export const AUTO_APPROVE_MATCHES = true
 export const AUTO_APPROVE_MATCH_COUNT = 3
 
+// Mentorship duration in days. Computed at activation time so existing
+// mentorships stay intact if this value changes.
+export const MENTORSHIP_DURATION_DAYS = 30
+
 // Domains that always require manual review (both applications and matches).
 export const REQUIRE_REVIEW_DOMAINS = new Set([
   'review.com',
   'test.com',
+  'example.com',
 ])
 
 export function requiresReview(email) {

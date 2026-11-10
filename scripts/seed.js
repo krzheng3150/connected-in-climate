@@ -128,6 +128,7 @@ async function seedMatchLifecycle(client, profiles, lifecycle, feedback, blockLi
     const isReviewed = state !== 'PENDING_REVIEW'
     const runStatus = state === 'PENDING_REVIEW' ? 'PENDING_REVIEW'
       : state === 'AWAITING_MENTEE' ? 'AWAITING_MENTEE'
+      : state === 'FINISHED' ? 'FINISHED'
       : 'ACTIVE'
 
     const runId = (await client.query(
@@ -160,9 +161,20 @@ async function seedMatchLifecycle(client, profiles, lifecycle, feedback, blockLi
         }
       }
 
+      const activatedAt = (matchStatus === 'ACTIVE' || matchStatus === 'FINISHED')
+        ? `now() - interval '${daysAgo} days'` : null
+      const endDateExpr = matchStatus === 'FINISHED'
+        ? `now() - interval '${Math.max(daysAgo - 30, 1)} days'`
+        : matchStatus === 'ACTIVE'
+          ? `now() + interval '${30 - daysAgo} days'`
+          : null
+
       const matchId = (await client.query(
-        `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'seed') RETURNING match_id`,
+        `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit,
+          activated_at, end_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'seed',
+          ${activatedAt ?? 'NULL'}, ${endDateExpr ?? 'NULL'})
+         RETURNING match_id`,
         [runId, result.mentor_snapshot.email, email, matchStatus,
          result.scores.final, result.rank, JSON.stringify(result)],
       )).rows[0].match_id

@@ -251,19 +251,48 @@ export async function adminSwitchTab(page, tabName) {
   await page.waitForTimeout(500)
 }
 
-export async function adminExpandScores(page) {
-  await page.waitForSelector('button:has-text("Show scores")', { timeout: 10000 })
-  await page.click('button:has-text("Show scores")')
-  await page.waitForSelector('.admin-scores')
+async function findRunCard(page, menteeName) {
+  if (!menteeName) return null
+  const cards = await page.$$('.review-run-card')
+  for (const card of cards) {
+    const title = await card.textContent()
+    if (title.includes(menteeName)) return card
+  }
+  return null
 }
 
-export async function adminExpandProfiles(page) {
-  await page.click('button:has-text("Show profiles")')
-  await page.waitForSelector('.admin-match-profiles')
+export async function adminExpandScores(page, menteeName) {
+  const card = await findRunCard(page, menteeName)
+  const scope = card || page
+  const pendingBtn = await scope.$('button:has-text("Algorithm details")')
+  if (pendingBtn) {
+    await pendingBtn.scrollIntoViewIfNeeded()
+    await pendingBtn.click({ force: true })
+    await page.waitForTimeout(500)
+  } else {
+    await page.waitForSelector('button:has-text("Show scores")', { timeout: 10000 })
+    await page.click('button:has-text("Show scores")')
+    await page.waitForSelector('.admin-scores')
+  }
+}
+
+export async function adminExpandProfiles(page, menteeName) {
+  const card = await findRunCard(page, menteeName)
+  const scope = card || page
+  const pendingBtn = await scope.$('button:has-text("Show details")')
+  if (pendingBtn) {
+    await pendingBtn.scrollIntoViewIfNeeded()
+    await pendingBtn.click({ force: true })
+    await page.waitForTimeout(500)
+  } else {
+    await page.click('button:has-text("Show profiles")')
+    await page.waitForSelector('.admin-match-profiles')
+  }
 }
 
 export async function adminExpandRawPayload(page) {
-  const btn = await page.waitForSelector('button:has-text("View Submission")', { timeout: 5000 })
+  const btn = await page.$('button:has-text("View Submission")')
+  if (!btn) return
   await btn.scrollIntoViewIfNeeded()
   await page.waitForTimeout(500)
   await btn.click()
@@ -272,18 +301,25 @@ export async function adminExpandRawPayload(page) {
   await json.scrollIntoViewIfNeeded()
 }
 
-export async function adminSelectCandidates(page, count = 1) {
-  const checkboxes = await page.$$('.admin-card input[type="checkbox"]')
+export async function adminSelectCandidates(page, count = 1, menteeName) {
+  const card = await findRunCard(page, menteeName)
+  const scope = card || page
+  let checkboxes = await scope.$$('.review-mentor-card input[type="checkbox"]')
+  if (checkboxes.length === 0) checkboxes = await scope.$$('.admin-card input[type="checkbox"]')
   let selected = 0
   for (let i = 0; i < Math.min(count, checkboxes.length); i++) {
-    await checkboxes[i].click()
+    await checkboxes[i].scrollIntoViewIfNeeded()
+    await checkboxes[i].evaluate(el => el.click())
     selected++
   }
   return selected
 }
 
-export async function adminSubmitReview(page) {
-  await page.click('button:has-text("Submit Review")')
+export async function adminSubmitReview(page, menteeName) {
+  const card = await findRunCard(page, menteeName)
+  const scope = card || page
+  const btn = await scope.$('button:has-text("Submit Review")')
+  await btn.click()
   await page.waitForSelector('.modal-overlay')
   await page.waitForTimeout(2000)
   await page.click('.modal-actions .btn-primary')
@@ -330,6 +366,24 @@ export async function waitForResourcesFolder(page, email, matchId, timeoutMs = 3
 export async function verifyResourcesButton(page) {
   const btn = await page.$('a.btn-primary:has-text("Open Resources Folder")')
   return !!btn
+}
+
+// ── Past Mentorships ──────────────────────────────────────────────
+
+export async function goToPastMentorships(page) {
+  await page.click('a[href="/dashboard/past"]')
+  await page.waitForSelector('h2:has-text("Past Mentorships")', { timeout: 10000 })
+}
+
+export async function getPastMentorshipCount(page) {
+  const cards = await page.$$('.match-card')
+  return cards.length
+}
+
+export async function openPastMentorshipDetail(page, index = 0) {
+  const buttons = await page.$$('.match-card .btn-link')
+  if (buttons[index]) await buttons[index].click()
+  await page.waitForTimeout(500)
 }
 
 // ── Utilities ──────────────────────────────────────────────────────

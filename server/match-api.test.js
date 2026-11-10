@@ -26,11 +26,16 @@ before(async () => {
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
       status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
-        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED')),
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED')),
       top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
       code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    DO $$ BEGIN
+      ALTER TABLE match_runs DROP CONSTRAINT IF EXISTS match_runs_status_check;
+      ALTER TABLE match_runs ADD CONSTRAINT match_runs_status_check
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED'));
+    END $$;
     CREATE TABLE IF NOT EXISTS matches (
       match_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       run_id UUID NOT NULL REFERENCES match_runs(run_id),
@@ -41,8 +46,11 @@ before(async () => {
       final_score NUMERIC(5,4) NOT NULL, rank INTEGER NOT NULL,
       computation_payload JSONB NOT NULL, code_commit TEXT NOT NULL,
       resources_folder_url TEXT,
+      activated_at TIMESTAMPTZ, end_date TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS end_date TIMESTAMPTZ;
     CREATE TABLE IF NOT EXISTS match_actions (
       action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       match_id UUID NOT NULL REFERENCES matches(match_id),
@@ -342,6 +350,58 @@ describe('GET /api/matches edge cases', () => {
     const { status, data } = await get('/api/matches?email=nobody@test.com')
     assert.equal(status, 200)
     assert.deepEqual(data.matches, [])
+  })
+})
+
+// ── Lazy expiration ───────────────────────────────────────────────
+
+describe('Lazy expiration', () => {
+  before(async () => {
+    // Set end_date to the past so the match expires on next load
+    await pool.query(
+      `UPDATE matches SET activated_at = now() - interval '31 days',
+              end_date = now() - interval '1 day'
+       WHERE mentee_email = 'mentee1@test.com' AND status = 'ACTIVE'`,
+    )
+  })
+
+  it('run/current returns null after end_date passes', async () => {
+    const { data } = await get('/api/matches/run/current?email=mentee1@test.com')
+    assert.equal(data.run, null)
+  })
+
+  it('match status is now FINISHED in DB', async () => {
+    const result = await pool.query(
+      `SELECT status FROM matches WHERE mentee_email = 'mentee1@test.com' AND mentor_email = 'mentor1@test.com'`,
+    )
+    assert.equal(result.rows[0].status, 'FINISHED')
+  })
+
+  it('match_run status is now FINISHED in DB', async () => {
+    const result = await pool.query(
+      `SELECT status FROM match_runs WHERE mentee_email = 'mentee1@test.com' ORDER BY created_at DESC LIMIT 1`,
+    )
+    assert.equal(result.rows[0].status, 'FINISHED')
+  })
+
+  it('GET /api/matches/past returns the finished match', async () => {
+    const { status, data } = await get('/api/matches/past?email=mentee1@test.com')
+    assert.equal(status, 200)
+    assert.ok(data.matches.length >= 1)
+    assert.equal(data.matches[0].status, 'FINISHED')
+    assert.equal(data.matches[0].mentor_email, 'mentor1@test.com')
+  })
+
+  it('mentor also sees finished match in past', async () => {
+    const { data } = await get('/api/matches/past?email=mentor1@test.com')
+    assert.ok(data.matches.length >= 1)
+    assert.equal(data.matches[0].mentee_email, 'mentee1@test.com')
+  })
+
+  it('GET /api/matches no longer returns the expired match', async () => {
+    const { data } = await get('/api/matches?email=mentee1@test.com')
+    const active = data.matches.filter(m => m.mentor_email === 'mentor1@test.com')
+    assert.equal(active.length, 0)
   })
 })
 

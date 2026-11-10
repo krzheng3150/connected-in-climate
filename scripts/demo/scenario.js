@@ -1,5 +1,5 @@
 import {
-  MENTEE_EMAIL, MENTEE_NAME, ADMIN_EMAIL,
+  MENTEE_EMAIL, MENTEE_NAME, ADMIN_EMAIL, FINISHED_MENTEE_EMAIL,
   NEW_MENTEE_EMAIL, NEW_MENTEE_NAME, NEW_MENTEE_EDITED_NAME, NEW_MENTEE_STATEMENT,
   NEW_MENTOR_EMAIL, NEW_MENTOR_NAME, NEW_MENTOR_EDITED_NAME, NEW_MENTOR_MOTIVATION,
   FEEDBACK_TEXT, FEEDBACK_RATING,
@@ -15,6 +15,7 @@ import {
   adminExpandProfiles, adminExpandRawPayload, adminSearchFeedback,
   adminSelectCandidates, adminSubmitReview, selectMentor,
   waitForResourcesFolder, verifyResourcesButton,
+  goToPastMentorships, getPastMentorshipCount, openPastMentorshipDetail,
   pause,
 } from './helpers.js'
 
@@ -111,7 +112,7 @@ export default async function runScenario(page) {
   await pause(page, 1500)
 
   console.log('  Expanding candidate scores...')
-  await adminExpandScores(page)
+  await adminExpandScores(page, MENTEE_NAME)
   await pause(page, 2000)
 
   console.log('  Viewing submission data...')
@@ -119,12 +120,12 @@ export default async function runScenario(page) {
   await pause(page, 3000)
 
   console.log('  Selecting top 2 candidates...')
-  const selected = await adminSelectCandidates(page, 2)
+  const selected = await adminSelectCandidates(page, 2, MENTEE_NAME)
   console.log(`  Selected ${selected} candidates`)
   await pause(page, 1000)
 
   console.log('  Submitting batch review...')
-  const reviewMsg = await adminSubmitReview(page)
+  const reviewMsg = await adminSubmitReview(page, MENTEE_NAME)
   console.log(`  Review result: ${reviewMsg}`)
   await pause(page, 1500)
 
@@ -229,6 +230,26 @@ export default async function runScenario(page) {
   console.log(`  Feedback items visible: ${fbCount}`)
   await pause(page, 2000)
   await closeAllPanels(page)
+
+  // ── Step 9b: View archived mentorships ──
+  console.log('\n── Step 9b: View archived mentorships ──')
+  await signOut(page)
+  await login(page, FINISHED_MENTEE_EMAIL)
+  console.log(`  Logged in as ${FINISHED_MENTEE_EMAIL}`)
+  await pause(page)
+
+  await goToPastMentorships(page)
+  const pastCount = await getPastMentorshipCount(page)
+  console.log(`  Past mentorships: ${pastCount}`)
+  if (pastCount === 0) throw new Error('Expected at least 1 past mentorship')
+
+  console.log('  Opening first past mentorship detail...')
+  await openPastMentorshipDetail(page, 0)
+  await pause(page, 2000)
+
+  await signOut(page)
+  console.log('  Signed out.')
+  await pause(page)
 
   // ── Step 10: Admin inspects in Search tab ──
   console.log('\n── Step 10: Admin inspects in Search tab ──')

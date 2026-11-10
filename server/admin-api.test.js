@@ -25,11 +25,16 @@ before(async () => {
       run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
       status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
-        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED')),
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED')),
       top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
       code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    DO $$ BEGIN
+      ALTER TABLE match_runs DROP CONSTRAINT IF EXISTS match_runs_status_check;
+      ALTER TABLE match_runs ADD CONSTRAINT match_runs_status_check
+        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED'));
+    END $$;
     CREATE TABLE IF NOT EXISTS matches (
       match_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       run_id UUID NOT NULL REFERENCES match_runs(run_id),
@@ -39,9 +44,11 @@ before(async () => {
         CHECK (status IN ('CANDIDATE','APPROVED','REJECTED','ACTIVE','STORED','FINISHED')),
       final_score NUMERIC(5,4) NOT NULL, rank INTEGER NOT NULL,
       computation_payload JSONB NOT NULL, code_commit TEXT NOT NULL,
-      resources_folder_url TEXT,
+      resources_folder_url TEXT, activated_at TIMESTAMPTZ, end_date TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS end_date TIMESTAMPTZ;
     CREATE TABLE IF NOT EXISTS match_actions (
       action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       match_id UUID NOT NULL REFERENCES matches(match_id),

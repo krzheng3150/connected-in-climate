@@ -3,6 +3,8 @@ export const BASE_URL = 'http://localhost:3000'
 export const MENTEE_EMAIL = 'mentee1@example.com'
 export const MENTEE_NAME = 'Jane Doe'
 
+export const FINISHED_MENTEE_EMAIL = 'finished.1@example.com'
+
 export const ADMIN_EMAIL = 'krzheng3150@gmail.com'
 
 export const NEW_MENTEE_EMAIL = 'newmentee@example.com'
