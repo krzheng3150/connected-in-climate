@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { ProfileDetail } from '../components/ProfileFields.jsx'
+import { lbl, ProfileDetail } from '../components/ProfileFields.jsx'
 import ConfirmationModal from '../components/ConfirmationModal.jsx'
 import NavBar from '../components/NavBar.jsx'
 
@@ -187,23 +187,132 @@ function PendingTab({ headers }) {
   )
 }
 
+function MenteeProfileSummary({ payload, name, email }) {
+  const p = payload || {}
+  const topClimates = (p.climate_areas || []).slice(0, 3)
+  const topTopics = (p.top_topics || []).slice(0, 5)
+
+  return (
+    <div className="review-mentee-panel">
+      <h3 className="review-mentee-name">{name}</h3>
+      {p.pronouns && <span className="review-meta-line">{p.pronouns}</span>}
+
+      <div className="review-field-group">
+        {p.timezone && <div className="review-field"><span className="review-field-label">Timezone</span><span>{p.timezone}</span></div>}
+        {p.links?.linkedin && <div className="review-field"><span className="review-field-label">LinkedIn</span><a href={p.links.linkedin} target="_blank" rel="noopener noreferrer">{p.links.linkedin.replace(/^https?:\/\/(www\.)?/, '')}</a></div>}
+        {email && <div className="review-field"><span className="review-field-label">Email</span><span>{email}</span></div>}
+      </div>
+
+      <div className="review-field-group">
+        <span className="review-field-label">Background</span>
+        <div className="review-meta-tags">
+          {p.education_level && <span className="tag">{lbl('education_level', p.education_level)}</span>}
+          {p.years_experience && <span className="tag">{lbl('years_experience', p.years_experience)} exp.</span>}
+          {p.employment_situation && <span className="tag">{lbl('employment_situation', p.employment_situation)}</span>}
+          {p.career_level && <span className="tag">{lbl('career_level', p.career_level)}</span>}
+        </div>
+      </div>
+
+      {topClimates.length > 0 && (
+        <div className="review-field-group">
+          <span className="review-field-label">Climate Areas{p.climate_areas?.length > 3 ? ` (top 3 of ${p.climate_areas.length})` : ''}</span>
+          <div className="review-meta-tags">
+            {topClimates.map(id => <span key={id} className="tag tag-climate">{lbl('climate_areas', id)}</span>)}
+          </div>
+        </div>
+      )}
+
+      {topTopics.length > 0 && (
+        <div className="review-field-group">
+          <span className="review-field-label">Wants Help With</span>
+          <ol className="review-topic-list">
+            {topTopics.map(id => <li key={id}>{lbl('topics', id)}</li>)}
+          </ol>
+        </div>
+      )}
+
+      {p.motivation && (
+        <div className="review-field-group">
+          <span className="review-field-label">Motivation</span>
+          <p className="review-text-block">{p.motivation}</p>
+        </div>
+      )}
+
+      {p.statement_of_intent && (
+        <div className="review-field-group">
+          <span className="review-field-label">Statement of Intent</span>
+          <p className="review-text-block">{p.statement_of_intent}</p>
+        </div>
+      )}
+
+      {p.fun_fact && (
+        <div className="review-field-group">
+          <span className="review-field-label">Fun Fact</span>
+          <p className="review-text-block">{p.fun_fact}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MentorCandidateCard({ match: m, isSelected, onToggle, expandedScores, onToggleScores, expandedProfile, onToggleProfile }) {
+  const p = m.mentor_payload || {}
+  const score = Math.round(m.final_score * 100)
+
+  return (
+    <div className={`review-mentor-card ${isSelected ? 'review-mentor-card-selected' : ''}`}>
+      <div className="review-mentor-header">
+        <label className="review-mentor-check">
+          <input type="checkbox" checked={isSelected} onChange={onToggle} />
+          <strong>Mentor {m.rank}</strong>
+          <span className="review-mentor-score">Rank #{m.rank} &middot; {score}%</span>
+        </label>
+      </div>
+
+      <div className="review-mentor-summary">
+        <div className="review-field"><span className="review-field-label">Name</span><span>{m.mentor_name}</span></div>
+        {p.timezone && <div className="review-field"><span className="review-field-label">Timezone</span><span>{p.timezone}</span></div>}
+        {(p.links?.linkedin || m.mentor_email) && (
+          <div className="review-field">
+            <span className="review-field-label">LinkedIn / Contact</span>
+            {p.links?.linkedin
+              ? <a href={p.links.linkedin} target="_blank" rel="noopener noreferrer">{p.links.linkedin.replace(/^https?:\/\/(www\.)?/, '')}</a>
+              : <span>{m.mentor_email}</span>}
+          </div>
+        )}
+      </div>
+
+      <div className="review-mentor-actions">
+        <button className="btn-link" onClick={onToggleProfile}>
+          {expandedProfile ? 'Hide details' : 'Show details'}
+        </button>
+        <button className="btn-link" onClick={onToggleScores}>
+          {expandedScores ? 'Hide algorithm details' : 'Algorithm details'}
+        </button>
+      </div>
+
+      {expandedProfile && (
+        <div className="review-mentor-detail">
+          <ProfileDetail payload={p} exclude={['timezone', 'links']} />
+        </div>
+      )}
+
+      {expandedScores && m.computation_payload && (
+        <div className="review-mentor-detail">
+          <ScoreBreakdown payload={m.computation_payload} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RunReviewCard({ run, headers, onUpdate }) {
   const [selected, setSelected] = useState(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [resultMsg, setResultMsg] = useState(null)
   const [expandedScores, setExpandedScores] = useState(new Set())
   const [expandedProfiles, setExpandedProfiles] = useState(new Set())
-  const [showMentee, setShowMentee] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-
-  function toggleProfile(matchId) {
-    setExpandedProfiles(prev => {
-      const next = new Set(prev)
-      if (next.has(matchId)) next.delete(matchId)
-      else next.add(matchId)
-      return next
-    })
-  }
 
   function toggleCandidate(matchId) {
     setSelected(prev => {
@@ -216,6 +325,15 @@ function RunReviewCard({ run, headers, onUpdate }) {
 
   function toggleScores(matchId) {
     setExpandedScores(prev => {
+      const next = new Set(prev)
+      if (next.has(matchId)) next.delete(matchId)
+      else next.add(matchId)
+      return next
+    })
+  }
+
+  function toggleProfile(matchId) {
+    setExpandedProfiles(prev => {
       const next = new Set(prev)
       if (next.has(matchId)) next.delete(matchId)
       else next.add(matchId)
@@ -256,63 +374,32 @@ function RunReviewCard({ run, headers, onUpdate }) {
   const date = new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <div className="admin-card" style={{ padding: '1rem' }}>
-      <div className="admin-card-header">
-        <strong>{run.mentee_name}</strong>
-        <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
-          {run.mentee_email} &middot; {date} &middot; {run.candidates.length} candidates / {run.total_scored} scored
-        </span>
-      </div>
-      <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>
-        <button className="btn-link" onClick={() => setShowMentee(!showMentee)}>
-          {showMentee ? 'Hide mentee profile' : 'Show mentee profile'}
-        </button>
-      </div>
-      {showMentee && <ProfileDetail payload={run.mentee_payload} />}
-
-      <div style={{ marginTop: '0.75rem' }}>
-        {run.candidates.map(m => {
-          const score = Math.round(m.final_score * 100)
-          const isSelected = selected.has(m.match_id)
-          const showScores = expandedScores.has(m.match_id)
-
-          return (
-            <div key={m.match_id} style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleCandidate(m.match_id)}
-                />
-                <strong>{m.mentor_name}</strong>
-                <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
-                  Rank #{m.rank} &middot; {score}%
-                </span>
-              </label>
-              <div className="admin-card-actions" style={{ marginTop: '0.25rem', marginLeft: '1.5rem' }}>
-                <button className="btn-link" onClick={() => toggleScores(m.match_id)}>
-                  {showScores ? 'Hide scores' : 'Show scores'}
-                </button>
-                <button className="btn-link" onClick={() => toggleProfile(m.match_id)}>
-                  {expandedProfiles.has(m.match_id) ? 'Hide mentor profile' : 'Show mentor profile'}
-                </button>
-              </div>
-              {showScores && m.computation_payload && (
-                <div style={{ marginLeft: '1.5rem' }}>
-                  <ScoreBreakdown payload={m.computation_payload} />
-                </div>
-              )}
-              {expandedProfiles.has(m.match_id) && (
-                <div style={{ marginLeft: '1.5rem' }}>
-                  <ProfileDetail payload={m.mentor_payload} />
-                </div>
-              )}
-            </div>
-          )
-        })}
+    <div className="review-run-card">
+      <div className="review-run-header">
+        <span className="review-run-title">Match Run — {run.mentee_name}</span>
+        <span className="review-run-meta">{date} &middot; {run.candidates.length} candidates / {run.total_scored} scored</span>
       </div>
 
-      <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="review-layout">
+        <MenteeProfileSummary payload={run.mentee_payload} name={run.mentee_name} email={run.mentee_email} />
+
+        <div className="review-mentors-column">
+          {run.candidates.map(m => (
+            <MentorCandidateCard
+              key={m.match_id}
+              match={m}
+              isSelected={selected.has(m.match_id)}
+              onToggle={() => toggleCandidate(m.match_id)}
+              expandedScores={expandedScores.has(m.match_id)}
+              onToggleScores={() => toggleScores(m.match_id)}
+              expandedProfile={expandedProfiles.has(m.match_id)}
+              onToggleProfile={() => toggleProfile(m.match_id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="review-submit-bar">
         <button className="btn-primary" onClick={() => setShowConfirm(true)} disabled={submitting}>
           {submitting ? 'Submitting...' : `Submit Review (${selected.size} approved)`}
         </button>
