@@ -294,7 +294,9 @@ export async function adminSubmitReview(page) {
 export async function selectMentor(page) {
   await page.click('button:has-text("Select This Mentor")')
   await page.waitForSelector('.modal-overlay')
-  await page.waitForTimeout(2000)
+  await page.waitForTimeout(500)
+  await page.click('.modal-overlay input[type="checkbox"]')
+  await page.waitForTimeout(500)
   await page.click('.modal-actions .btn-primary')
   await page.waitForSelector('.dashboard-message')
   return page.textContent('.dashboard-message')

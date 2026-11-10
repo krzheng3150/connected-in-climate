@@ -15,6 +15,7 @@ export default function MenteeDashboard() {
   const [openPanels, setOpenPanels] = useState([])
   const [confirmFind, setConfirmFind] = useState(false)
   const [confirmSelect, setConfirmSelect] = useState(null)
+  const [ackSpoken, setAckSpoken] = useState(false)
 
   function togglePanel(matchId) {
     setOpenPanels(prev =>
@@ -145,8 +146,8 @@ export default function MenteeDashboard() {
           <p className="placeholder-text">
             Your admin has reviewed your candidates and selected {run.matches.length} mentor{run.matches.length > 1 ? 's' : ''} for you.
             {run.matches.length > 1
-              ? ' Compare them and pick the one you\'d like to work with.'
-              : ' Review their profile and confirm the match.'}
+              ? ' Before making your decision, we strongly encourage you to schedule a short (15-minute) introductory call with each mentor. This helps you find the best fit for your goals and working style.'
+              : ' Before confirming, we encourage you to schedule a short introductory call with your mentor to make sure it\'s a good fit.'}
           </p>
           <div className="match-list">
             {run.matches.map(m => (
@@ -183,12 +184,14 @@ export default function MenteeDashboard() {
         <ConfirmationModal
           title="Confirm Mentor Selection"
           confirmLabel="Select This Mentor"
-          onConfirm={() => { const id = confirmSelect.match_id; setConfirmSelect(null); handleSelect(id) }}
-          onCancel={() => setConfirmSelect(null)}
+          onConfirm={() => { const id = confirmSelect.match_id; setConfirmSelect(null); setAckSpoken(false); handleSelect(id) }}
+          onCancel={() => { setConfirmSelect(null); setAckSpoken(false) }}
           confirming={selecting}
+          confirmDisabled={!ackSpoken}
         >
           <p style={{ marginBottom: '0.75rem' }}>
             You are selecting <strong>{confirmSelect.mentor_name}</strong> as your mentor.
+            This decision is final — your other candidates will no longer be available.
           </p>
           {confirmSelect.mentor_payload && (
             <>
@@ -196,6 +199,10 @@ export default function MenteeDashboard() {
               <ProfileDetail payload={confirmSelect.mentor_payload} exclude={['max_capacity', 'w_horiz', 'w_vert', 'w_sector', 'geo_match_preference']} />
             </>
           )}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '1rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={ackSpoken} onChange={e => setAckSpoken(e.target.checked)} style={{ marginTop: '0.2rem' }} />
+            <span>I have spoken with my matched mentor{run?.matches?.length > 1 ? 's' : ''} and am ready to make my final decision.</span>
+          </label>
         </ConfirmationModal>
       )}
     </div>

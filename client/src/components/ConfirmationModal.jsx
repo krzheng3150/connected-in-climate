@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export default function ConfirmationModal({ title, children, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, onCancel, confirming = false }) {
+export default function ConfirmationModal({ title, children, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, onCancel, confirming = false, confirmDisabled = false }) {
   const overlayRef = useRef(null)
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function ConfirmationModal({ title, children, confirmLabel = 'Con
         <div className="modal-body">{children}</div>
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onCancel} disabled={confirming}>{cancelLabel}</button>
-          <button className="btn-primary" onClick={onConfirm} disabled={confirming}>
+          <button className="btn-primary" onClick={onConfirm} disabled={confirming || confirmDisabled}>
             {confirming ? 'Processing...' : confirmLabel}
           </button>
         </div>
