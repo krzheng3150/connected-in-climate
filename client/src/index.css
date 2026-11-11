@@ -1251,7 +1251,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius); font-size: 0.95rem; font-weight: 600; cursor: pointer;
 }
 .btn-primary:hover { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.5; cursor: default; }
+.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }
 .btn-secondary {
   padding: 0.6rem 1.5rem; background: var(--surface); color: var(--fg); border: 1px solid var(--border);
   border-radius: var(--radius); font-size: 0.95rem; cursor: pointer;
