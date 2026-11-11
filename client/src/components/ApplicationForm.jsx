@@ -27,10 +27,16 @@ const MENTEE_SINGLE = [
   { key: 'employment_situation', label: 'Employment Situation' },
 ]
 
-const MULTI_SELECT = [
+const MULTI_SELECT_MENTEE = [
   { key: 'climate_areas', label: 'Climate Areas of Interest' },
-  { key: 'career_areas', label: 'Career Areas' },
-  { key: 'sectors', label: 'Sectors' },
+  { key: 'career_areas', label: 'Career Areas of Interest' },
+  { key: 'sectors', label: 'Sectors of Interest' },
+]
+
+const MULTI_SELECT_MENTOR = [
+  { key: 'climate_areas', label: 'Climate Areas of Experience' },
+  { key: 'career_areas', label: 'Experience in Career Areas' },
+  { key: 'sectors', label: 'Experience in Sectors' },
 ]
 
 const TOPIC_FIELDS_MENTOR = [
@@ -259,11 +265,13 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
     const menteeTopics = isMentee ? TOPIC_FIELDS_MENTEE : []
     return (
       <div className="application-form">
-        <h2>Your Interests</h2>
+        <h2>Your {isMentor ? 'Experience' : 'Interests'}</h2>
         <p className="placeholder-text" style={{ marginBottom: '0.5rem' }}>
-          Select the areas you're interested in pursuing — not just where you are today.
+          {isMentor
+            ? 'Select the areas where you have experience and can offer guidance.'
+            : 'Select the areas you\'re interested in pursuing — not just where you are today.'}
         </p>
-        {MULTI_SELECT.map(f => (
+        {(isMentor ? MULTI_SELECT_MENTOR : MULTI_SELECT_MENTEE).map(f => (
           <MultiSelectField key={f.key} field={f} value={form[f.key] || []} onChange={set} />
         ))}
         {[...topicFields, ...menteeTopics].map(f => (

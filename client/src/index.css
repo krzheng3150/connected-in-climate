@@ -1221,7 +1221,7 @@ h1, h2, h3, h4, h5, h6 {
 .role-option span { color: var(--muted); font-size: 0.9rem; }
 
 .form-group { margin-bottom: 1.25rem; }
-.form-group label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; }
+.form-group > label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; }
 .form-group input[type="text"],
 .form-group input[type="url"],
 .form-group textarea,
