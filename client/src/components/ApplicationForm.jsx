@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { LABELS } from './ProfileFields.jsx'
 import HowItWorksPanel from './HowItWorksPanel.jsx'
@@ -108,6 +108,17 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
     }
     return { role: null, name: '' }
   })
+  const detectedTz = useMemo(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return '' }
+  }, [])
+  const tzOptions = useMemo(() => {
+    try { return Intl.supportedValuesOf('timeZone') } catch { return [] }
+  }, [])
+
+  useEffect(() => {
+    if (detectedTz && !form.timezone) set('timezone', detectedTz)
+  }, [detectedTz])
+
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
@@ -137,8 +148,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
     setError(null)
     setFieldErrors({})
     try {
-      const timezone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return null } })()
-      const payload = { ...form, ...(timezone ? { timezone } : {}) }
+      const payload = { ...form }
       const headers = { 'Content-Type': 'application/json' }
       const res = await fetch('/api/profiles', {
         method: isEdit ? 'PATCH' : 'POST',
@@ -247,6 +257,19 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
             <div className="form-group">
               <label>City *</label>
               <input type="text" value={form.city || ''} onChange={e => set('city', e.target.value)} placeholder="Your city" />
+            </div>
+            <div className="form-group">
+              <label>Timezone</label>
+              <input
+                type="text"
+                list="tz-list"
+                value={form.timezone || ''}
+                onChange={e => set('timezone', e.target.value)}
+                placeholder="e.g. America/New_York"
+              />
+              <datalist id="tz-list">
+                {tzOptions.map(tz => <option key={tz} value={tz} />)}
+              </datalist>
             </div>
           </>
         )}
