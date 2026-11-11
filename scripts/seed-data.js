@@ -353,7 +353,7 @@ function addLinks(payload, name, idx) {
   const slug = name.toLowerCase().replace(/[^a-z]/g, '')
   payload.links = { linkedin: `https://linkedin.com/in/${slug}` }
   if (idx % 3 === 0) payload.links.website = `https://${slug}.dev`
-  if (idx % 5 === 0) payload.links.calendly = `https://calendly.com/${slug}`
+  if (idx % 2 === 0) payload.scheduling_link = `https://calendly.com/obviously-fake-link-${slug}/15min`
 }
 
 // ── Generate all profiles ──────────────────────────────────────────
