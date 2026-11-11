@@ -309,27 +309,29 @@ describe('After admin batch review', () => {
     assert.equal(data.run_status, 'ACTIVE')
   })
 
-  it('GET /api/matches returns ACTIVE matches', async () => {
-    const { data } = await get('/api/matches?email=mentee1@test.com')
+  it('GET /api/matches returns ACTIVE matches scoped by role', async () => {
+    const { data } = await get('/api/matches?email=mentee1@test.com&role=mentee')
     assert.ok(data.matches.length >= 1)
     for (const m of data.matches) {
       assert.equal(m.status, 'ACTIVE')
+      assert.equal(m.your_role, 'mentee')
     }
   })
 
-  it('includes partner names in response', async () => {
-    const { data } = await get('/api/matches?email=mentee1@test.com')
+  it('includes partner info in response', async () => {
+    const { data } = await get('/api/matches?email=mentee1@test.com&role=mentee')
     const match = data.matches[0]
-    assert.ok(match.mentor_name)
-    assert.ok(match.mentee_name)
+    assert.ok(match.partner_name)
+    assert.ok(match.partner_email)
     assert.ok(match.match_id)
     assert.ok(match.created_at)
   })
 
   it('shows match from mentor perspective too', async () => {
-    const { data } = await get('/api/matches?email=mentor1@test.com')
+    const { data } = await get('/api/matches?email=mentor1@test.com&role=mentor')
     assert.ok(data.matches.length >= 1)
-    assert.equal(data.matches[0].mentor_email, 'mentor1@test.com')
+    assert.equal(data.matches[0].your_role, 'mentor')
+    assert.equal(data.matches[0].partner_email, 'mentee1@test.com')
   })
 
   it('run/current shows ACTIVE status', async () => {
@@ -346,7 +348,7 @@ describe('GET /api/matches/:match_id', () => {
   let matchId
 
   before(async () => {
-    const { data } = await get('/api/matches?email=mentee1@test.com')
+    const { data } = await get('/api/matches?email=mentee1@test.com&role=mentee')
     matchId = data.matches[0].match_id
   })
 
@@ -398,8 +400,20 @@ describe('GET /api/matches edge cases', () => {
     assert.equal(data.error, 'email query param is required')
   })
 
+  it('returns 400 when role is missing', async () => {
+    const { status, data } = await get('/api/matches?email=mentee1@test.com')
+    assert.equal(status, 400)
+    assert.ok(data.error.includes('role'))
+  })
+
+  it('returns 400 for invalid role', async () => {
+    const { status, data } = await get('/api/matches?email=mentee1@test.com&role=admin')
+    assert.equal(status, 400)
+    assert.ok(data.error.includes('role'))
+  })
+
   it('returns empty array for user with no matches', async () => {
-    const { status, data } = await get('/api/matches?email=nobody@test.com')
+    const { status, data } = await get('/api/matches?email=nobody@test.com&role=mentor')
     assert.equal(status, 200)
     assert.deepEqual(data.matches, [])
   })
@@ -440,18 +454,20 @@ describe('Lazy expiration', () => {
     assert.equal(status, 200)
     assert.ok(data.matches.length >= 1)
     assert.equal(data.matches[0].status, 'FINISHED')
-    assert.equal(data.matches[0].mentor_email, 'mentor1@test.com')
+    assert.equal(data.matches[0].your_role, 'mentee')
+    assert.equal(data.matches[0].partner_email, 'mentor1@test.com')
   })
 
   it('mentor also sees finished match in past', async () => {
     const { data } = await get('/api/matches/past?email=mentor1@test.com')
     assert.ok(data.matches.length >= 1)
-    assert.equal(data.matches[0].mentee_email, 'mentee1@test.com')
+    assert.equal(data.matches[0].your_role, 'mentor')
+    assert.equal(data.matches[0].partner_email, 'mentee1@test.com')
   })
 
   it('GET /api/matches no longer returns the expired match', async () => {
-    const { data } = await get('/api/matches?email=mentee1@test.com')
-    const active = data.matches.filter(m => m.mentor_email === 'mentor1@test.com')
+    const { data } = await get('/api/matches?email=mentee1@test.com&role=mentee')
+    const active = data.matches.filter(m => m.partner_email === 'mentor1@test.com')
     assert.equal(active.length, 0)
   })
 })
@@ -503,6 +519,86 @@ describe('POST /api/matches/:match_id/select', () => {
     const { status, data } = await post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' })
     assert.equal(status, 400)
     assert.ok(data.error.includes('ACTIVE'))
+  })
+})
+
+// ── Dual-role user isolation ──────────────────────────────────────
+
+describe('Dual-role user sees only role-appropriate matches', () => {
+  before(async () => {
+    await pool.query(
+      `INSERT INTO user_profiles (email, name, role, payload)
+       VALUES ('dual@test.com', 'Dual User', 'both', '{"career_areas":["Engineering"],"climate_areas":["Energy"],"sectors":["Private"],"location":"SF, CA","w_horiz":3,"w_vert":3,"w_sector":3}')
+       ON CONFLICT (email) DO UPDATE SET role='both'`,
+    )
+    await pool.query(
+      `INSERT INTO mentor_applications (email, status, payload)
+       VALUES ('dual@test.com', 'APPROVED', '{"top_strengths":["Topic A"],"motivation":"Help.","max_capacity":5}')
+       ON CONFLICT (email) DO UPDATE SET status='APPROVED', payload=EXCLUDED.payload`,
+    )
+    await pool.query(
+      `INSERT INTO mentee_applications (email, status, payload)
+       VALUES ('dual@test.com', 'APPROVED', '{"top_topics":["Topic A"],"statement_of_intent":"Learn."}')
+       ON CONFLICT (email) DO UPDATE SET status='APPROVED', payload=EXCLUDED.payload`,
+    )
+
+    // Create a match where dual user is the mentee (mentor1 is their mentor)
+    const runResult = await pool.query(
+      `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit)
+       VALUES ('dual@test.com', 'ACTIVE', 1, 1, 'test') RETURNING run_id`,
+    )
+    await pool.query(
+      `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit, activated_at, end_date)
+       VALUES ($1, 'mentor1@test.com', 'dual@test.com', 'ACTIVE', 0.85, 1, '{}', 'test', now(), now() + interval '30 days')`,
+      [runResult.rows[0].run_id],
+    )
+
+    // Create a match where dual user is the mentor (mentee2 is their mentee)
+    const runResult2 = await pool.query(
+      `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit)
+       VALUES ('mentee2@test.com', 'ACTIVE', 1, 1, 'test') RETURNING run_id`,
+    )
+    await pool.query(
+      `INSERT INTO matches (run_id, mentor_email, mentee_email, status, final_score, rank, computation_payload, code_commit, activated_at, end_date)
+       VALUES ($1, 'dual@test.com', 'mentee2@test.com', 'ACTIVE', 0.70, 1, '{}', 'test', now(), now() + interval '30 days')`,
+      [runResult2.rows[0].run_id],
+    )
+  })
+
+  it('role=mentor returns only mentee partners', async () => {
+    const { data } = await get('/api/matches?email=dual@test.com&role=mentor')
+    assert.equal(data.matches.length, 1)
+    assert.equal(data.matches[0].your_role, 'mentor')
+    assert.equal(data.matches[0].partner_email, 'mentee2@test.com')
+  })
+
+  it('role=mentee returns only mentor partners', async () => {
+    const { data } = await get('/api/matches?email=dual@test.com&role=mentee')
+    assert.equal(data.matches.length, 1)
+    assert.equal(data.matches[0].your_role, 'mentee')
+    assert.equal(data.matches[0].partner_email, 'mentor1@test.com')
+  })
+
+  it('past endpoint computes your_role correctly for both', async () => {
+    // Finish the matches so they appear in /past
+    await pool.query(
+      `UPDATE matches SET status = 'FINISHED', end_date = now() - interval '1 day'
+       WHERE mentor_email = 'dual@test.com' OR mentee_email = 'dual@test.com'`,
+    )
+    await pool.query(
+      `UPDATE match_runs SET status = 'FINISHED'
+       WHERE mentee_email IN ('dual@test.com', 'mentee2@test.com')`,
+    )
+
+    const { data } = await get('/api/matches/past?email=dual@test.com')
+    assert.equal(data.matches.length, 2)
+
+    const asMentee = data.matches.find(m => m.your_role === 'mentee')
+    const asMentor = data.matches.find(m => m.your_role === 'mentor')
+    assert.ok(asMentee)
+    assert.ok(asMentor)
+    assert.equal(asMentee.partner_email, 'mentor1@test.com')
+    assert.equal(asMentor.partner_email, 'mentee2@test.com')
   })
 })
 

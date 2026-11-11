@@ -22,7 +22,7 @@ export default function MentorDashboard() {
   const fetchMatches = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/matches?email=${encodeURIComponent(user.email)}`)
+      const res = await fetch(`/api/matches?email=${encodeURIComponent(user.email)}&role=mentor`)
       if (res.ok) {
         const data = await res.json()
         setMatches(data.matches)

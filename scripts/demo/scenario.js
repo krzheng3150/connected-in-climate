@@ -168,12 +168,12 @@ export default async function runScenario(page) {
 
   // Get the match info via API for the mentor step
   const matchInfo = await page.evaluate(async (email) => {
-    const res = await fetch(`/api/matches?email=${encodeURIComponent(email)}`, {
+    const res = await fetch(`/api/matches?email=${encodeURIComponent(email)}&role=mentee`, {
       headers: { 'x-user-email': email },
     })
     const data = await res.json()
     const active = data.matches.find(m => m.status === 'ACTIVE')
-    return active ? { matchId: active.match_id, mentorEmail: active.mentor_email } : null
+    return active ? { matchId: active.match_id, mentorEmail: active.partner_email } : null
   }, MENTEE_EMAIL)
 
   if (!matchInfo) throw new Error('No active match found')

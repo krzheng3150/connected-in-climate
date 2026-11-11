@@ -3,9 +3,9 @@ function formatDate(d) {
 }
 
 export default function MatchCard({ match, userEmail, onOpen }) {
-  const isMentee = match.mentee_email === userEmail
-  const partnerName = isMentee ? match.mentor_name : match.mentee_name
-  const partnerRole = isMentee ? 'Mentor' : 'Mentee'
+  const yourRole = match.your_role ?? (match.mentee_email === userEmail ? 'mentee' : 'mentor')
+  const partnerName = match.partner_name ?? (yourRole === 'mentee' ? match.mentor_name : match.mentee_name)
+  const partnerRole = yourRole === 'mentee' ? 'Mentor' : 'Mentee'
   const dateRange = match.activated_at && match.end_date
     ? `${formatDate(match.activated_at)} – ${formatDate(match.end_date)}`
     : `Matched ${formatDate(match.created_at)}`

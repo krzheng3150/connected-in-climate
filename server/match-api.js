@@ -309,20 +309,26 @@ router.get('/run/current', async (req, res, next) => {
   }
 })
 
-// ── GET /api/matches?email= ────────────────────────────────────────
-// ACTIVE matches for a user (mentor sees mentees, mentee sees mentors).
+// ── GET /api/matches?email=&role=mentor|mentee ────────────────────────
+// ACTIVE matches for a user in a specific role.
 
 router.get('/', async (req, res, next) => {
   try {
-    const { email } = req.query
+    const { email, role } = req.query
     if (!email) return res.status(400).json({ error: 'email query param is required' })
+    if (!role || !['mentor', 'mentee'].includes(role)) {
+      return res.status(400).json({ error: 'role query param is required (mentor or mentee)' })
+    }
 
     const normalEmail = email.toLowerCase().trim()
+    const myCol = role === 'mentor' ? 'mentor_email' : 'mentee_email'
+    const partnerCol = role === 'mentor' ? 'mentee_email' : 'mentor_email'
+    const partnerAppTable = role === 'mentor' ? 'mentee_applications' : 'mentor_applications'
 
     // Lazy-expire any active matches past their end date
     await pool.query(
       `UPDATE matches SET status = 'FINISHED'
-       WHERE (mentee_email = $1 OR mentor_email = $1)
+       WHERE ${myCol} = $1
          AND status = 'ACTIVE' AND end_date IS NOT NULL AND end_date < now()`,
       [normalEmail],
     )
@@ -330,36 +336,31 @@ router.get('/', async (req, res, next) => {
       `UPDATE match_runs SET status = 'FINISHED'
        WHERE run_id IN (
          SELECT DISTINCT run_id FROM matches
-         WHERE (mentee_email = $1 OR mentor_email = $1) AND status = 'FINISHED'
+         WHERE ${myCol} = $1 AND status = 'FINISHED'
        ) AND status = 'ACTIVE'`,
       [normalEmail],
     )
 
     const result = await pool.query(
-      `SELECT m.match_id, m.mentor_email, m.mentee_email, m.status, m.final_score,
-              m.rank, m.created_at, m.activated_at, m.end_date,
-              mentor.name AS mentor_name,
-              mentor.payload || COALESCE(mta.payload, '{}') AS mentor_payload,
-              mentee.name AS mentee_name,
-              mentee.payload || COALESCE(ma.payload, '{}') AS mentee_payload
+      `SELECT m.match_id, m.status, m.final_score, m.rank,
+              m.created_at, m.activated_at, m.end_date,
+              partner.email AS partner_email,
+              partner.name AS partner_name,
+              partner.payload || COALESCE(pa.payload, '{}') AS partner_payload
        FROM matches m
-       JOIN user_profiles mentor ON mentor.email = m.mentor_email
-       LEFT JOIN mentor_applications mta ON mta.email = m.mentor_email
-       JOIN user_profiles mentee ON mentee.email = m.mentee_email
-       LEFT JOIN mentee_applications ma ON ma.email = m.mentee_email
-       WHERE (m.mentee_email = $1 OR m.mentor_email = $1)
-         AND m.status = 'ACTIVE'
+       JOIN user_profiles partner ON partner.email = m.${partnerCol}
+       LEFT JOIN ${partnerAppTable} pa ON pa.email = m.${partnerCol}
+       WHERE m.${myCol} = $1 AND m.status = 'ACTIVE'
        ORDER BY m.created_at DESC`,
       [normalEmail],
     )
 
     const matches = result.rows.map(row => ({
       match_id: row.match_id,
-      mentor_email: row.mentor_email,
-      mentor_name: row.mentor_name,
-      mentor_payload: row.mentor_payload,
-      mentee_email: row.mentee_email,
-      mentee_name: row.mentee_name,
+      your_role: role,
+      partner_email: row.partner_email,
+      partner_name: row.partner_name,
+      partner_payload: row.partner_payload,
       status: row.status,
       final_score: parseFloat(row.final_score),
       created_at: row.created_at,
@@ -401,20 +402,21 @@ router.get('/past', async (req, res, next) => {
       [normalEmail],
     )
 
-    const matches = result.rows.map(row => ({
-      match_id: row.match_id,
-      mentor_email: row.mentor_email,
-      mentor_name: row.mentor_name,
-      mentor_payload: row.mentor_payload,
-      mentee_email: row.mentee_email,
-      mentee_name: row.mentee_name,
-      mentee_payload: row.mentee_payload,
-      status: row.status,
-      final_score: parseFloat(row.final_score),
-      created_at: row.created_at,
-      activated_at: row.activated_at,
-      end_date: row.end_date,
-    }))
+    const matches = result.rows.map(row => {
+      const isMentee = row.mentee_email === normalEmail
+      return {
+        match_id: row.match_id,
+        your_role: isMentee ? 'mentee' : 'mentor',
+        partner_email: isMentee ? row.mentor_email : row.mentee_email,
+        partner_name: isMentee ? row.mentor_name : row.mentee_name,
+        partner_payload: isMentee ? row.mentor_payload : row.mentee_payload,
+        status: row.status,
+        final_score: parseFloat(row.final_score),
+        created_at: row.created_at,
+        activated_at: row.activated_at,
+        end_date: row.end_date,
+      }
+    })
 
     res.json({ matches })
   } catch (err) {

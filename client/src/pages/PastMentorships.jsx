@@ -48,9 +48,7 @@ export default function PastMentorships() {
         {!loading && matches.length > 0 && (
           <div className="match-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             {matches.map(m => {
-              const isMentee = m.mentee_email === user.email
-              const partnerName = isMentee ? m.mentor_name : m.mentee_name
-              const partnerRole = isMentee ? 'Mentor' : 'Mentee'
+              const partnerRole = m.your_role === 'mentee' ? 'Mentor' : 'Mentee'
               const dateRange = m.activated_at && m.end_date
                 ? `${formatDate(m.activated_at)} – ${formatDate(m.end_date)}`
                 : formatDate(m.created_at)
@@ -58,7 +56,7 @@ export default function PastMentorships() {
               return (
                 <div key={m.match_id} className="match-card" style={{ cursor: 'default', opacity: 0.85 }}>
                   <div className="match-card-top">
-                    <span className="match-card-name">{partnerName}</span>
+                    <span className="match-card-name">{m.partner_name}</span>
                     <span className="match-card-role">{partnerRole}</span>
                   </div>
                   <div className="match-card-meta">
