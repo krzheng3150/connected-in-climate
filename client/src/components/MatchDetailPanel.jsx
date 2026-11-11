@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { lbl, ProfileDetail } from './ProfileFields.jsx'
+import BookCallButton from './BookCallButton.jsx'
 
 export default function MatchDetailPanel({ matchId, onClose }) {
   const { user } = useAuth()
@@ -135,20 +136,14 @@ export default function MatchDetailPanel({ matchId, onClose }) {
 
       <div className="partner-section">
         <h3>Contact</h3>
-        {p.scheduling_link && (
-          <div style={{ marginBottom: '0.75rem' }}>
-            <a
-              className="btn-primary"
-              href={p.scheduling_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => handleContactClick('scheduling_link', p.scheduling_link)}
-              style={{ display: 'inline-block', textDecoration: 'none' }}
-            >
-              Book a Meeting
-            </a>
-          </div>
-        )}
+        <div style={{ marginBottom: '0.75rem' }}>
+          <BookCallButton
+            link={p.scheduling_link}
+            label="Book Call"
+            variant="btn-primary"
+            onClick={() => p.scheduling_link && handleContactClick('scheduling_link', p.scheduling_link)}
+          />
+        </div>
         <div className="contact-links">
           <ContactLink type="email" value={p.email} onClick={handleContactClick} />
           {p.links && Object.entries(p.links).map(([type, value]) => (

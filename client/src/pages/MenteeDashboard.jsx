@@ -4,6 +4,7 @@ import { lbl, ProfileDetail } from '../components/ProfileFields.jsx'
 import MatchCard from '../components/MatchCard.jsx'
 import MatchDetailPanel from '../components/MatchDetailPanel.jsx'
 import ConfirmationModal from '../components/ConfirmationModal.jsx'
+import BookCallButton from '../components/BookCallButton.jsx'
 
 export default function MenteeDashboard() {
   const { user } = useAuth()
@@ -232,16 +233,7 @@ function PickCard({ match, onSelect, onViewDetail, disabled }) {
         )}
       </div>
       <div className="admin-card-actions">
-        {mp.scheduling_link ? (
-          <a className="btn-secondary" href={mp.scheduling_link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-            Book Intro Call
-          </a>
-        ) : (
-          <span className="tooltip-wrap">
-            <button className="btn-secondary" disabled>Book Intro Call</button>
-            <span className="tooltip-text">Mentor has not set up a scheduling link. Please reach out to mentor directly.</span>
-          </span>
-        )}
+        <BookCallButton link={mp.scheduling_link} label="Book Intro Call" />
         <button className="btn-link" onClick={onViewDetail}>View full profile</button>
         <button className="btn-primary" onClick={onSelect} disabled={disabled}>
           {disabled ? 'Selecting...' : 'Select This Mentor'}
