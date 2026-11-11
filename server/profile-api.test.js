@@ -205,7 +205,7 @@ describe('POST /api/profiles', () => {
       ...VALID_MENTEE,
       preferred_name: 'JD',
       pronouns: 'she/her',
-      location: 'NYC',
+      city: 'New York', country: 'US',
       organization: 'ClimateOrg',
       fun_fact: 'I climb mountains.',
     })

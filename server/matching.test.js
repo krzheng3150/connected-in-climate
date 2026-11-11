@@ -24,7 +24,7 @@ function makeMentee(overrides = {}) {
       sectors: ['Private'],
       top_topics: ['Topic A', 'Topic B', 'Topic C'],
       statement_of_intent: 'I want to transition into climate tech.',
-      location: 'San Francisco, CA',
+      city: 'San Francisco', country: 'US',
       geo_match_preference: true,
       w_horiz: 3, w_vert: 3, w_sector: 3,
       ...overrides.payload,
@@ -47,8 +47,8 @@ function makeMentor(overrides = {}) {
       general_topics: ['Topic B', 'Topic F'],
       motivation: 'I want to help engineers transition.',
       max_capacity: 2,
-      location: 'San Francisco, CA',
-      locations_open_to: ['San Francisco, CA', 'Remote'],
+      city: 'San Francisco', country: 'US',
+      locations_open_to: ['San Francisco', 'Remote'],
       ...overrides.payload,
     },
     embedding: overrides.embedding ?? null,
@@ -474,31 +474,31 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('scores exact city match as 1.0', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: 'San Francisco, CA',
+      geo_match_preference: true, city: 'San Francisco', country: 'US',
     }})
-    const mentor = makeMentor({ payload: { location: 'San Francisco, CA' } })
+    const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = scoreGeo(mentee, mentor)
     assert.equal(result.score, 1.0)
     assert.equal(result.reason, 'exact_city_match')
   })
 
-  it('scores same region as 0.5', () => {
+  it('scores same country as 0.5', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: 'Oakland, CA',
+      geo_match_preference: true, city: 'Oakland', country: 'US',
     }})
-    const mentor = makeMentor({ payload: { location: 'San Francisco, CA' } })
+    const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = scoreGeo(mentee, mentor)
     assert.equal(result.score, 0.5)
-    assert.equal(result.reason, 'same_region')
+    assert.equal(result.reason, 'same_country')
   })
 
   it('scores remote mentor as 0.25', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: 'New York, NY',
+      geo_match_preference: true, city: 'New York', country: 'US',
     }})
     const mentor = makeMentor({ payload: {
-      location: 'San Francisco, CA',
-      locations_open_to: ['San Francisco, CA', 'Remote'],
+      city: 'London', country: 'GB',
+      locations_open_to: ['London', 'Remote'],
     }})
     const result = scoreGeo(mentee, mentor)
     assert.equal(result.score, 0.25)
@@ -507,11 +507,11 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('scores different locations as 0', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: 'New York, NY',
+      geo_match_preference: true, city: 'New York', country: 'US',
     }})
     const mentor = makeMentor({ payload: {
-      location: 'San Francisco, CA',
-      locations_open_to: ['San Francisco, CA'],
+      city: 'London', country: 'GB',
+      locations_open_to: ['London'],
     }})
     const result = scoreGeo(mentee, mentor)
     assert.equal(result.score, 0)
@@ -520,7 +520,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('handles missing mentee location', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: '',
+      geo_match_preference: true, city: '', country: '',
     }})
     const mentor = makeMentor()
     const result = scoreGeo(mentee, mentor)
@@ -528,20 +528,20 @@ describe('Phase 4b: scoreGeo', () => {
     assert.equal(result.reason, 'missing_location')
   })
 
-  it('is case-insensitive', () => {
+  it('is case-insensitive for city', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: 'san francisco, ca',
+      geo_match_preference: true, city: 'san francisco', country: 'US',
     }})
-    const mentor = makeMentor({ payload: { location: 'San Francisco, CA' } })
+    const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = scoreGeo(mentee, mentor)
     assert.equal(result.score, 1.0)
   })
 
   it('handles missing mentor location', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, location: 'San Francisco, CA',
+      geo_match_preference: true, city: 'San Francisco', country: 'US',
     }})
-    const mentor = makeMentor({ payload: { location: '' } })
+    const mentor = makeMentor({ payload: { city: '', country: '' } })
     const result = scoreGeo(mentee, mentor)
     assert.equal(result.score, 0)
     assert.equal(result.reason, 'missing_location')
@@ -668,8 +668,8 @@ describe('Phase 5: scoreExperienceSignals', () => {
 
 describe('Phase 6: computeMatch', () => {
   it('uses geo weights when geo enabled', () => {
-    const mentee = makeMentee({ payload: { geo_match_preference: true, location: 'SF, CA' } })
-    const mentor = makeMentor({ payload: { location: 'SF, CA' } })
+    const mentee = makeMentee({ payload: { geo_match_preference: true, city: 'San Francisco', country: 'US' } })
+    const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = computeMatch(mentee, mentor)
     assert.equal(result.scores.weights_used.categorical, 0.35)
     assert.equal(result.scores.weights_used.topic, 0.25)
@@ -835,8 +835,8 @@ describe('Integration: sample profiles', () => {
       general_topics: ['Job search strategy', 'Interview prep'],
       motivation: 'Helped 20+ engineers transition into climate tech.',
       max_capacity: 2,
-      location: 'San Francisco, CA',
-      locations_open_to: ['San Francisco, CA', 'Remote'],
+      city: 'San Francisco', country: 'US',
+      locations_open_to: ['San Francisco', 'Remote'],
     },
     embedding: null,
   }
@@ -852,8 +852,8 @@ describe('Integration: sample profiles', () => {
       general_topics: ['Climate Policy', 'Public speaking'],
       motivation: '15 years shaping global climate policy.',
       max_capacity: 3,
-      location: 'Washington, DC',
-      locations_open_to: ['Washington, DC', 'Geneva', 'Remote'],
+      city: 'Washington', country: 'US',
+      locations_open_to: ['Washington', 'Geneva', 'Remote'],
     },
     embedding: null,
   }
@@ -866,7 +866,7 @@ describe('Integration: sample profiles', () => {
       sectors: ['Private'],
       top_topics: ['Translating non-climate experience', 'Job search strategy', 'Networking'],
       statement_of_intent: '6 years building high-throughput distributed ledger systems.',
-      location: 'San Francisco, CA',
+      city: 'San Francisco', country: 'US',
       geo_match_preference: true,
       w_horiz: 5, w_vert: 1, w_sector: 2,
     },
@@ -881,7 +881,7 @@ describe('Integration: sample profiles', () => {
       sectors: ['Nonprofit', 'Government'],
       top_topics: ['Navigating career transition', 'International work', 'Climate Policy'],
       statement_of_intent: '4 years as a policy analyst at a DC think tank.',
-      location: 'Washington, DC',
+      city: 'Washington', country: 'US',
       geo_match_preference: true,
       w_horiz: 2, w_vert: 5, w_sector: 3,
     },

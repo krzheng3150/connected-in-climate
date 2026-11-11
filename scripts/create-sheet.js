@@ -4,7 +4,7 @@ import { FIELDS } from '../server/field-registry.js'
 
 const HEADERS = [
   'email', 'name', 'role', 'preferred_name', 'name_pronunciation', 'pronouns',
-  'photo_url', 'location', 'locations_open_to', 'geo_match_preference',
+  'photo_url', 'city', 'country', 'locations_open_to', 'geo_match_preference',
   'geo_match_distance_km', 'career_level', 'education_level', 'years_experience',
   'years_climate_experience', 'employment_situation', 'management_experience',
   'business_experience', 'international_experience', 'nonprofit_board_experience',
@@ -27,13 +27,16 @@ const DROPDOWN_FIELDS = {
   business_experience:        { field: 'business_experience' },
   international_experience:   { field: 'international_experience' },
   nonprofit_board_experience: { field: 'nonprofit_board_experience' },
+  country:                    { field: 'countries' },
 }
 
 const NOTES = {
   email:                'Required. Lowercase.',
   name:                 'Required. Full name.',
   role:                 'Required. mentor, mentee, or both.',
-  locations_open_to:    'Pipe-separated. e.g. "Portland, OR|Remote"',
+  city:                 'Free text. City name.',
+  country:              'Country code from dropdown.',
+  locations_open_to:    'Pipe-separated. e.g. "Portland|Remote"',
   career_areas:         'Labels or IDs from Reference tab. One per line, or separated by | or ;',
   climate_areas:        'Labels or IDs from Reference tab. One per line, or separated by | or ;',
   sectors:              'Labels or IDs from Reference tab. One per line, or separated by | or ;',

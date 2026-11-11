@@ -118,7 +118,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
 
   const STEP_FIELDS = {
     0: ['role'],
-    1: ['name', 'career_level'],
+    1: ['name', 'career_level', 'city'],
     2: ['climate_areas', 'career_areas'],
     3: ['statement_of_intent', 'motivation'],
   }
@@ -137,11 +137,13 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
     setError(null)
     setFieldErrors({})
     try {
+      const timezone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return null } })()
+      const payload = { ...form, ...(timezone ? { timezone } : {}) }
       const headers = { 'Content-Type': 'application/json' }
       const res = await fetch('/api/profiles', {
         method: isEdit ? 'PATCH' : 'POST',
         headers,
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       let data
       try {
@@ -234,12 +236,17 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
               <input type="text" value={form.organization || ''} onChange={e => set('organization', e.target.value)} placeholder="Where do you work?" />
             </div>
             <div className="form-group">
-              <label>Location</label>
-              <input type="text" value={form.location || ''} onChange={e => set('location', e.target.value)} placeholder="City, Country" />
+              <label>Country *</label>
+              <select value={form.country || ''} onChange={e => set('country', e.target.value || null)}>
+                <option value="">Select country…</option>
+                {Object.entries(LABELS.countries || {}).map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
-              <label>Timezone</label>
-              <input type="text" value={form.timezone || ''} onChange={e => set('timezone', e.target.value)} placeholder="e.g. EST, PST, GMT+1" />
+              <label>City *</label>
+              <input type="text" value={form.city || ''} onChange={e => set('city', e.target.value)} placeholder="Your city" />
             </div>
           </>
         )}
@@ -253,7 +260,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
             : isSecondApp
               ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
               : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
-          <button className="btn-primary" disabled={!isSecondApp && (!form.name?.trim() || !form.career_level)} onClick={() => setStep(2)}>Next</button>
+          <button className="btn-primary" disabled={!isSecondApp && (!form.name?.trim() || !form.career_level || !form.city?.trim())} onClick={() => setStep(2)}>Next</button>
         </div>
       </div>
     )

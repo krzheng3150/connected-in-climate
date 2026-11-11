@@ -96,7 +96,7 @@ before(async () => {
       email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
       shared: {
         career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        location: 'SF, CA',
+        city: 'San Francisco', country: 'US',
       },
       mentorPayload: {
         top_strengths: ['Topic A'], general_topics: [],
@@ -107,7 +107,7 @@ before(async () => {
       email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
       shared: {
         career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        w_horiz: 1, w_vert: 1, w_sector: 1, location: 'SF, CA', geo_match_preference: false,
+        w_horiz: 1, w_vert: 1, w_sector: 1, city: 'San Francisco', country: 'US', geo_match_preference: false,
       },
       menteePayload: {
         top_topics: ['Topic A'], statement_of_intent: 'Transition.',

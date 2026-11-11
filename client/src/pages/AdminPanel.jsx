@@ -118,8 +118,8 @@ function ApplicationsTab({ headers }) {
               </span>
             </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--muted)', marginTop: '0.25rem' }}>
-              {p.payload?.location && <span>{p.payload.location}</span>}
-              {p.payload?.location && p.payload?.timezone && <span> &middot; </span>}
+              {(p.payload?.city || p.payload?.country) && <span>{[p.payload.city, p.payload.country && lbl('countries', p.payload.country)].filter(Boolean).join(', ')}</span>}
+              {(p.payload?.city || p.payload?.country) && p.payload?.timezone && <span> &middot; </span>}
               {p.payload?.timezone && <span>{p.payload.timezone}</span>}
             </div>
             <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>

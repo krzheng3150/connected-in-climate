@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@clerk/express": "^2.1.87",
+    "country-list": "^2.4.1",
     "express": "^4.21.0",
     "googleapis": "^189.0.0",
     "pg": "^8.13.0",

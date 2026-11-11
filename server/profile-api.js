@@ -13,7 +13,7 @@ const EMBEDDING_DIMENSIONS = 1536
 
 // Fields that live in user_profiles.payload (shared identity)
 const SHARED_PAYLOAD_FIELDS = new Set([
-  'preferred_name', 'pronouns', 'location', 'organization', 'timezone', 'fun_fact',
+  'preferred_name', 'pronouns', 'city', 'country', 'organization', 'timezone', 'fun_fact',
   'career_level', 'education_level', 'years_experience', 'years_climate_experience',
   'career_areas', 'climate_areas', 'sectors',
   'certifications', 'interests_hobbies', 'locations_open_to',
@@ -38,6 +38,7 @@ const ENUM_SINGLE_FIELDS = new Set([
   'education_level', 'career_level', 'years_experience', 'years_climate_experience',
   'employment_situation', 'management_experience', 'business_experience',
   'international_experience', 'nonprofit_board_experience', 'freelance_experience',
+  'country',
 ])
 
 const ENUM_ARRAY_FIELDS = new Set([
@@ -49,10 +50,11 @@ const ENUM_FIELD_MAP = {
   top_strengths: 'topics',
   general_topics: 'topics',
   top_topics: 'topics',
+  country: 'countries',
 }
 
 const FREE_TEXT_FIELDS = new Set([
-  'preferred_name', 'pronouns', 'location', 'organization', 'timezone', 'scheduling_link',
+  'preferred_name', 'pronouns', 'city', 'organization', 'timezone', 'scheduling_link',
   'motivation', 'statement_of_intent', 'fun_fact',
   'relevant_projects', 'eq_response', 'additional_info', 'commitment_name',
 ])
@@ -67,7 +69,7 @@ const MAX_TEXT_LENGTH = {
   fun_fact: 500,
   preferred_name: 200,
   pronouns: 100,
-  location: 200,
+  city: 200,
   organization: 200,
   relevant_projects: 2000,
   eq_response: 2000,
@@ -146,6 +148,9 @@ function validateFields(body) {
   if (!fields.career_areas || (Array.isArray(fields.career_areas) && fields.career_areas.length === 0)) {
     errors.push({ field: 'career_areas', message: 'At least one career area is required.' })
   }
+  if (!fields.city?.trim()) {
+    errors.push({ field: 'city', message: 'City is required.' })
+  }
 
   const allPayload = {}
   const links = {}
@@ -167,7 +172,8 @@ function validateFields(body) {
     }
 
     if (ENUM_SINGLE_FIELDS.has(key)) {
-      const result = normalize(key, val)
+      const registryField = ENUM_FIELD_MAP[key] || key
+      const result = normalize(registryField, val)
       if (result && typeof result === 'object' && result.unknown) {
         errors.push({ field: key, message: `Invalid value for ${key}: "${val}"` })
       } else if (result) {

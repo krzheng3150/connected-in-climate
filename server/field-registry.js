@@ -3,6 +3,8 @@
 // mentor/mentee applications. IDs are stable; display labels can
 // change without breaking matching or storage.
 
+import { COUNTRIES } from '../shared/countries.js'
+
 export const FIELDS = {
   // ── Shared single-select ────────────────────────────────────────
   education_level: {
@@ -96,6 +98,9 @@ export const FIELDS = {
     business_ideas: 'Serving as a sounding board for new business ideas',
     nonprofit_board: 'Serving on a nonprofit board',
   },
+
+  // ── Location ────────────────────────────────────────────────────
+  countries: COUNTRIES,
 
   // ── Mentor single-select ────────────────────────────────────────
   management_experience: {

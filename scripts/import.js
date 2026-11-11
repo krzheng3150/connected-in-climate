@@ -448,7 +448,7 @@ if (dryRun) {
     console.log(`    name: ${p.name}`)
     console.log(`    payload keys: ${Object.keys(p.payload).join(', ')}`)
     if (p.payload.links) console.log(`    links: ${Object.keys(p.payload.links).join(', ')}`)
-    if (p.payload.location) console.log(`    location: ${p.payload.location}`)
+    if (p.payload.city || p.payload.country) console.log(`    location: ${[p.payload.city, p.payload.country].filter(Boolean).join(', ')}`)
     console.log(`    embedding text: "${(p.embeddingText || '').slice(0, 80)}..."`)
     console.log()
   }

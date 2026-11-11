@@ -7,80 +7,80 @@ import { isMentor, isMentee } from '../server/roles.js'
 // ── Name & location pools ──────────────────────────────────────────
 
 const MENTOR_POOL = [
-  { name: 'Alex Chen', pn: 'Ah-lex Chen', pronouns: 'he/him', loc: 'San Francisco, CA' },
-  { name: 'Priya Sharma', pn: 'PREE-yah', pronouns: 'she/her', loc: 'Washington, DC' },
-  { name: 'Jordan Lee', pn: null, pronouns: 'they/them', loc: 'Austin, TX' },
-  { name: 'Amara Okafor', pn: 'Ah-MAH-rah', pronouns: 'she/her', loc: 'Nairobi, Kenya' },
-  { name: 'Wei Zhang', pn: 'Way', pronouns: 'he/him', loc: 'Singapore' },
-  { name: 'Elena Vasquez', pn: 'Eh-LEH-nah', pronouns: 'she/her', loc: 'London, UK' },
-  { name: 'Raj Patel', pn: 'Rahj', pronouns: 'he/him', loc: 'Remote' },
-  { name: 'Maria Santos', pn: 'Mah-REE-ah', pronouns: 'she/her', loc: 'São Paulo, Brazil' },
-  { name: 'David Okonkwo', pn: 'Oh-KOHN-kwoh', pronouns: 'he/him', loc: 'Lagos, Nigeria' },
-  { name: 'Sophie Laurent', pn: 'So-FEE Loh-RAHN', pronouns: 'she/her', loc: 'Paris, France' },
-  { name: 'Kenji Watanabe', pn: 'KEN-jee', pronouns: 'he/him', loc: 'Tokyo, Japan' },
-  { name: 'Ana Petrova', pn: 'AH-nah', pronouns: 'she/her', loc: 'Berlin, Germany' },
-  { name: 'Miguel Torres', pn: 'Mee-GEL', pronouns: 'he/him', loc: 'Mexico City, Mexico' },
-  { name: 'Ingrid Larsen', pn: 'ING-rid', pronouns: 'she/her', loc: 'Amsterdam, Netherlands' },
-  { name: 'Kwame Asante', pn: 'KWAH-may', pronouns: 'he/him', loc: 'Cape Town, South Africa' },
-  { name: 'Mei Lin', pn: 'May Lin', pronouns: 'she/her', loc: 'Sydney, Australia' },
-  { name: 'Omar Hassan', pn: 'OH-mar', pronouns: 'he/him', loc: 'Dubai, UAE' },
-  { name: 'Clara Hoffmann', pn: 'KLAH-rah', pronouns: 'she/her', loc: 'Zurich, Switzerland' },
-  { name: 'Tomoko Ito', pn: 'Toh-MOH-koh', pronouns: 'she/her', loc: 'Osaka, Japan' },
-  { name: 'Dimitri Volkov', pn: 'Dee-MEE-tree', pronouns: 'he/him', loc: 'Toronto, Canada' },
-  { name: 'Lena Fischer', pn: 'LEH-nah', pronouns: 'she/her', loc: 'Vienna, Austria' },
-  { name: 'Samuel Achebe', pn: 'Ah-CHEH-bay', pronouns: 'he/him', loc: 'Accra, Ghana' },
-  { name: 'Isabella Rossi', pn: 'Ee-zah-BEL-lah', pronouns: 'she/her', loc: 'Milan, Italy' },
-  { name: 'Henrik Svensson', pn: 'HEN-rick', pronouns: 'he/him', loc: 'Stockholm, Sweden' },
-  { name: 'Yuki Tanaka', pn: 'YOO-kee', pronouns: 'she/her', loc: 'Seoul, South Korea' },
+  { name: 'Alex Chen', pn: 'Ah-lex Chen', pronouns: 'he/him', city: 'San Francisco', country: 'US' },
+  { name: 'Priya Sharma', pn: 'PREE-yah', pronouns: 'she/her', city: 'Washington', country: 'US' },
+  { name: 'Jordan Lee', pn: null, pronouns: 'they/them', city: 'Austin', country: 'US' },
+  { name: 'Amara Okafor', pn: 'Ah-MAH-rah', pronouns: 'she/her', city: 'Nairobi', country: 'KE' },
+  { name: 'Wei Zhang', pn: 'Way', pronouns: 'he/him', city: 'Singapore', country: 'SG' },
+  { name: 'Elena Vasquez', pn: 'Eh-LEH-nah', pronouns: 'she/her', city: 'London', country: 'GB' },
+  { name: 'Raj Patel', pn: 'Rahj', pronouns: 'he/him', city: null, country: null },
+  { name: 'Maria Santos', pn: 'Mah-REE-ah', pronouns: 'she/her', city: 'São Paulo', country: 'BR' },
+  { name: 'David Okonkwo', pn: 'Oh-KOHN-kwoh', pronouns: 'he/him', city: 'Lagos', country: 'NG' },
+  { name: 'Sophie Laurent', pn: 'So-FEE Loh-RAHN', pronouns: 'she/her', city: 'Paris', country: 'FR' },
+  { name: 'Kenji Watanabe', pn: 'KEN-jee', pronouns: 'he/him', city: 'Tokyo', country: 'JP' },
+  { name: 'Ana Petrova', pn: 'AH-nah', pronouns: 'she/her', city: 'Berlin', country: 'DE' },
+  { name: 'Miguel Torres', pn: 'Mee-GEL', pronouns: 'he/him', city: 'Mexico City', country: 'MX' },
+  { name: 'Ingrid Larsen', pn: 'ING-rid', pronouns: 'she/her', city: 'Amsterdam', country: 'NL' },
+  { name: 'Kwame Asante', pn: 'KWAH-may', pronouns: 'he/him', city: 'Cape Town', country: 'ZA' },
+  { name: 'Mei Lin', pn: 'May Lin', pronouns: 'she/her', city: 'Sydney', country: 'AU' },
+  { name: 'Omar Hassan', pn: 'OH-mar', pronouns: 'he/him', city: 'Dubai', country: 'AE' },
+  { name: 'Clara Hoffmann', pn: 'KLAH-rah', pronouns: 'she/her', city: 'Zurich', country: 'CH' },
+  { name: 'Tomoko Ito', pn: 'Toh-MOH-koh', pronouns: 'she/her', city: 'Osaka', country: 'JP' },
+  { name: 'Dimitri Volkov', pn: 'Dee-MEE-tree', pronouns: 'he/him', city: 'Toronto', country: 'CA' },
+  { name: 'Lena Fischer', pn: 'LEH-nah', pronouns: 'she/her', city: 'Vienna', country: 'AT' },
+  { name: 'Samuel Achebe', pn: 'Ah-CHEH-bay', pronouns: 'he/him', city: 'Accra', country: 'GH' },
+  { name: 'Isabella Rossi', pn: 'Ee-zah-BEL-lah', pronouns: 'she/her', city: 'Milan', country: 'IT' },
+  { name: 'Henrik Svensson', pn: 'HEN-rick', pronouns: 'he/him', city: 'Stockholm', country: 'SE' },
+  { name: 'Yuki Tanaka', pn: 'YOO-kee', pronouns: 'she/her', city: 'Seoul', country: 'KR' },
 ]
 
 const MENTEE_POOL = [
-  { name: 'Jane Doe', pn: null, pronouns: 'she/her', loc: 'San Francisco, CA' },
-  { name: 'Marcus Rivera', pn: 'MAR-koos', pronouns: 'he/him', loc: 'Washington, DC' },
-  { name: 'Lily Nguyen', pn: 'LIH-lee', pronouns: 'she/her', loc: 'London, UK' },
-  { name: 'Carlos Mendez', pn: 'CAR-lohs', pronouns: 'he/him', loc: 'Remote' },
-  { name: 'Fatima Al-Hassan', pn: 'FAH-tee-mah', pronouns: 'she/her', loc: 'Nairobi, Kenya' },
-  { name: 'Tomás Reyes', pn: 'Toh-MAHS', pronouns: 'he/him', loc: 'Austin, TX' },
-  { name: 'Aisha Patel', pn: 'Eye-EE-shah', pronouns: 'she/her', loc: 'San Francisco, CA' },
-  { name: 'Noah Kim', pn: 'NOH-ah', pronouns: 'he/him', loc: 'Seattle, WA' },
-  { name: 'Zara Obi', pn: 'ZAH-rah', pronouns: 'she/her', loc: 'Lagos, Nigeria' },
-  { name: 'Ethan Brooks', pn: null, pronouns: 'he/him', loc: 'Denver, CO' },
-  { name: 'Priyanka Mehta', pn: 'Pree-YAHN-kah', pronouns: 'she/her', loc: 'Mumbai, India' },
-  { name: 'Lucas Ferreira', pn: 'LOO-kahs', pronouns: 'he/him', loc: 'São Paulo, Brazil' },
-  { name: 'Chloe Martin', pn: null, pronouns: 'she/her', loc: 'Paris, France' },
-  { name: 'Hassan Ahmed', pn: 'Hah-SAHN', pronouns: 'he/him', loc: 'Cairo, Egypt' },
-  { name: 'Nina Johansson', pn: 'NEE-nah', pronouns: 'she/her', loc: 'Stockholm, Sweden' },
-  { name: 'Ravi Krishnan', pn: 'RAH-vee', pronouns: 'he/him', loc: 'Bangalore, India' },
-  { name: 'Aaliyah Thompson', pn: 'Ah-LEE-yah', pronouns: 'she/her', loc: 'Atlanta, GA' },
-  { name: 'Mateo García', pn: 'Mah-TAY-oh', pronouns: 'he/him', loc: 'Buenos Aires, Argentina' },
-  { name: 'Emma Lindqvist', pn: null, pronouns: 'she/her', loc: 'Helsinki, Finland' },
-  { name: 'James Chen-Ramirez', pn: null, pronouns: 'he/him', loc: 'Los Angeles, CA' },
-  { name: 'Amina Diallo', pn: 'Ah-MEE-nah', pronouns: 'she/her', loc: 'Dakar, Senegal' },
-  { name: 'Sebastian Müller', pn: 'Zeh-BAS-tee-ahn', pronouns: 'he/him', loc: 'Berlin, Germany' },
-  { name: 'Yara Costa', pn: 'YAH-rah', pronouns: 'she/her', loc: 'Lisbon, Portugal' },
-  { name: 'Daniel Park', pn: null, pronouns: 'he/him', loc: 'Chicago, IL' },
-  { name: 'Leila Mahmoud', pn: 'LAY-lah', pronouns: 'she/her', loc: 'Amman, Jordan' },
-  { name: 'Kofi Mensah', pn: 'KOH-fee', pronouns: 'he/him', loc: 'Kumasi, Ghana' },
-  { name: 'Sofia Andersson', pn: 'So-FEE-ah', pronouns: 'she/her', loc: 'Copenhagen, Denmark' },
-  { name: 'Tariq Bashir', pn: 'Tah-REEK', pronouns: 'he/him', loc: 'Karachi, Pakistan' },
-  { name: 'Maya Williams', pn: null, pronouns: 'she/her', loc: 'Portland, OR' },
-  { name: 'Diego Morales', pn: 'Dee-AY-go', pronouns: 'he/him', loc: 'Bogotá, Colombia' },
-  { name: 'Lin Zhang', pn: 'Lin Jahng', pronouns: 'she/her', loc: 'Shanghai, China' },
-  { name: 'Alex Rivera', pn: null, pronouns: 'they/them', loc: 'Boston, MA' },
-  { name: 'Rachel Nakamura', pn: null, pronouns: 'she/her', loc: 'Honolulu, HI' },
-  { name: 'Pierre Dubois', pn: 'Pee-AIR', pronouns: 'he/him', loc: 'Montreal, Canada' },
-  { name: 'Grace Adeyemi', pn: null, pronouns: 'she/her', loc: 'Abuja, Nigeria' },
+  { name: 'Jane Doe', pn: null, pronouns: 'she/her', city: 'San Francisco', country: 'US' },
+  { name: 'Marcus Rivera', pn: 'MAR-koos', pronouns: 'he/him', city: 'Washington', country: 'US' },
+  { name: 'Lily Nguyen', pn: 'LIH-lee', pronouns: 'she/her', city: 'London', country: 'GB' },
+  { name: 'Carlos Mendez', pn: 'CAR-lohs', pronouns: 'he/him', city: null, country: null },
+  { name: 'Fatima Al-Hassan', pn: 'FAH-tee-mah', pronouns: 'she/her', city: 'Nairobi', country: 'KE' },
+  { name: 'Tomás Reyes', pn: 'Toh-MAHS', pronouns: 'he/him', city: 'Austin', country: 'US' },
+  { name: 'Aisha Patel', pn: 'Eye-EE-shah', pronouns: 'she/her', city: 'San Francisco', country: 'US' },
+  { name: 'Noah Kim', pn: 'NOH-ah', pronouns: 'he/him', city: 'Seattle', country: 'US' },
+  { name: 'Zara Obi', pn: 'ZAH-rah', pronouns: 'she/her', city: 'Lagos', country: 'NG' },
+  { name: 'Ethan Brooks', pn: null, pronouns: 'he/him', city: 'Denver', country: 'US' },
+  { name: 'Priyanka Mehta', pn: 'Pree-YAHN-kah', pronouns: 'she/her', city: 'Mumbai', country: 'IN' },
+  { name: 'Lucas Ferreira', pn: 'LOO-kahs', pronouns: 'he/him', city: 'São Paulo', country: 'BR' },
+  { name: 'Chloe Martin', pn: null, pronouns: 'she/her', city: 'Paris', country: 'FR' },
+  { name: 'Hassan Ahmed', pn: 'Hah-SAHN', pronouns: 'he/him', city: 'Cairo', country: 'EG' },
+  { name: 'Nina Johansson', pn: 'NEE-nah', pronouns: 'she/her', city: 'Stockholm', country: 'SE' },
+  { name: 'Ravi Krishnan', pn: 'RAH-vee', pronouns: 'he/him', city: 'Bangalore', country: 'IN' },
+  { name: 'Aaliyah Thompson', pn: 'Ah-LEE-yah', pronouns: 'she/her', city: 'Atlanta', country: 'US' },
+  { name: 'Mateo García', pn: 'Mah-TAY-oh', pronouns: 'he/him', city: 'Buenos Aires', country: 'AR' },
+  { name: 'Emma Lindqvist', pn: null, pronouns: 'she/her', city: 'Helsinki', country: 'FI' },
+  { name: 'James Chen-Ramirez', pn: null, pronouns: 'he/him', city: 'Los Angeles', country: 'US' },
+  { name: 'Amina Diallo', pn: 'Ah-MEE-nah', pronouns: 'she/her', city: 'Dakar', country: 'SN' },
+  { name: 'Sebastian Müller', pn: 'Zeh-BAS-tee-ahn', pronouns: 'he/him', city: 'Berlin', country: 'DE' },
+  { name: 'Yara Costa', pn: 'YAH-rah', pronouns: 'she/her', city: 'Lisbon', country: 'PT' },
+  { name: 'Daniel Park', pn: null, pronouns: 'he/him', city: 'Chicago', country: 'US' },
+  { name: 'Leila Mahmoud', pn: 'LAY-lah', pronouns: 'she/her', city: 'Amman', country: 'JO' },
+  { name: 'Kofi Mensah', pn: 'KOH-fee', pronouns: 'he/him', city: 'Kumasi', country: 'GH' },
+  { name: 'Sofia Andersson', pn: 'So-FEE-ah', pronouns: 'she/her', city: 'Copenhagen', country: 'DK' },
+  { name: 'Tariq Bashir', pn: 'Tah-REEK', pronouns: 'he/him', city: 'Karachi', country: 'PK' },
+  { name: 'Maya Williams', pn: null, pronouns: 'she/her', city: 'Portland', country: 'US' },
+  { name: 'Diego Morales', pn: 'Dee-AY-go', pronouns: 'he/him', city: 'Bogotá', country: 'CO' },
+  { name: 'Lin Zhang', pn: 'Lin Jahng', pronouns: 'she/her', city: 'Shanghai', country: 'CN' },
+  { name: 'Alex Rivera', pn: null, pronouns: 'they/them', city: 'Boston', country: 'US' },
+  { name: 'Rachel Nakamura', pn: null, pronouns: 'she/her', city: 'Honolulu', country: 'US' },
+  { name: 'Pierre Dubois', pn: 'Pee-AIR', pronouns: 'he/him', city: 'Montreal', country: 'CA' },
+  { name: 'Grace Adeyemi', pn: null, pronouns: 'she/her', city: 'Abuja', country: 'NG' },
 ]
 
 const BOTH_POOL = [
-  { name: 'Suki Tanaka', pn: 'SOO-kee', pronouns: 'she/her', loc: 'Austin, TX' },
-  { name: 'Nia Washington', pn: 'NEE-ah', pronouns: 'she/her', loc: 'San Francisco, CA' },
-  { name: 'Taylor Kim', pn: null, pronouns: 'they/them', loc: 'New York, NY' },
-  { name: 'Rohan Gupta', pn: 'ROH-hahn', pronouns: 'he/him', loc: 'Delhi, India' },
-  { name: 'Camille Dubois', pn: 'Kah-MEEL', pronouns: 'she/her', loc: 'Brussels, Belgium' },
-  { name: 'Jesse Moreno', pn: null, pronouns: 'they/them', loc: 'Miami, FL' },
-  { name: 'Hana Park', pn: 'HAH-nah', pronouns: 'she/her', loc: 'Seoul, South Korea' },
-  { name: 'Chris Okafor', pn: null, pronouns: 'he/him', loc: 'London, UK' },
+  { name: 'Suki Tanaka', pn: 'SOO-kee', pronouns: 'she/her', city: 'Austin', country: 'US' },
+  { name: 'Nia Washington', pn: 'NEE-ah', pronouns: 'she/her', city: 'San Francisco', country: 'US' },
+  { name: 'Taylor Kim', pn: null, pronouns: 'they/them', city: 'New York', country: 'US' },
+  { name: 'Rohan Gupta', pn: 'ROH-hahn', pronouns: 'he/him', city: 'Delhi', country: 'IN' },
+  { name: 'Camille Dubois', pn: 'Kah-MEEL', pronouns: 'she/her', city: 'Brussels', country: 'BE' },
+  { name: 'Jesse Moreno', pn: null, pronouns: 'they/them', city: 'Miami', country: 'US' },
+  { name: 'Hana Park', pn: 'HAH-nah', pronouns: 'she/her', city: 'Seoul', country: 'KR' },
+  { name: 'Chris Okafor', pn: null, pronouns: 'he/him', city: 'London', country: 'GB' },
 ]
 
 // ── Field value pools ──────────────────────────────────────────────
@@ -120,9 +120,9 @@ const NONPROFIT_BOARD = ['yes', 'none']
 const FREELANCE = ['none', '0_3', '4_10', '10_plus']
 
 const LOCATIONS_OPEN = [
-  'Remote', 'San Francisco, CA', 'New York, NY', 'Washington, DC',
-  'London, UK', 'Singapore', 'Berlin, Germany', 'Toronto, Canada',
-  'Sydney, Australia', 'Nairobi, Kenya', 'São Paulo, Brazil',
+  'Remote', 'San Francisco', 'New York', 'Washington',
+  'London', 'Singapore', 'Berlin', 'Toronto',
+  'Sydney', 'Nairobi', 'São Paulo',
 ]
 
 const MOTIVATIONS = [
@@ -309,11 +309,13 @@ function buildBothPayload(idx) {
   }
 }
 
-function addLocations(payload, loc, idx) {
-  payload.location = loc
-  const open = [loc]
+function addLocations(payload, city, country, idx) {
+  if (city) payload.city = city
+  if (country) payload.country = country
+  const cityLabel = city || 'Remote'
+  const open = [cityLabel]
   if (idx % 3 === 0) open.push('Remote')
-  const extra = pick(LOCATIONS_OPEN.filter(l => l !== loc), idx + 50)
+  const extra = pick(LOCATIONS_OPEN.filter(l => l !== cityLabel), idx + 50)
   if (idx % 4 === 0) open.push(extra)
   payload.locations_open_to = open
   if (payload.geo_match_preference) {
@@ -335,10 +337,10 @@ export function generateProfiles() {
 
   // ── Mentors ──────────────────────────────────────────────────────
   for (let i = 0; i < MENTOR_POOL.length; i++) {
-    const { name, pn, pronouns, loc } = MENTOR_POOL[i]
+    const { name, pn, pronouns, city, country } = MENTOR_POOL[i]
     const email = `mentor.${i + 1}@example.com`
     const payload = buildMentorPayload(i)
-    addLocations(payload, loc, i)
+    addLocations(payload, city, country, i)
     addLinks(payload, name, i)
     if (pn) payload.name_pronunciation = pn
     payload.pronouns = pronouns
@@ -352,9 +354,9 @@ export function generateProfiles() {
 
   // ── Mentees ──────────────────────────────────────────────────────
   for (let i = 0; i < MENTEE_POOL.length; i++) {
-    const { name, pn, pronouns, loc } = MENTEE_POOL[i]
+    const { name, pn, pronouns, city, country } = MENTEE_POOL[i]
     const payload = buildMenteePayload(i)
-    addLocations(payload, loc, i)
+    addLocations(payload, city, country, i)
     addLinks(payload, name, i)
     if (pn) payload.name_pronunciation = pn
     payload.pronouns = pronouns
@@ -362,7 +364,7 @@ export function generateProfiles() {
 
     // Email prefix assigned by LIFECYCLE_PLAN below
     profiles.push({
-      _pool_idx: i, name, role: 'mentee', payload, loc,
+      _pool_idx: i, name, role: 'mentee', payload,
       embeddingText: payload.statement_of_intent,
       pronouns, pn,
     })
@@ -370,16 +372,16 @@ export function generateProfiles() {
 
   // ── Both ─────────────────────────────────────────────────────────
   for (let i = 0; i < BOTH_POOL.length; i++) {
-    const { name, pn, pronouns, loc } = BOTH_POOL[i]
+    const { name, pn, pronouns, city, country } = BOTH_POOL[i]
     const payload = buildBothPayload(i)
-    addLocations(payload, loc, i)
+    addLocations(payload, city, country, i)
     addLinks(payload, name, i)
     if (pn) payload.name_pronunciation = pn
     payload.pronouns = pronouns
     payload.preferred_name = name.split(' ')[0]
 
     profiles.push({
-      _pool_idx: i + 100, name, role: 'both', payload, loc,
+      _pool_idx: i + 100, name, role: 'both', payload,
       embeddingText: payload.motivation,
       pronouns, pn,
     })

@@ -120,7 +120,7 @@ export default function MatchDetailPanel({ matchId, onClose }) {
       </div>
 
       <div className="partner-meta">
-        {p.location && <span>{p.location}</span>}
+        {(p.city || p.country) && <span>{[p.city, p.country && lbl('countries', p.country)].filter(Boolean).join(', ')}</span>}
         {p.timezone && <span>{p.timezone}</span>}
         {p.career_level && <span>{lbl('career_level', p.career_level)}</span>}
         {p.education_level && <span>{lbl('education_level', p.education_level)}</span>}
@@ -130,7 +130,7 @@ export default function MatchDetailPanel({ matchId, onClose }) {
 
       <ProfileDetail
         payload={p}
-        exclude={['preferred_name', 'pronouns', 'location', 'timezone', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url', 'scheduling_link']}
+        exclude={['preferred_name', 'pronouns', 'city', 'country', 'timezone', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url', 'scheduling_link']}
       />
 
       <div className="partner-section">

@@ -3,7 +3,7 @@
 // returns scores and computation payloads out.
 
 import { isMentor } from './roles.js'
-import { hasExperience } from './field-registry.js'
+import { hasExperience, FIELDS } from './field-registry.js'
 
 const TOPIC_EXPERIENCE_MAP = [
   ['international_work', 'international_experience'],
@@ -160,13 +160,12 @@ export function scoreSemantic(menteeEmbedding, mentorEmbedding) {
 
 // ── Phase 4b: Geographic Proximity ─────────────────────────────────
 
-function normalizeLocation(loc) {
-  return (loc ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
-}
-
-function extractRegion(loc) {
-  const parts = loc.split(',').map(s => s.trim())
-  return parts.length >= 2 ? parts.slice(1).join(', ') : ''
+function formatLocation(payload) {
+  const city = payload?.city ?? ''
+  const countryCode = payload?.country ?? ''
+  const countryName = FIELDS.countries?.[countryCode] || countryCode
+  if (city && countryName) return `${city}, ${countryName}`
+  return city || countryName || ''
 }
 
 export function scoreGeo(mentee, mentor) {
@@ -175,10 +174,14 @@ export function scoreGeo(mentee, mentor) {
     return { enabled: false, score: 0 }
   }
 
-  const menteeLoc = mentee.payload?.location ?? ''
-  const mentorLoc = mentor.payload?.location ?? ''
+  const menteeCountry = (mentee.payload?.country ?? '').toUpperCase()
+  const mentorCountry = (mentor.payload?.country ?? '').toUpperCase()
+  const menteeCity = (mentee.payload?.city ?? '').toLowerCase().trim()
+  const mentorCity = (mentor.payload?.city ?? '').toLowerCase().trim()
+  const menteeLoc = formatLocation(mentee.payload)
+  const mentorLoc = formatLocation(mentor.payload)
 
-  if (!menteeLoc || !mentorLoc) {
+  if (!menteeCountry || !mentorCountry) {
     return {
       enabled: true,
       mentee_location: menteeLoc || null,
@@ -188,10 +191,7 @@ export function scoreGeo(mentee, mentor) {
     }
   }
 
-  const mteNorm = normalizeLocation(menteeLoc)
-  const mtrNorm = normalizeLocation(mentorLoc)
-
-  if (mteNorm === mtrNorm) {
+  if (menteeCountry === mentorCountry && menteeCity && mentorCity && menteeCity === mentorCity) {
     return {
       enabled: true,
       mentee_location: menteeLoc,
@@ -201,20 +201,18 @@ export function scoreGeo(mentee, mentor) {
     }
   }
 
-  const mteRegion = extractRegion(mteNorm)
-  const mtrRegion = extractRegion(mtrNorm)
-  if (mteRegion && mtrRegion && mteRegion === mtrRegion) {
+  if (menteeCountry === mentorCountry) {
     return {
       enabled: true,
       mentee_location: menteeLoc,
       mentor_location: mentorLoc,
-      reason: 'same_region',
+      reason: 'same_country',
       score: 0.5,
     }
   }
 
-  const mentorOpen = (mentor.payload?.locations_open_to ?? []).map(normalizeLocation)
-  if (mentorOpen.some(loc => loc === 'remote')) {
+  const mentorOpen = (mentor.payload?.locations_open_to ?? []).map(v => (v ?? '').toLowerCase().trim())
+  if (mentorOpen.includes('remote')) {
     return {
       enabled: true,
       mentee_location: menteeLoc,

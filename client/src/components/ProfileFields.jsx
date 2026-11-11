@@ -1,4 +1,7 @@
+import { COUNTRIES } from '../../../shared/countries.js'
+
 export const LABELS = {
+  countries: COUNTRIES,
   career_level: { entry: 'Associate / Entry', mid_level: 'Mid-Level', lead: 'Lead', managerial: 'Managerial', director: 'Director / Executive', c_suite: 'C-Suite' },
   education_level: { high_school: 'High School', associates: 'Associates', bachelors: "Bachelor's", masters: "Master's", doctorate: 'Doctorate' },
   years_experience: { '0_5': '0–5 years', '5_10': '5–10 years', '10_15': '10–15 years', '15_plus': '15+ years' },
@@ -19,6 +22,7 @@ const LABEL_LOOKUP = {
   top_strengths: 'topics',
   general_topics: 'topics',
   top_topics: 'topics',
+  country: 'countries',
 }
 
 export function lbl(field, id) {
@@ -29,7 +33,8 @@ export function lbl(field, id) {
 const FIELD_NAMES = {
   preferred_name: 'Preferred Name',
   pronouns: 'Pronouns',
-  location: 'Location',
+  country: 'Country',
+  city: 'City',
   career_level: 'Career Level',
   education_level: 'Education',
   years_experience: 'Years Experience',
@@ -75,11 +80,10 @@ function tagClass(key) {
 }
 
 const FIELD_ORDER = [
-  'preferred_name', 'pronouns', 'location',
+  'preferred_name', 'pronouns', 'city', 'country', 'timezone',
   'career_level', 'education_level', 'years_experience', 'years_climate_experience',
   'employment_situation',
   'management_experience', 'business_experience', 'international_experience', 'nonprofit_board_experience', 'freelance_experience',
-  'timezone',
   'career_areas', 'climate_areas', 'sectors',
   'top_strengths', 'general_topics', 'top_topics',
   'certifications', 'interests_hobbies',

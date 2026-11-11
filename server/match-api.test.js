@@ -91,7 +91,7 @@ before(async () => {
       email: 'mentor1@test.com', name: 'Mentor One', role: 'mentor',
       shared: {
         career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        location: 'SF, CA', locations_open_to: ['SF, CA', 'Remote'],
+        city: 'San Francisco', country: 'US', locations_open_to: ['San Francisco', 'Remote'],
         preferred_name: 'M1', pronouns: 'they/them',
         links: { linkedin: 'https://linkedin.com/test' },
       },
@@ -104,7 +104,7 @@ before(async () => {
       email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
       shared: {
         career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-        location: 'DC',
+        city: 'Washington', country: 'US',
       },
       mentorPayload: {
         top_strengths: ['Topic X'], general_topics: [],
@@ -116,7 +116,7 @@ before(async () => {
       shared: {
         career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
         w_horiz: 3, w_vert: 3, w_sector: 3,
-        location: 'SF, CA', geo_match_preference: true,
+        city: 'San Francisco', country: 'US', geo_match_preference: true,
       },
       menteePayload: {
         top_topics: ['Topic A', 'Topic C'], statement_of_intent: 'Transition to climate.',
@@ -127,7 +127,7 @@ before(async () => {
       shared: {
         career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
         w_horiz: 1, w_vert: 5, w_sector: 3,
-        location: 'DC', geo_match_preference: false,
+        city: 'Washington', country: 'US', geo_match_preference: false,
       },
       menteePayload: {
         top_topics: ['Topic X'], statement_of_intent: 'Policy career.',
