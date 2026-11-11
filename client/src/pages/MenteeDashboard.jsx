@@ -220,7 +220,7 @@ function PickCard({ match, onSelect, onViewDetail, disabled }) {
         <span className="match-card-score">{score}% match</span>
       </div>
       <div className="pick-card-details" style={{ margin: '0.5rem 0', fontSize: '0.875rem', color: 'var(--muted)' }}>
-        {mp.location && <div>{mp.location}</div>}
+        {mp.location && <div>{mp.location}{mp.timezone ? ` (${mp.timezone})` : ''}</div>}
         {mp.career_areas?.length > 0 && (
           <div>Career: {mp.career_areas.map(a => lbl('career_areas', a)).join(', ')}</div>
         )}
