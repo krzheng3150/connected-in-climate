@@ -232,10 +232,14 @@ function PickCard({ match, onSelect, onViewDetail, disabled }) {
         )}
       </div>
       <div className="admin-card-actions">
-        {mp.scheduling_link && (
+        {mp.scheduling_link ? (
           <a className="btn-secondary" href={mp.scheduling_link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
             Book Intro Call
           </a>
+        ) : (
+          <button className="btn-secondary" disabled title="Mentor has not set up a scheduling link. Please reach out to mentor directly.">
+            Book Intro Call
+          </button>
         )}
         <button className="btn-link" onClick={onViewDetail}>View full profile</button>
         <button className="btn-primary" onClick={onSelect} disabled={disabled}>
