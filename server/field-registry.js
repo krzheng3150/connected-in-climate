@@ -38,6 +38,7 @@ export const FIELDS = {
   // ── Shared multi-select ─────────────────────────────────────────
   sectors: {
     private: 'Private sector',
+    startup: 'Startup',
     nonprofit: 'Nonprofit / INGO / Social Sector',
     project_based: 'Project-based work',
     education: 'Education',
