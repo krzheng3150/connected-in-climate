@@ -148,7 +148,7 @@ function validateFields(body) {
   if (!fields.career_areas || (Array.isArray(fields.career_areas) && fields.career_areas.length === 0)) {
     errors.push({ field: 'career_areas', message: 'At least one career area is required.' })
   }
-  if (!fields.city?.trim()) {
+  if ('city' in fields && !fields.city?.trim()) {
     errors.push({ field: 'city', message: 'City is required.' })
   }
 
