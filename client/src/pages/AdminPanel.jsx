@@ -115,6 +115,7 @@ function ApplicationsTab({ headers }) {
               <strong>{p.name}</strong>
               <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
                 {p.email} &middot; <span className="role-badge">{p.role}</span> &middot; {date}
+                {p.payload?.timezone && <> &middot; {p.payload.timezone}</>}
               </span>
             </div>
             <div className="admin-card-actions" style={{ marginTop: '0.25rem' }}>
