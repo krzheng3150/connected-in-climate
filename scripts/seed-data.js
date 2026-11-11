@@ -309,9 +309,35 @@ function buildBothPayload(idx) {
   }
 }
 
+const CITY_TZ = {
+  'San Francisco': 'America/Los_Angeles', 'Los Angeles': 'America/Los_Angeles',
+  'Washington': 'America/New_York', 'Atlanta': 'America/New_York',
+  'Austin': 'America/Chicago', 'Chicago': 'America/Chicago', 'Denver': 'America/Denver',
+  'Seattle': 'America/Los_Angeles',
+  'London': 'Europe/London', 'Paris': 'Europe/Paris', 'Berlin': 'Europe/Berlin',
+  'Amsterdam': 'Europe/Amsterdam', 'Zurich': 'Europe/Zurich', 'Vienna': 'Europe/Vienna',
+  'Milan': 'Europe/Rome', 'Stockholm': 'Europe/Stockholm', 'Copenhagen': 'Europe/Copenhagen',
+  'Helsinki': 'Europe/Helsinki', 'Lisbon': 'Europe/Lisbon',
+  'Nairobi': 'Africa/Nairobi', 'Lagos': 'Africa/Lagos', 'Cape Town': 'Africa/Johannesburg',
+  'Accra': 'Africa/Accra', 'Kumasi': 'Africa/Accra', 'Cairo': 'Africa/Cairo',
+  'Dakar': 'Africa/Dakar',
+  'Tokyo': 'Asia/Tokyo', 'Osaka': 'Asia/Tokyo', 'Seoul': 'Asia/Seoul',
+  'Singapore': 'Asia/Singapore', 'Mumbai': 'Asia/Kolkata', 'Bangalore': 'Asia/Kolkata',
+  'Dubai': 'Asia/Dubai', 'Amman': 'Asia/Amman', 'Karachi': 'Asia/Karachi',
+  'Sydney': 'Australia/Sydney',
+  'São Paulo': 'America/Sao_Paulo', 'Buenos Aires': 'America/Argentina/Buenos_Aires',
+  'Mexico City': 'America/Mexico_City', 'Toronto': 'America/Toronto',
+  'Portland': 'America/Los_Angeles', 'Boston': 'America/New_York',
+  'New York': 'America/New_York', 'Miami': 'America/New_York',
+  'Honolulu': 'Pacific/Honolulu', 'Montreal': 'America/Toronto',
+  'Bogotá': 'America/Bogota', 'Shanghai': 'Asia/Shanghai', 'Delhi': 'Asia/Kolkata',
+  'Brussels': 'Europe/Brussels', 'Abuja': 'Africa/Lagos',
+}
+
 function addLocations(payload, city, country, idx) {
   if (city) payload.city = city
   if (country) payload.country = country
+  if (city && CITY_TZ[city]) payload.timezone = CITY_TZ[city]
   const cityLabel = city || 'Remote'
   const open = [cityLabel]
   if (idx % 3 === 0) open.push('Remote')
