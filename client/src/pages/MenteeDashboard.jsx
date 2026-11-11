@@ -237,9 +237,10 @@ function PickCard({ match, onSelect, onViewDetail, disabled }) {
             Book Intro Call
           </a>
         ) : (
-          <button className="btn-secondary" disabled title="Mentor has not set up a scheduling link. Please reach out to mentor directly.">
-            Book Intro Call
-          </button>
+          <span className="tooltip-wrap">
+            <button className="btn-secondary" disabled>Book Intro Call</button>
+            <span className="tooltip-text">Mentor has not set up a scheduling link. Please reach out to mentor directly.</span>
+          </span>
         )}
         <button className="btn-link" onClick={onViewDetail}>View full profile</button>
         <button className="btn-primary" onClick={onSelect} disabled={disabled}>

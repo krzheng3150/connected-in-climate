@@ -1252,6 +1252,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }
+.tooltip-wrap { position: relative; display: inline-block; }
+.tooltip-text {
+  visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 0.4rem 0.7rem;
+  border-radius: var(--radius); font-size: 0.8rem; white-space: normal; width: max-content;
+  max-width: 240px; text-align: center; z-index: 10; pointer-events: none;
+  transition: opacity 0.1s;
+}
+.tooltip-wrap:hover .tooltip-text { visibility: visible; opacity: 1; }
 .btn-secondary {
   padding: 0.6rem 1.5rem; background: var(--surface); color: var(--fg); border: 1px solid var(--border);
   border-radius: var(--radius); font-size: 0.95rem; cursor: pointer;
