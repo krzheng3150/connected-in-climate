@@ -22,7 +22,8 @@ export default function NavBar() {
     <header className="page-header">
       <span className="nav-brand">Connected in Climate</span>
       <div className="user-info">
-        <Link to={user ? '/dashboard' : '/'} className="btn-link">Home</Link>
+        <Link to="/" className="btn-link">Home</Link>
+        {user && <Link to="/dashboard" className="btn-link">My Dashboard</Link>}
         <Link to="/about" className="btn-link">About Us</Link>
         {user && (
           <>

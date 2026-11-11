@@ -40,7 +40,7 @@ export default function Landing() {
   const [email, setEmail] = useState('')
   const [testError, setTestError] = useState(null)
   const [showAdminLogin, setShowAdminLogin] = useState(false)
-  const { testLogin, error: authError } = useAuth()
+  const { testLogin, error: authError, isSignedIn } = useAuth()
   const navigate = useNavigate()
 
   const isAdminError = authError && authError.includes('admin')
@@ -99,7 +99,11 @@ export default function Landing() {
 
       <hr className="landing-divider" />
 
-      {!AUTH_ENABLED ? (
+      {isSignedIn ? (
+        <div className="landing-cta">
+          <button className="btn-primary" onClick={() => navigate('/dashboard')}>Go to My Dashboard</button>
+        </div>
+      ) : !AUTH_ENABLED ? (
         <div className="test-login-wrapper">
           <form onSubmit={handleTestLogin} className="test-login-form">
             <label>Enter your email to get started</label>
