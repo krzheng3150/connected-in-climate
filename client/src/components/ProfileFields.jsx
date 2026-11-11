@@ -61,7 +61,7 @@ const FIELD_NAMES = {
   additional_info: 'Additional Info',
   commitment_name: 'Commitment Confirmation',
   fun_fact: 'Fun Fact',
-  scheduling_link: 'Scheduling Link',
+  scheduling_link: 'Meeting Scheduler',
   links: 'Contact',
 }
 

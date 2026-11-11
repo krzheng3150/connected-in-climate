@@ -385,7 +385,10 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
       )}
       {isMentor && (
         <div className="form-group">
-          <label>Scheduling Link</label>
+          <label>Meeting Scheduler</label>
+          <p style={{ margin: '0 0 6px', fontSize: '0.875rem', opacity: 0.75 }}>
+            We recommend setting up a meeting scheduler (e.g. Calendly, Cal.com, Google Calendar appointment schedule) so your mentee can easily book time with you.
+          </p>
           <input type="url" value={form.scheduling_link || ''} onChange={e => set('scheduling_link', e.target.value)} placeholder="e.g. https://calendly.com/yourname" />
         </div>
       )}
