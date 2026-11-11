@@ -22,7 +22,6 @@ export const MENTORSHIP_DURATION_DAYS = 30
 export const REQUIRE_REVIEW_DOMAINS = new Set([
   'review.com',
   'test.com',
-  'example.com',
 ])
 
 export function requiresReview(email) {
