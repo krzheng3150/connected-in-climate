@@ -5,6 +5,7 @@ import MatchCard from '../components/MatchCard.jsx'
 import MatchDetailPanel from '../components/MatchDetailPanel.jsx'
 import ConfirmationModal from '../components/ConfirmationModal.jsx'
 import BookCallButton from '../components/BookCallButton.jsx'
+import ResetMatchesModal from '../components/ResetMatchesModal.jsx'
 
 export default function MenteeDashboard() {
   const { user } = useAuth()
@@ -17,6 +18,7 @@ export default function MenteeDashboard() {
   const [confirmFind, setConfirmFind] = useState(false)
   const [confirmSelect, setConfirmSelect] = useState(null)
   const [ackSpoken, setAckSpoken] = useState(false)
+  const [showReset, setShowReset] = useState(false)
 
   function togglePanel(matchId) {
     setOpenPanels(prev =>
@@ -161,8 +163,13 @@ export default function MenteeDashboard() {
               />
             ))}
           </div>
+          <p className="placeholder-text" style={{ marginTop: '1rem', fontSize: '0.6em' }}>
+            <button className="btn-link" style={{ fontSize: 'inherit' }} onClick={() => setShowReset(true)}>None of these a good fit?</button>
+          </p>
         </div>
       )}
+
+      {showReset && <ResetMatchesModal user={user} run={run} onClose={() => setShowReset(false)} />}
 
       {isActive && run.matches.length > 0 && (
         <div className="match-list">
