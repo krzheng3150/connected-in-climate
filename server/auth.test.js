@@ -4,83 +4,14 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { clerkMiddleware } from '@clerk/express'
-import { pool } from './db.js'
+import { pool, setupDb, resetDb } from './test-db.js'
 import { getAuthEmail } from './auth.js'
 import adminRouter from './admin-api.js'
 
 let server, baseUrl
 
 before(async () => {
-  await pool.query(`
-    CREATE EXTENSION IF NOT EXISTS vector;
-    CREATE TABLE IF NOT EXISTS user_profiles (
-      email TEXT PRIMARY KEY, name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('mentor','mentee','both')),
-      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS mentor_applications (
-      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
-      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS mentee_applications (
-      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
-      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS match_runs (
-      run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
-        CHECK (status IN ('PENDING_REVIEW','AWAITING_MENTEE','ACTIVE','CANCELLED','FINISHED')),
-      top_candidates INTEGER NOT NULL, total_scored INTEGER NOT NULL,
-      code_commit TEXT NOT NULL, reviewed_by TEXT, reviewed_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS matches (
-      match_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      run_id UUID NOT NULL REFERENCES match_runs(run_id),
-      mentor_email TEXT NOT NULL REFERENCES user_profiles(email),
-      mentee_email TEXT NOT NULL REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'CANDIDATE'
-        CHECK (status IN ('CANDIDATE','APPROVED','REJECTED','ACTIVE','STORED','FINISHED')),
-      final_score NUMERIC(5,4) NOT NULL, rank INTEGER NOT NULL,
-      computation_payload JSONB NOT NULL, code_commit TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS match_actions (
-      action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      match_id UUID NOT NULL REFERENCES matches(match_id),
-      actor_email TEXT NOT NULL,
-      action_type TEXT NOT NULL CHECK (action_type IN ('VIEW','FEEDBACK','CONTACT_CLICK','REJECT','APPROVE','SELECT')),
-      payload JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS feedbacks (
-      feedback_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      match_id UUID NOT NULL REFERENCES matches(match_id),
-      submitter_email TEXT NOT NULL, rating SMALLINT,
-      text TEXT NOT NULL, payload JSONB,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS rejections (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      mentor_email TEXT NOT NULL, mentee_email TEXT NOT NULL,
-      match_id UUID REFERENCES matches(match_id), reason TEXT,
-      created_by TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-  `)
-
-  await pool.query('DELETE FROM match_actions')
-  await pool.query('DELETE FROM feedbacks')
-  await pool.query('DELETE FROM matches')
-  await pool.query('DELETE FROM match_runs')
-  await pool.query('DELETE FROM rejections')
-  await pool.query('DELETE FROM mentee_applications')
-  await pool.query('DELETE FROM mentor_applications')
-  await pool.query('DELETE FROM user_profiles')
+  await setupDb()
 
   await pool.query(
     `INSERT INTO user_profiles (email, name, role, payload) VALUES ($1, $2, $3, $4)
@@ -123,14 +54,7 @@ before(async () => {
 })
 
 after(async () => {
-  await pool.query('DELETE FROM match_actions')
-  await pool.query('DELETE FROM feedbacks')
-  await pool.query('DELETE FROM matches')
-  await pool.query('DELETE FROM match_runs')
-  await pool.query('DELETE FROM rejections')
-  await pool.query('DELETE FROM mentee_applications')
-  await pool.query('DELETE FROM mentor_applications')
-  await pool.query('DELETE FROM user_profiles')
+  await resetDb()
   server?.close()
   await pool.end()
 })

@@ -2,36 +2,13 @@ import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { clerkMiddleware } from '@clerk/express'
-import { pool } from './db.js'
+import { pool, setupDb, resetDb } from './test-db.js'
 import profileRouter from './profile-api.js'
 
 let server, baseUrl
 
 before(async () => {
-  await pool.query(`
-    CREATE EXTENSION IF NOT EXISTS vector;
-    CREATE TABLE IF NOT EXISTS user_profiles (
-      email TEXT PRIMARY KEY, name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('mentor','mentee','both')),
-      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
-      status TEXT NOT NULL DEFAULT 'APPROVED',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED';
-    CREATE TABLE IF NOT EXISTS mentor_applications (
-      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
-      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS mentee_applications (
-      email TEXT PRIMARY KEY REFERENCES user_profiles(email),
-      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED')),
-      payload JSONB NOT NULL DEFAULT '{}', embedding vector(1536),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-  `)
-
+  await setupDb()
   const app = express()
   app.use(express.json())
   app.use(clerkMiddleware())
@@ -43,17 +20,13 @@ before(async () => {
 })
 
 after(async () => {
-  await pool.query('DELETE FROM mentee_applications')
-  await pool.query('DELETE FROM mentor_applications')
-  await pool.query('DELETE FROM user_profiles')
+  await resetDb()
   server?.close()
   await pool.end()
 })
 
 beforeEach(async () => {
-  await pool.query('DELETE FROM mentee_applications')
-  await pool.query('DELETE FROM mentor_applications')
-  await pool.query('DELETE FROM user_profiles')
+  await resetDb()
 })
 
 async function req(method, path, body, headers = {}) {
@@ -212,7 +185,8 @@ describe('POST /api/profiles', () => {
     const profile = await getProfile('new@test.com')
     assert.equal(profile.payload.preferred_name, 'JD')
     assert.equal(profile.payload.pronouns, 'she/her')
-    assert.equal(profile.payload.location, 'NYC')
+    assert.equal(profile.payload.city, 'New York')
+    assert.equal(profile.payload.country, 'US')
     assert.equal(profile.payload.organization, 'ClimateOrg')
     assert.equal(profile.payload.fun_fact, 'I climb mountains.')
 
