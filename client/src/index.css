@@ -1600,3 +1600,83 @@ h1, h2, h3, h4, h5, h6 {
   height: 1px;
   background: var(--border);
 }
+
+/* ── Team section (About page) ───────────────────────────────── */
+
+.landing.landing-wide {
+  max-width: 1800px;
+}
+
+.team-section {
+  text-align: center;
+  max-width: 1700px;
+  margin: 0 auto;
+}
+.team-section h2 {
+  font-size: 1.25rem;
+  color: var(--fg);
+  margin-bottom: 1.25rem;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr));
+  gap: 1.5rem;
+}
+.team-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.team-photo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  margin-bottom: 1rem;
+}
+.team-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.125rem;
+}
+.team-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.team-bio {
+  text-align: left;
+  margin-bottom: 1rem;
+}
+.team-bio p {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.team-bio p:last-child {
+  margin-bottom: 0;
+}
+.team-linkedin {
+  margin-top: auto;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.team-linkedin:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
