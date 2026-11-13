@@ -136,7 +136,7 @@ export function ProfileDetail({ payload, exclude = [] }) {
           if (value.every(v => typeof v === 'string')) {
             return hasLabels ? (
               <div key={key} className="partner-section">
-                <h3>{fieldName(key)}</h3>
+                <span className="partner-section-label">{fieldName(key)}</span>
                 <div className="partner-tags">
                   {value.map((item, i) => (
                     <span key={i} className={`tag ${tagClass(key)}`}>{lbl(key, item)}</span>
@@ -145,14 +145,14 @@ export function ProfileDetail({ payload, exclude = [] }) {
               </div>
             ) : (
               <div key={key} className="partner-section">
-                <h3>{fieldName(key)}</h3>
+                <span className="partner-section-label">{fieldName(key)}</span>
                 <p>{value.join(', ')}</p>
               </div>
             )
           }
           return (
             <div key={key} className="partner-section">
-              <h3>{fieldName(key)}</h3>
+              <span className="partner-section-label">{fieldName(key)}</span>
               <pre className="admin-json">{JSON.stringify(value, null, 2)}</pre>
             </div>
           )
@@ -160,7 +160,7 @@ export function ProfileDetail({ payload, exclude = [] }) {
         if (typeof value === 'object' && value !== null) {
           return (
             <div key={key} className="partner-section">
-              <h3>{fieldName(key)}</h3>
+              <span className="partner-section-label">{fieldName(key)}</span>
               <div className="partner-tags">
                 {Object.entries(value).map(([k, v]) => (
                   <span key={k} className="tag">{humanize(k)}: {String(v)}</span>
@@ -171,7 +171,7 @@ export function ProfileDetail({ payload, exclude = [] }) {
         }
         return (
           <div key={key} className="partner-section">
-            <h3>{fieldName(key)}</h3>
+            <span className="partner-section-label">{fieldName(key)}</span>
             <p>{String(value)}</p>
           </div>
         )

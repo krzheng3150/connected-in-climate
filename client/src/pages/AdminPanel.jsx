@@ -195,6 +195,7 @@ function PendingTab({ headers }) {
 function MenteeProfileSummary({ payload, name, email }) {
   const p = payload || {}
   const topClimates = (p.climate_areas || []).slice(0, 3)
+  const careerAreas = p.career_areas || []
   const topTopics = (p.top_topics || []).slice(0, 5)
 
   return (
@@ -223,6 +224,15 @@ function MenteeProfileSummary({ payload, name, email }) {
           <span className="review-field-label">Climate Areas{p.climate_areas?.length > 3 ? ` (top 3 of ${p.climate_areas.length})` : ''}</span>
           <div className="review-meta-tags">
             {topClimates.map(id => <span key={id} className="tag tag-climate">{lbl('climate_areas', id)}</span>)}
+          </div>
+        </div>
+      )}
+
+      {careerAreas.length > 0 && (
+        <div className="review-field-group">
+          <span className="review-field-label">Career Areas of Interest</span>
+          <div className="review-meta-tags">
+            {careerAreas.map(id => <span key={id} className="tag">{lbl('career_areas', id)}</span>)}
           </div>
         </div>
       )}

@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "docker compose up -d db && until docker compose exec db psql -U postgres -d connected_in_climate -c 'SELECT 1' 2>/dev/null; do sleep 1; done && concurrently -n api,web -c blue,green \"npm run dev:server\" \"npm run dev:client\"",
+    "predev": "lsof -ti tcp:3000 | xargs kill 2>/dev/null || true",
+    "dev": "docker compose up -d db && until docker compose exec db psql -U postgres -d connected_in_climate -c 'SELECT 1' 2>/dev/null; do sleep 1; done && concurrently -k -n api,web -c blue,green \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "node --watch --env-file=.env server/index.js",
     "dev:client": "npm --prefix client run dev",
     "build": "npm --prefix client install && npm --prefix client run build",

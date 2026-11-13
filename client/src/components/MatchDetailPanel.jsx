@@ -135,7 +135,7 @@ export default function MatchDetailPanel({ matchId, onClose }) {
       />
 
       <div className="partner-section">
-        <h3>Contact</h3>
+        <span className="partner-section-label">Contact</span>
         <div style={{ marginBottom: '0.75rem' }}>
           <BookCallButton
             link={p.scheduling_link}
@@ -157,7 +157,7 @@ export default function MatchDetailPanel({ matchId, onClose }) {
 
       {match.resources_folder_url && match.status === 'ACTIVE' && (
         <div className="partner-section">
-          <h3>Shared Resources</h3>
+          <span className="partner-section-label">Shared Resources</span>
           <a
             className="btn-primary"
             href={match.resources_folder_url}
