@@ -33,7 +33,6 @@ export function lbl(field, id) {
 const FIELD_NAMES = {
   preferred_name: 'Preferred Name',
   name_pronunciation: 'Name Pronunciation',
-  locations_open_to: 'Open to Mentoring In',
   pronouns: 'Pronouns',
   country: 'Country',
   city: 'City',
@@ -82,7 +81,7 @@ function tagClass(key) {
 }
 
 const FIELD_ORDER = [
-  'preferred_name', 'name_pronunciation', 'pronouns', 'city', 'country', 'timezone', 'locations_open_to',
+  'preferred_name', 'name_pronunciation', 'pronouns', 'city', 'country', 'timezone',
   'career_level', 'education_level', 'years_experience', 'years_climate_experience',
   'employment_situation',
   'management_experience', 'business_experience', 'international_experience', 'nonprofit_board_experience', 'freelance_experience',
@@ -95,7 +94,7 @@ const FIELD_ORDER = [
 
 export function ProfileDetail({ payload, exclude = [] }) {
   if (!payload) return null
-  const excludeSet = new Set(exclude)
+  const excludeSet = new Set([...exclude, 'locations_open_to'])
 
   const allKeys = Object.keys(payload)
   const ordered = []
