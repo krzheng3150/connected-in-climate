@@ -18,7 +18,7 @@
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && echo 'DB wiped. Run npm run go to start fresh.'",
     "test": "node --test server/field-registry.test.js server/matching.test.js",
-    "test:api": "node --env-file=.env --test --test-concurrency=1 server/match-api.test.js server/action-feedback-api.test.js server/admin-api.test.js server/auth.test.js server/profile-api.test.js",
+    "test:api": "node --env-file=.env --test --test-concurrency=1 server/match-api.test.js server/action-feedback-api.test.js server/admin-api.test.js server/admin-reset.test.js server/auth.test.js server/profile-api.test.js",
     "test:email": "node --env-file=.env --test server/email.test.js",
     "test:email:live": "SEND_EMAIL=1 node --env-file=.env --test server/email.test.js",
     "test:auth": "node --env-file=.env --test server/auth.test.js",

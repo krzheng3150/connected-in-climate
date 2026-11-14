@@ -344,8 +344,10 @@ router.get('/matches', async (req, res, next) => {
     const result = await pool.query(
       `SELECT m.match_id, m.run_id, m.mentor_email, m.mentee_email, m.status,
               m.final_score, m.rank, m.computation_payload, m.code_commit, m.created_at,
-              mentor.name AS mentor_name, mentee.name AS mentee_name
+              mentor.name AS mentor_name, mentee.name AS mentee_name,
+              r.status AS run_status
        FROM matches m
+       JOIN match_runs r ON r.run_id = m.run_id
        JOIN user_profiles mentor ON mentor.email = m.mentor_email
        JOIN user_profiles mentee ON mentee.email = m.mentee_email
        WHERE m.mentee_email = $1 OR m.mentor_email = $1
@@ -357,6 +359,7 @@ router.get('/matches', async (req, res, next) => {
     const matches = result.rows.map(row => ({
       match_id: row.match_id,
       run_id: row.run_id,
+      run_status: row.run_status,
       mentor_email: row.mentor_email,
       mentor_name: row.mentor_name,
       mentee_email: row.mentee_email,
@@ -453,6 +456,22 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
         [row.run_id],
       )
 
+      // Close the run's other open matches too, otherwise those mentors stay
+      // filtered out of future runs as "in progress".
+      const siblings = await client.query(
+        `UPDATE matches SET status = 'REJECTED'
+         WHERE run_id = $1 AND status IN ('CANDIDATE', 'APPROVED')
+         RETURNING match_id`,
+        [row.run_id],
+      )
+      for (const sib of siblings.rows) {
+        await client.query(
+          `INSERT INTO match_actions (match_id, actor_email, action_type, payload)
+           VALUES ($1, $2, 'REJECT', $3)`,
+          [sib.match_id, req.adminEmail, JSON.stringify({ reason: reason || null, closed_with: match_id })],
+        )
+      }
+
       await client.query(
         `INSERT INTO match_actions (match_id, actor_email, action_type, payload)
          VALUES ($1, $2, 'REJECT', $3)`,
@@ -472,6 +491,91 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
       await client.query('COMMIT')
       console.log(`[admin] reject: match_id=${match_id} admin=${req.adminEmail} block=${!!block}`)
       res.json({ status: 'REJECTED', block_created: !!block, block_id: blockId })
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── POST /api/admin/runs/:run_id/reset ─────────────────────────────
+// Cancel a mentee's whole run so they can request new matches. Optionally
+// block selected mentors for this mentee. Does NOT trigger a new run.
+
+const RESETTABLE_RUN_STATUSES = ['PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE']
+
+router.post('/runs/:run_id/reset', async (req, res, next) => {
+  try {
+    const { run_id } = req.params
+    const { reason, block_mentor_emails = [] } = req.body
+
+    if (!Array.isArray(block_mentor_emails) || !block_mentor_emails.every(e => typeof e === 'string')) {
+      return res.status(400).json({ error: 'block_mentor_emails must be an array of emails' })
+    }
+
+    const run = await pool.query(
+      'SELECT run_id, mentee_email, status FROM match_runs WHERE run_id = $1',
+      [run_id],
+    )
+    if (run.rows.length === 0) {
+      return res.status(404).json({ error: 'run not found' })
+    }
+    const { mentee_email, status: runStatus } = run.rows[0]
+    if (!RESETTABLE_RUN_STATUSES.includes(runStatus)) {
+      return res.status(400).json({ error: `run is ${runStatus}, cannot be reset` })
+    }
+
+    const runMatches = (await pool.query(
+      'SELECT match_id, mentor_email, status FROM matches WHERE run_id = $1',
+      [run_id],
+    )).rows
+    const byMentor = new Map(runMatches.map(m => [m.mentor_email, m]))
+
+    const toBlock = [...new Set(block_mentor_emails.map(e => e.toLowerCase().trim()))]
+    for (const email of toBlock) {
+      if (!byMentor.has(email)) {
+        return res.status(400).json({ error: `${email} is not a mentor in this run` })
+      }
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      await client.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE run_id = $1`, [run_id])
+
+      const open = runMatches.filter(m => ['CANDIDATE', 'APPROVED', 'ACTIVE'].includes(m.status))
+      for (const m of open) {
+        await client.query(`UPDATE matches SET status = 'REJECTED' WHERE match_id = $1`, [m.match_id])
+        await client.query(
+          `INSERT INTO match_actions (match_id, actor_email, action_type, payload)
+           VALUES ($1, $2, 'REJECT', $3)`,
+          [m.match_id, req.adminEmail, JSON.stringify({ reset: true, reason: reason || null })],
+        )
+      }
+
+      let blocksCreated = 0
+      for (const email of toBlock) {
+        const exists = await client.query(
+          'SELECT 1 FROM rejections WHERE mentor_email = $1 AND mentee_email = $2',
+          [email, mentee_email],
+        )
+        if (exists.rows.length > 0) continue
+        await client.query(
+          `INSERT INTO rejections (mentor_email, mentee_email, match_id, reason, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [email, mentee_email, byMentor.get(email).match_id, reason || null, req.adminEmail],
+        )
+        blocksCreated++
+      }
+
+      await client.query('COMMIT')
+      console.log(`[admin] reset: run_id=${run_id} mentee=${mentee_email} admin=${req.adminEmail} rejected=${open.length} blocks=${blocksCreated}`)
+      res.json({ status: 'CANCELLED', matches_rejected: open.length, blocks_created: blocksCreated })
     } catch (err) {
       await client.query('ROLLBACK')
       throw err

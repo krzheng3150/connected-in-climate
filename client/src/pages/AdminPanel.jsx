@@ -572,12 +572,36 @@ function SearchTab({ headers }) {
   const [matches, setMatches] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [resetMsg, setResetMsg] = useState(null)
+
+  async function refreshMatches() {
+    try {
+      const res = await fetch(`/api/admin/matches?email=${encodeURIComponent(email.trim())}`, { headers })
+      if (res.ok) setMatches((await res.json()).matches)
+    } catch { /* ignore */ }
+  }
+
+  // Runs belonging to the searched mentee that can still be reset
+  const resettableRuns = []
+  const seenRuns = new Set()
+  for (const m of matches) {
+    if (m.mentee_email !== email.trim().toLowerCase() || seenRuns.has(m.run_id)) continue
+    if (!['PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE'].includes(m.run_status)) continue
+    seenRuns.add(m.run_id)
+    resettableRuns.push({
+      run_id: m.run_id,
+      status: m.run_status,
+      mentee_name: m.mentee_name,
+      mentors: matches.filter(x => x.run_id === m.run_id && ['CANDIDATE', 'APPROVED', 'ACTIVE'].includes(x.status)),
+    })
+  }
 
   async function handleSearch(e) {
     e.preventDefault()
     if (!email.trim()) return
     setLoading(true)
     setError(null)
+    setResetMsg(null)
     setProfile(null)
     setMatches([])
 
@@ -628,6 +652,10 @@ function SearchTab({ headers }) {
       {matches.length > 0 && (
         <div className="admin-section">
           <h3>Matches ({matches.length})</h3>
+          {resetMsg && <p className="feedback-msg">{resetMsg}</p>}
+          {resettableRuns.map(r => (
+            <ResetRunControl key={r.run_id} run={r} headers={headers} onDone={refreshMatches} onMessage={setResetMsg} />
+          ))}
           {matches.map(m => (
             <AdminMatchCard key={m.match_id} match={m} headers={headers} />
           ))}
@@ -638,6 +666,117 @@ function SearchTab({ headers }) {
         <p className="placeholder-text" style={{ marginTop: '1rem' }}>No matches found.</p>
       )}
     </>
+  )
+}
+
+function ResetRunControl({ run, headers, onDone, onMessage }) {
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState(1)
+  const [reason, setReason] = useState('')
+  const [blocked, setBlocked] = useState(new Set())
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  function close() {
+    setOpen(false)
+    setStep(1)
+    setReason('')
+    setBlocked(new Set())
+    setError(null)
+  }
+
+  function toggleBlock(email) {
+    setBlocked(prev => {
+      const next = new Set(prev)
+      next.has(email) ? next.delete(email) : next.add(email)
+      return next
+    })
+  }
+
+  async function handleReset() {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/runs/${run.run_id}/reset`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reason: reason.trim() || null, block_mentor_emails: [...blocked] }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        onMessage(`Run reset. ${data.matches_rejected} match(es) closed, ${data.blocks_created} mentor(s) blocked. The mentee can now request new matches.`)
+        close()
+        onDone()
+      } else {
+        setError(data.error || 'Reset failed.')
+        setStep(1)
+      }
+    } catch {
+      setError('Could not reach the server.')
+      setStep(1)
+    }
+    setSubmitting(false)
+  }
+
+  return (
+    <div className="admin-card" style={{ padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+      <strong>Current run</strong> <span className="role-badge">{run.status}</span>
+      {' '}
+      <button className="btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => setOpen(true)}>Reset run</button>
+
+      {open && step === 1 && (
+        <ConfirmationModal
+          title={`Reset matches for ${run.mentee_name || 'this mentee'}`}
+          confirmLabel="Continue"
+          onConfirm={() => setStep(2)}
+          onCancel={close}
+        >
+          <p style={{ marginBottom: '0.75rem' }}>
+            This cancels the current run. The mentee can then request new matches from their dashboard.
+            Nothing is re-run automatically.
+          </p>
+          <label>Reason (optional)</label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.75rem' }}
+          />
+          <p style={{ marginBottom: '0.25rem' }}><strong>Block any of these mentors for this mentee?</strong></p>
+          <p style={{ fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.75 }}>
+            Blocked mentors will never be matched with this mentee again. Leave unchecked to allow them in future runs.
+          </p>
+          {run.mentors.length === 0 && <p className="placeholder-text">No open matches in this run.</p>}
+          {run.mentors.map(m => (
+            <label key={m.match_id} className="checkbox-option" style={{ display: 'block' }}>
+              <input type="checkbox" checked={blocked.has(m.mentor_email)} onChange={() => toggleBlock(m.mentor_email)} />
+              {' '}{m.mentor_name} <span style={{ opacity: 0.6 }}>({m.mentor_email})</span>
+            </label>
+          ))}
+          {error && <p className="form-error">{error}</p>}
+        </ConfirmationModal>
+      )}
+
+      {open && step === 2 && (
+        <ConfirmationModal
+          title="Are you sure you want to reset this run?"
+          confirmLabel="Yes, reset run"
+          onConfirm={handleReset}
+          onCancel={() => setStep(1)}
+          cancelLabel="Back"
+          confirming={submitting}
+        >
+          <p style={{ marginBottom: '0.5rem' }}>
+            This will cancel the run and close all {run.mentors.length} open match(es) for {run.mentee_name || 'this mentee'}. This cannot be undone.
+          </p>
+          <p>
+            {blocked.size > 0
+              ? `${blocked.size} mentor(s) will also be permanently blocked for this mentee.`
+              : 'No mentors will be blocked.'}
+          </p>
+        </ConfirmationModal>
+      )}
+    </div>
   )
 }
 
