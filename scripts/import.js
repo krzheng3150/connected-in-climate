@@ -4,8 +4,6 @@ import { isMentor, isMentee } from '../server/roles.js'
 import { FIELDS, normalize, normalizeArray } from '../server/field-registry.js'
 import pg from 'pg'
 
-const SHEET_URL_RE = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/
-
 const EMBEDDING_DIMENSIONS = 1536
 
 const STABLE_COLUMNS = new Set(['email', 'name', 'role'])
@@ -54,15 +52,13 @@ const BOOL_FIELDS = new Set(['geo_match_preference'])
 const LINKS_PREFIX = 'links_'
 
 function usage() {
-  console.error(`Usage: node scripts/import.js [--dry-run] <file.csv|file.json|sheet-url>
+  console.error(`Usage: node scripts/import.js [--dry-run] <file.csv|file.json>
 
   Imports user profiles into the database.
   --dry-run   Parse and validate only, no DB writes or embedding calls.
 
 Sources:
   file.csv / file.json   Local file.
-  Google Sheet URL        Fetches as CSV. Sheet must be link-shared or
-                          accessible by the service account in .env.
 
 CSV format:
   - First row is headers.
@@ -82,43 +78,6 @@ JSON format:
   - Array fields should be actual arrays (not pipe-separated).
   - Links should be an object: { "links": { "linkedin": "...", "phone": "..." } }.`)
   process.exit(1)
-}
-
-async function fetchSheet(source) {
-  const match = source.match(SHEET_URL_RE)
-  if (!match) return null
-
-  const sheetId = match[1]
-
-  // Try authenticated fetch first (private sheets), fall back to public export
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-    try {
-      const { getAuth } = await import('./google-auth.js')
-      const { google } = await import('googleapis')
-      const auth = getAuth(['https://www.googleapis.com/auth/spreadsheets.readonly'])
-      const sheets = google.sheets({ version: 'v4', auth })
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: 'Profiles!A:ZZ',
-      })
-      const rows = res.data.values
-      if (!rows || rows.length < 2) throw new Error('Sheet is empty or has no data rows')
-      const headers = rows[0].map(h => h.toLowerCase().trim())
-      return rows.slice(1).map((r, idx) => {
-        const obj = {}
-        for (let i = 0; i < headers.length; i++) obj[headers[i]] = r[i] ?? ''
-        obj._row = idx + 2
-        return obj
-      })
-    } catch (err) {
-      console.error(`  Authenticated fetch failed (${err.message}), trying public export...`)
-    }
-  }
-
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`
-  const res = await fetch(url, { redirect: 'follow' })
-  if (!res.ok) throw new Error(`Sheet export failed: ${res.status} ${res.statusText}`)
-  return parseCSV(await res.text())
 }
 
 // ── CSV parser (handles quoted fields with commas/newlines) ──────────
@@ -407,20 +366,14 @@ const source = args.find(a => !a.startsWith('-'))
 if (!source) usage()
 
 let rows
-const isSheet = SHEET_URL_RE.test(source)
-if (isSheet) {
-  console.log(`Fetching from Google Sheet...`)
-  rows = await fetchSheet(source)
+console.log(`Reading ${source}...`)
+const raw = readFileSync(source, 'utf8')
+const ext = parse(source).ext.toLowerCase()
+if (ext === '.json') {
+  rows = JSON.parse(raw)
+  if (!Array.isArray(rows)) throw new Error('JSON file must contain an array of objects')
 } else {
-  console.log(`Reading ${source}...`)
-  const raw = readFileSync(source, 'utf8')
-  const ext = parse(source).ext.toLowerCase()
-  if (ext === '.json') {
-    rows = JSON.parse(raw)
-    if (!Array.isArray(rows)) throw new Error('JSON file must contain an array of objects')
-  } else {
-    rows = parseCSV(raw)
-  }
+  rows = parseCSV(raw)
 }
 console.log(`Parsed ${rows.length} rows`)
 

@@ -205,6 +205,39 @@ describe('POST /api/profiles', () => {
     assert.ok(profile.payload.sectors.length >= 1)
   })
 
+  it('accepts the freelance sector', async () => {
+    const { status } = await post({ ...VALID_MENTEE, sectors: ['freelance', 'startup'] })
+    assert.equal(status, 201)
+    const profile = await getProfile('new@test.com')
+    assert.ok(profile.payload.sectors.includes('freelance'))
+  })
+
+  it('accepts the freelance sector by label', async () => {
+    const { status } = await post({ ...VALID_MENTOR, sectors: ['Freelance / self-employed'] })
+    assert.equal(status, 201)
+    const profile = await getProfile('new@test.com')
+    assert.deepEqual(profile.payload.sectors, ['freelance'])
+  })
+
+  it('stores optional name_pronunciation in shared payload', async () => {
+    await post({ ...VALID_MENTEE, name_pronunciation: '  KEV-in ZHENG ' })
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.name_pronunciation, 'KEV-in ZHENG')
+  })
+
+  it('creates a profile without name_pronunciation', async () => {
+    const { status } = await post(VALID_MENTEE)
+    assert.equal(status, 201)
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.name_pronunciation, undefined)
+  })
+
+  it('rejects an overlong name_pronunciation', async () => {
+    const { status, data } = await post({ ...VALID_MENTEE, name_pronunciation: 'x'.repeat(201) })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'name_pronunciation'))
+  })
+
   it('stores links in shared payload', async () => {
     await post({
       ...VALID_MENTEE,

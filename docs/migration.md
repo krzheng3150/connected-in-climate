@@ -157,19 +157,12 @@ pg_dump "$OLD_DATABASE_URL" --no-owner --no-acl -t user_profiles > profiles.sql
 psql "$NEW_DATABASE_URL" < profiles.sql
 ```
 
-Or re-import from your Google Sheet / CSV:
+Or re-import from a CSV / JSON file:
 ```bash
 DATABASE_URL="$NEW_DATABASE_URL" node --env-file=.env scripts/import.js <source>
 ```
 
-## Step 11: Google Sheets (if used)
-
-If using Google Sheets for profile import:
-1. The Google OAuth credentials (not a service account) handle Drive/Sheets access
-2. Share the Google Sheet with the Google account that authorized the OAuth refresh token
-3. Run `npm run sheet:create -- <sheet-url>` to set up headers and dropdowns
-
-## Step 12: Deploy and Verify
+## Step 11: Deploy and Verify
 
 Push to `main` (or re-run the workflow). The deploy workflow will:
 1. Inject secrets from GH Actions into the app spec
@@ -209,5 +202,4 @@ Also verify:
 - [ ] Social login works on the new domain
 - [ ] Email notifications work
 - [ ] Google Drive integration works
-- [ ] Google Sheet shared and configured (if applicable)
 - [ ] Old DO instance decommissioned after confirming everything works

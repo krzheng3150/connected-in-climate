@@ -13,7 +13,7 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 4. Approved mentors are presented to the mentee, who picks one
 5. Both sides see the active match on their dashboard and can leave feedback
 
-Profiles can also be bulk-imported from a Google Sheet or CSV.
+Profiles can also be bulk-imported from a CSV or JSON file.
 
 ## Local development
 

@@ -30,7 +30,6 @@
     "db:restore": "node --env-file=.env scripts/db-restore.js",
     "import": "node --env-file=.env scripts/import.js",
     "import:dry": "node --env-file=.env scripts/import.js --dry-run",
-    "sheet:create": "node --env-file=.env scripts/create-sheet.js",
     "demo": "node --env-file=.env scripts/demo.js",
     "demo:headless": "node --env-file=.env scripts/demo.js --headless",
     "drive:cleanup": "node --env-file=.env scripts/cleanup-drive.js",

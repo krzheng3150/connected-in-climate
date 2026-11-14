@@ -30,7 +30,7 @@ IDs are snake_case, stable, and used in storage/matching. Labels are display-onl
 
 ### 2. `scripts/import.js`
 
-Add the field to the `buildPayload()` function so Google Sheet / CSV import picks it up. Match the field type:
+Add the field to the `buildPayload()` function so CSV import picks it up. Match the field type:
 - Single enum: `normalize('field_name', row.field_name)`
 - Multi enum: `normalizeArray('field_name', splitMulti(row.field_name))`
 - Free text: `row.field_name?.trim() || undefined`
@@ -73,5 +73,4 @@ Add the column with sample values for at least 2-3 rows. Use IDs for enum fields
 ## After all files
 
 - Run `npm run test:all` to verify nothing broke
-- If Google Sheets import is active: `npm run sheet:create -- <sheet-url>` to update headers and dropdowns
 - Update `CLAUDE.md` if the field introduces a new pattern or convention
