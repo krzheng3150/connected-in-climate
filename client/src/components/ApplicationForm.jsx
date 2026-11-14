@@ -123,6 +123,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
   const [error, setError] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [hiwOpen, setHiwOpen] = useState(false)
+  const [showPronunciation, setShowPronunciation] = useState(false)
 
   const isMentor = form.role === 'mentor'
   const isMentee = form.role === 'mentee'
@@ -237,6 +238,16 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
               <label>Preferred Name</label>
               <input type="text" value={form.preferred_name || ''} onChange={e => set('preferred_name', e.target.value)} placeholder="What should we call you?" />
             </div>
+            {(showPronunciation || form.name_pronunciation) ? (
+              <div className="form-group">
+                <label>Name Pronunciation</label>
+                <input type="text" value={form.name_pronunciation || ''} onChange={e => set('name_pronunciation', e.target.value)} placeholder="e.g. KEV-in ZHENG" />
+              </div>
+            ) : (
+              <div className="form-group">
+                <button type="button" className="btn-link" onClick={() => setShowPronunciation(true)}>+ Add a name pronunciation</button>
+              </div>
+            )}
             <div className="form-group">
               <label>Pronouns</label>
               <input type="text" value={form.pronouns || ''} onChange={e => set('pronouns', e.target.value)} placeholder="e.g. she/her, he/him, they/them" />

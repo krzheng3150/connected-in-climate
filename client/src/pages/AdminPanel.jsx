@@ -201,6 +201,7 @@ function MenteeProfileSummary({ payload, name, email }) {
   return (
     <div className="review-mentee-panel">
       <h3 className="review-mentee-name">{name}</h3>
+      {p.name_pronunciation && <span className="review-meta-line">Pronounced: {p.name_pronunciation}</span>}
       {p.pronouns && <span className="review-meta-line">{p.pronouns}</span>}
 
       <div className="review-field-group">
@@ -285,7 +286,7 @@ function MentorCandidateCard({ match: m, isSelected, onToggle, expandedScores, o
       </div>
 
       <div className="review-mentor-summary">
-        <div className="review-field"><span className="review-field-label">Name</span><span>{m.mentor_name}</span></div>
+        <div className="review-field"><span className="review-field-label">Name</span><span>{m.mentor_name}{p.name_pronunciation && <span className="review-meta-line"> ({p.name_pronunciation})</span>}</span></div>
         {p.timezone && <div className="review-field"><span className="review-field-label">Timezone</span><span>{p.timezone}</span></div>}
         {(p.links?.linkedin || m.mentor_email) && (
           <div className="review-field">
@@ -308,7 +309,7 @@ function MentorCandidateCard({ match: m, isSelected, onToggle, expandedScores, o
 
       {expandedProfile && (
         <div className="review-mentor-detail">
-          <ProfileDetail payload={p} exclude={['timezone', 'links']} />
+          <ProfileDetail payload={p} exclude={['timezone', 'links', 'name_pronunciation']} />
         </div>
       )}
 

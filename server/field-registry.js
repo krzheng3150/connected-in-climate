@@ -41,6 +41,7 @@ export const FIELDS = {
     startup: 'Startup',
     nonprofit: 'Nonprofit / INGO / Social Sector',
     project_based: 'Project-based work',
+    freelance: 'Freelance / self-employed',
     education: 'Education',
     government: 'Government (includes local, state, national, multilateral / bilateral institutions)',
   },

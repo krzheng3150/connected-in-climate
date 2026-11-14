@@ -13,7 +13,7 @@ const EMBEDDING_DIMENSIONS = 1536
 
 // Fields that live in user_profiles.payload (shared identity)
 const SHARED_PAYLOAD_FIELDS = new Set([
-  'preferred_name', 'pronouns', 'city', 'country', 'organization', 'timezone', 'fun_fact',
+  'preferred_name', 'name_pronunciation', 'pronouns', 'city', 'country', 'organization', 'timezone', 'fun_fact',
   'career_level', 'education_level', 'years_experience', 'years_climate_experience',
   'career_areas', 'climate_areas', 'sectors',
   'certifications', 'interests_hobbies', 'locations_open_to',
@@ -54,7 +54,7 @@ const ENUM_FIELD_MAP = {
 }
 
 const FREE_TEXT_FIELDS = new Set([
-  'preferred_name', 'pronouns', 'city', 'organization', 'timezone', 'scheduling_link',
+  'preferred_name', 'name_pronunciation', 'pronouns', 'city', 'organization', 'timezone', 'scheduling_link',
   'motivation', 'statement_of_intent', 'fun_fact',
   'relevant_projects', 'eq_response', 'additional_info', 'commitment_name',
 ])
@@ -68,6 +68,7 @@ const MAX_TEXT_LENGTH = {
   motivation: 2000,
   fun_fact: 500,
   preferred_name: 200,
+  name_pronunciation: 200,
   pronouns: 100,
   city: 200,
   organization: 200,
