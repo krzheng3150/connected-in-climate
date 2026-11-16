@@ -4,6 +4,7 @@
 
 import { isMentor } from './roles.js'
 import { hasExperience, FIELDS } from './field-registry.js'
+import { DEFAULT_MAX_CAPACITY } from '../shared/constants.js'
 
 const TOPIC_EXPERIENCE_MAP = [
   ['international_work', 'international_experience'],
@@ -40,7 +41,7 @@ export function filterEligible(mentee, mentors, activeMatches, blockList) {
     if (inProgressPartners.has(mentor.email)) reasons.push('active_match_exists')
     if (blocked.has(mentor.email)) reasons.push('blocked')
 
-    const capacity = mentor.payload?.max_capacity ?? 0
+    const capacity = mentor.payload?.max_capacity ?? DEFAULT_MAX_CAPACITY
     const activeAsMentor = activeMatches.filter(
       m => m.mentor_email === mentor.email && m.status === 'ACTIVE',
     ).length

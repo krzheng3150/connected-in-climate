@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { LABELS } from './ProfileFields.jsx'
+import { DEFAULT_MAX_CAPACITY } from '../../../shared/constants.js'
 import HowItWorksPanel from './HowItWorksPanel.jsx'
 
 const ROLE_OPTIONS = [
@@ -373,6 +374,14 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
               value={form.eq_response || ''}
               onChange={e => set('eq_response', e.target.value)}
             />
+          </div>
+          <div className="form-group">
+            <label>How many mentees can you work with at a time?</label>
+            <select value={form.max_capacity ?? DEFAULT_MAX_CAPACITY} onChange={e => set('max_capacity', Number(e.target.value))}>
+              {[1, 2, 3, 4, 5].map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
           </div>
         </>
       )}

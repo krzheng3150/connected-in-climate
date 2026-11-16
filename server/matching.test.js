@@ -10,6 +10,7 @@ import {
   computeMatch,
   rankMentors,
 } from './matching.js'
+import { DEFAULT_MAX_CAPACITY } from '../shared/constants.js'
 
 // ── Test helpers ───────────────────────────────────────────────────
 
@@ -166,12 +167,16 @@ describe('Phase 1: filterEligible', () => {
     assert.ok(filtered[0].reasons.includes('capacity_full'))
   })
 
-  it('excludes when max_capacity is missing', () => {
+  it(`defaults to DEFAULT_MAX_CAPACITY (${DEFAULT_MAX_CAPACITY}) when max_capacity is missing`, () => {
     const mentee = makeMentee()
     const mentor = makeMentor({ payload: {} })
-    const { eligible, filtered } = filterEligible(mentee, [mentor], [], [])
-    assert.equal(eligible.length, 0)
-    assert.ok(filtered[0].reasons.includes('capacity_full'))
+    const active = Array.from({ length: DEFAULT_MAX_CAPACITY }, (_, i) => ({
+      mentee_email: `other${i}@example.com`, mentor_email: 'mentor@example.com', status: 'ACTIVE',
+    }))
+    const { eligible: whenFull } = filterEligible(mentee, [mentor], active, [])
+    assert.equal(whenFull.length, 0, 'should be full at DEFAULT_MAX_CAPACITY active matches')
+    const { eligible: whenUnder } = filterEligible(mentee, [mentor], active.slice(1), [])
+    assert.equal(whenUnder.length, 1, 'should be eligible below DEFAULT_MAX_CAPACITY')
   })
 })
 
