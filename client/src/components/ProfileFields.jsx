@@ -62,6 +62,7 @@ const FIELD_NAMES = {
   additional_info: 'Additional Info',
   commitment_name: 'Commitment Confirmation',
   fun_fact: 'Fun Fact',
+  max_capacity: 'Max Active Mentees',
   scheduling_link: 'Meeting Scheduler',
   links: 'Contact',
 }

@@ -376,7 +376,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
             />
           </div>
           <div className="form-group">
-            <label>How many mentees can you work with at a time?</label>
+            <label>How many mentees can you take on at once?</label>
             <select value={form.max_capacity ?? DEFAULT_MAX_CAPACITY} onChange={e => set('max_capacity', Number(e.target.value))}>
               {[1, 2, 3, 4, 5].map(n => (
                 <option key={n} value={n}>{n}</option>
