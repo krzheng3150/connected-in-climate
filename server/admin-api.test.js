@@ -1,6 +1,6 @@
 process.env.ADMIN_EMAILS = 'admin@test.com'
 
-import { describe, it, before, after } from 'node:test'
+import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { pool, setupDb, resetDb } from './test-db.js'
@@ -10,44 +10,61 @@ import adminRouter from './admin-api.js'
 
 let server, baseUrl
 
+// Test data lives at module level so every test can rebuild it from scratch.
+const PROFILES = [
+  {
+    email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
+    shared: {
+      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+      city: 'San Francisco', country: 'US', preferred_name: 'M', pronouns: 'they/them',
+    },
+    mentorPayload: {
+      top_strengths: ['Topic A'], general_topics: [],
+      motivation: 'Helping.', max_capacity: 2,
+    },
+  },
+  {
+    email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
+    shared: {
+      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+      city: 'Washington', country: 'US',
+    },
+    mentorPayload: {
+      top_strengths: ['Topic X'], general_topics: [],
+      motivation: 'Policy.', max_capacity: 1,
+    },
+  },
+  {
+    email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
+    shared: {
+      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+      w_horiz: 1, w_vert: 1, w_sector: 1, city: 'San Francisco', country: 'US',
+    },
+    menteePayload: {
+      top_topics: ['Topic A'], statement_of_intent: 'Transition.',
+    },
+  },
+]
+
 before(async () => {
   await setupDb()
+  const app = express()
+  app.use(express.json())
+  app.use('/api/matches', matchRouter)
+  app.use('/api/feedback', feedbackRouter)
+  app.use('/api/admin', adminRouter)
+  app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
 
-  const profiles = [
-    {
-      email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
-      shared: {
-        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        city: 'San Francisco', country: 'US', preferred_name: 'M', pronouns: 'they/them',
-      },
-      mentorPayload: {
-        top_strengths: ['Topic A'], general_topics: [],
-        motivation: 'Helping.', max_capacity: 2,
-      },
-    },
-    {
-      email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
-      shared: {
-        career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-        city: 'Washington', country: 'US',
-      },
-      mentorPayload: {
-        top_strengths: ['Topic X'], general_topics: [],
-        motivation: 'Policy.', max_capacity: 1,
-      },
-    },
-    {
-      email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
-      shared: {
-        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        w_horiz: 1, w_vert: 1, w_sector: 1, city: 'San Francisco', country: 'US',
-      },
-      menteePayload: {
-        top_topics: ['Topic A'], statement_of_intent: 'Transition.',
-      },
-    },
-  ]
-  for (const p of profiles) {
+  await new Promise(resolve => { server = app.listen(0, resolve) })
+  baseUrl = `http://localhost:${server.address().port}`
+})
+
+// Every test starts from the same known state: seeded profiles and one pending run
+// (matches are CANDIDATE). Tests that need another state create it themselves, so they
+// pass in any order and on their own.
+beforeEach(async () => {
+  await resetDb()
+  for (const p of PROFILES) {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload) VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, role=EXCLUDED.role, payload=EXCLUDED.payload`,
@@ -68,16 +85,6 @@ before(async () => {
       )
     }
   }
-
-  const app = express()
-  app.use(express.json())
-  app.use('/api/matches', matchRouter)
-  app.use('/api/feedback', feedbackRouter)
-  app.use('/api/admin', adminRouter)
-  app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
-
-  await new Promise(resolve => { server = app.listen(0, resolve) })
-  baseUrl = `http://localhost:${server.address().port}`
 
   // Create a run (matches start as CANDIDATE)
   await post('/api/matches/run', { email: 'mentee@test.com' })
@@ -115,6 +122,15 @@ async function getRunId() {
     `SELECT run_id FROM match_runs WHERE mentee_email = 'mentee@test.com' ORDER BY created_at DESC LIMIT 1`,
   )
   return result.rows[0].run_id
+}
+
+// Approve the top candidate so the run (and that match) become ACTIVE.
+async function activate() {
+  const runId = await getRunId()
+  const candidateIds = await getCandidateIds(runId)
+  const { status } = await post(`/api/admin/runs/${runId}/review`, { approved: [candidateIds[0]] }, admin)
+  assert.equal(status, 200)
+  return { runId, matchId: candidateIds[0] }
 }
 
 async function getCandidateIds(runId) {
@@ -256,7 +272,7 @@ describe('POST /api/admin/runs/:run_id/review', () => {
   })
 
   it('returns 400 when reviewing an already-reviewed run', async () => {
-    const runId = await getRunId()
+    const { runId } = await activate()
     const { status, data } = await post(
       `/api/admin/runs/${runId}/review`,
       { approved: [] },
@@ -313,36 +329,26 @@ describe('GET /api/admin/matches/:match_id', () => {
 
 describe('POST /api/admin/matches/:match_id/reject', () => {
   it('rejects an active match', async () => {
-    const { data: listData } = await get('/api/admin/matches?email=mentee@test.com', admin)
-    const activeMatch = listData.matches.find(m => m.status === 'ACTIVE')
-    assert.ok(activeMatch, 'expected an ACTIVE match')
+    const { matchId } = await activate()
 
     const { status, data } = await post(
-      `/api/admin/matches/${activeMatch.match_id}/reject`,
+      `/api/admin/matches/${matchId}/reject`,
       { reason: 'Domain mismatch' },
       admin,
     )
     assert.equal(status, 200)
     assert.equal(data.status, 'REJECTED')
     assert.equal(data.block_created, false)
-  })
 
-  it('match status is now REJECTED in DB', async () => {
-    const result = await pool.query(
-      `SELECT status FROM matches WHERE mentee_email = 'mentee@test.com' AND rank = 1`,
-    )
+    const result = await pool.query('SELECT status FROM matches WHERE match_id = $1', [matchId])
     assert.equal(result.rows[0].status, 'REJECTED')
   })
 
   it('returns 400 when rejecting a non-active match', async () => {
-    const { data: listData } = await get('/api/admin/matches?email=mentee@test.com', admin)
-    const rejectedMatch = listData.matches.find(m => m.status === 'REJECTED')
+    const { matchId } = await activate()
+    await post(`/api/admin/matches/${matchId}/reject`, { reason: 'First' }, admin)
 
-    const { status, data } = await post(
-      `/api/admin/matches/${rejectedMatch.match_id}/reject`,
-      { reason: 'Again' },
-      admin,
-    )
+    const { status, data } = await post(`/api/admin/matches/${matchId}/reject`, { reason: 'Again' }, admin)
     assert.equal(status, 400)
     assert.ok(data.error.includes('not ACTIVE'))
   })
@@ -351,19 +357,8 @@ describe('POST /api/admin/matches/:match_id/reject', () => {
 // ── Reject with block ──────────────────────────────────────────────
 
 describe('Reject with block', () => {
-  before(async () => {
-    // Set rank-1 match back to ACTIVE so we can test block
-    await pool.query(
-      `UPDATE matches SET status = 'ACTIVE'
-       WHERE mentee_email = 'mentee@test.com' AND rank = 1`,
-    )
-  })
-
   it('rejects and creates a block entry', async () => {
-    const result = await pool.query(
-      `SELECT match_id FROM matches WHERE mentee_email = 'mentee@test.com' AND rank = 1`,
-    )
-    const matchId = result.rows[0].match_id
+    const { matchId } = await activate()
 
     const { status, data } = await post(
       `/api/admin/matches/${matchId}/reject`,
@@ -373,13 +368,17 @@ describe('Reject with block', () => {
     assert.equal(status, 200)
     assert.equal(data.block_created, true)
     assert.ok(data.block_id)
+
+    const blocks = await pool.query('SELECT mentor_email, mentee_email FROM rejections')
+    assert.equal(blocks.rows.length, 1)
+    assert.equal(blocks.rows[0].mentee_email, 'mentee@test.com')
   })
 })
 
 // ── GET /api/admin/feedback ────────────────────────────────────────
 
 describe('GET /api/admin/feedback', () => {
-  before(async () => {
+  beforeEach(async () => {
     // Create feedback on an existing match
     const result = await pool.query(
       `SELECT match_id FROM matches WHERE mentee_email = 'mentee@test.com' LIMIT 1`,
@@ -407,24 +406,21 @@ describe('GET /api/admin/feedback', () => {
 // ── Block list CRUD ────────────────────────────────────────────────
 
 describe('Block list', () => {
-  let blockId
+  const NEW_BLOCK = { mentor_email: 'mentor@test.com', mentee_email: 'someone@test.com', reason: 'Conflict of interest' }
 
   it('lists blocks', async () => {
+    await post('/api/admin/blocks', NEW_BLOCK, admin)
     const { status, data } = await get('/api/admin/blocks', admin)
     assert.equal(status, 200)
     assert.ok(Array.isArray(data.blocks))
-    assert.ok(data.blocks.length >= 1)
+    assert.equal(data.blocks.length, 1)
+    assert.equal(data.blocks[0].mentee_email, 'someone@test.com')
   })
 
   it('adds a block without a prior match', async () => {
-    const { status, data } = await post('/api/admin/blocks', {
-      mentor_email: 'mentor@test.com',
-      mentee_email: 'someone@test.com',
-      reason: 'Conflict of interest',
-    }, admin)
+    const { status, data } = await post('/api/admin/blocks', NEW_BLOCK, admin)
     assert.equal(status, 201)
     assert.ok(data.block_id)
-    blockId = data.block_id
   })
 
   it('returns 400 without required fields', async () => {
@@ -433,9 +429,12 @@ describe('Block list', () => {
   })
 
   it('deletes a block', async () => {
-    const { status, data } = await del(`/api/admin/blocks/${blockId}`, admin)
+    const { data: created } = await post('/api/admin/blocks', NEW_BLOCK, admin)
+    const { status, data } = await del(`/api/admin/blocks/${created.block_id}`, admin)
     assert.equal(status, 200)
     assert.equal(data.deleted, true)
+    const left = await pool.query('SELECT 1 FROM rejections')
+    assert.equal(left.rows.length, 0)
   })
 
   it('returns 404 deleting nonexistent block', async () => {

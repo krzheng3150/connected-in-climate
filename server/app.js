@@ -1,0 +1,136 @@
+// The Express app, without starting it. index.js runs the migrations and listens;
+// tests import this directly.
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import express from 'express'
+import { clerkMiddleware } from '@clerk/express'
+import { pool } from './db.js'
+import { getAuthEmail } from './auth.js'
+import matchRouter from './match-api.js'
+import actionRouter from './action-api.js'
+import feedbackRouter from './feedback-api.js'
+import adminRouter from './admin-api.js'
+import profileRouter from './profile-api.js'
+import { deriveRole } from './roles.js'
+
+const app = express()
+const clientDist = path.join(path.dirname(fileURLToPath(import.meta.url)), '../client/dist')
+
+app.use(express.json())
+
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const ms = Date.now() - start
+    console.log(`[req] ${req.method} ${req.path} ${res.statusCode} ${ms}ms`)
+  })
+  next()
+})
+
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1')
+    import('./resources.js').then(m => m.ping()).catch(() => {})
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[health] DB check failed:', err.message)
+    res.status(503).json({ ok: false, error: 'database unavailable' })
+  }
+})
+
+app.use(clerkMiddleware())
+
+function getAdminEmails() {
+  return new Set(
+    (process.env.ADMIN_EMAILS || '').split(',').map(e => e.toLowerCase().trim()).filter(Boolean),
+  )
+}
+
+app.get('/api/profiles/me', async (req, res, next) => {
+  try {
+    const email = await getAuthEmail(req)
+    if (!email) return res.status(401).json({ error: 'not authenticated' })
+    const normalEmail = email.toLowerCase().trim()
+    const isAdmin = getAdminEmails().has(normalEmail)
+
+    const result = await pool.query(
+      'SELECT email, name, payload FROM user_profiles WHERE email = $1',
+      [normalEmail],
+    )
+    if (result.rows.length === 0) {
+      return res.json({
+        email: normalEmail,
+        name: normalEmail.split('@')[0],
+        role: null,
+        is_mentor: false,
+        is_mentee: false,
+        preferred_name: null,
+        is_admin: isAdmin,
+        has_profile: false,
+        mentor_status: null,
+        mentee_status: null,
+      })
+    }
+
+    const row = result.rows[0]
+    const mentorApp = (await pool.query(
+      'SELECT status, payload FROM mentor_applications WHERE email = $1', [normalEmail],
+    )).rows[0] || null
+    const menteeApp = (await pool.query(
+      'SELECT status, payload FROM mentee_applications WHERE email = $1', [normalEmail],
+    )).rows[0] || null
+
+    const hasMentorApp = !!mentorApp
+    const hasMenteeApp = !!menteeApp
+    const role = deriveRole(hasMentorApp, hasMenteeApp)
+    const isMentor = mentorApp?.status === 'APPROVED'
+    const isMentee = menteeApp?.status === 'APPROVED'
+
+    const mergedPayload = {
+      ...row.payload,
+      ...(mentorApp?.payload || {}),
+      ...(menteeApp?.payload || {}),
+    }
+
+    res.json({
+      email: row.email,
+      name: row.name,
+      role,
+      is_mentor: isMentor,
+      is_mentee: isMentee,
+      preferred_name: row.payload?.preferred_name || null,
+      payload: mergedPayload,
+      is_admin: isAdmin,
+      has_profile: true,
+      mentor_status: mentorApp?.status || null,
+      mentee_status: menteeApp?.status || null,
+      status: isMentor || isMentee ? 'APPROVED' : (mentorApp?.status || menteeApp?.status || 'PENDING'),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.use('/api/matches', matchRouter)
+app.use('/api/actions', actionRouter)
+app.use('/api/feedback', feedbackRouter)
+app.use('/api/profiles', profileRouter)
+app.use('/api/admin', adminRouter)
+
+app.use('/api', (_req, res) => res.status(404).json({ error: 'not found' }))
+
+// In production the built React app is served by this same server.
+// Hashed assets (JS/CSS) get long cache; index.html always revalidates so
+// deploys never serve a stale shell that points to old bundles.
+app.use(express.static(clientDist, { maxAge: '1y', immutable: true }))
+app.use((_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache')
+  res.sendFile(path.join(clientDist, 'index.html'))
+})
+
+app.use((err, req, res, _next) => {
+  console.error(`[error] ${req.method} ${req.path} user=${req.headers['x-user-email'] || 'unknown'}`, err)
+  res.status(500).json({ error: 'internal error' })
+})
+
+export default app

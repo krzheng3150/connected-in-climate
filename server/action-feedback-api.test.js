@@ -1,6 +1,6 @@
 process.env.ADMIN_EMAILS = 'admin@test.com'
 
-import { describe, it, before, after } from 'node:test'
+import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { pool, setupDb, resetDb } from './test-db.js'
@@ -11,33 +11,50 @@ import feedbackRouter from './feedback-api.js'
 
 let server, baseUrl
 
+// Test data lives at module level so every test can rebuild it from scratch.
+const PROFILES = [
+  {
+    email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
+    shared: {
+      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+      city: 'San Francisco', country: 'US',
+    },
+    mentorPayload: {
+      top_strengths: ['Topic A'], general_topics: [],
+      motivation: 'Helping.', max_capacity: 2,
+    },
+  },
+  {
+    email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
+    shared: {
+      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+      w_horiz: 1, w_vert: 1, w_sector: 1, city: 'San Francisco', country: 'US',
+    },
+    menteePayload: {
+      top_topics: ['Topic A'], statement_of_intent: 'Transition.',
+    },
+  },
+]
+
 before(async () => {
   await setupDb()
+  const app = express()
+  app.use(express.json())
+  app.use('/api/matches', matchRouter)
+  app.use('/api/admin', adminRouter)
+  app.use('/api/actions', actionRouter)
+  app.use('/api/feedback', feedbackRouter)
+  app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
 
-  const profiles = [
-    {
-      email: 'mentor@test.com', name: 'Mentor', role: 'mentor',
-      shared: {
-        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        city: 'San Francisco', country: 'US',
-      },
-      mentorPayload: {
-        top_strengths: ['Topic A'], general_topics: [],
-        motivation: 'Helping.', max_capacity: 2,
-      },
-    },
-    {
-      email: 'mentee@test.com', name: 'Mentee', role: 'mentee',
-      shared: {
-        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        w_horiz: 1, w_vert: 1, w_sector: 1, city: 'San Francisco', country: 'US',
-      },
-      menteePayload: {
-        top_topics: ['Topic A'], statement_of_intent: 'Transition.',
-      },
-    },
-  ]
-  for (const p of profiles) {
+  await new Promise(resolve => { server = app.listen(0, resolve) })
+  baseUrl = `http://localhost:${server.address().port}`
+})
+
+// Every test starts from the same known state: seeded profiles and one ACTIVE match.
+// Tests that need actions or feedback create them first, so they pass in any order.
+beforeEach(async () => {
+  await resetDb()
+  for (const p of PROFILES) {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload) VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, role=EXCLUDED.role, payload=EXCLUDED.payload`,
@@ -58,17 +75,6 @@ before(async () => {
       )
     }
   }
-
-  const app = express()
-  app.use(express.json())
-  app.use('/api/matches', matchRouter)
-  app.use('/api/admin', adminRouter)
-  app.use('/api/actions', actionRouter)
-  app.use('/api/feedback', feedbackRouter)
-  app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
-
-  await new Promise(resolve => { server = app.listen(0, resolve) })
-  baseUrl = `http://localhost:${server.address().port}`
 
   // Create run → admin review (1 approved → auto-activate) so we have an ACTIVE match
   const { data: runData } = await post('/api/matches/run', { email: 'mentee@test.com' })
@@ -181,11 +187,13 @@ describe('GET /api/actions', () => {
 
   it('lists actions for a match', async () => {
     const matchId = await getMatchId()
+    await post('/api/actions', { match_id: matchId, email: 'mentee@test.com', action_type: 'VIEW' })
+    await post('/api/actions', { match_id: matchId, email: 'mentee@test.com', action_type: 'CONTACT_CLICK', payload: { link_type: 'linkedin' } })
+
     const { status, data } = await get(`/api/actions?match_id=${matchId}&email=mentee@test.com`)
     assert.equal(status, 200)
-    assert.ok(data.actions.length >= 2)
-    assert.ok(data.actions.some(a => a.action_type === 'VIEW'))
-    assert.ok(data.actions.some(a => a.action_type === 'CONTACT_CLICK'))
+    // APPROVE is the admin review that activated the match in the baseline setup
+    assert.deepEqual(data.actions.map(a => a.action_type).sort(), ['APPROVE', 'CONTACT_CLICK', 'VIEW'])
   })
 })
 
@@ -259,6 +267,7 @@ describe('POST /api/feedback', () => {
 
   it('also logs a FEEDBACK action', async () => {
     const matchId = await getMatchId()
+    await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'Great match!', rating: 5 })
     const { data } = await get(`/api/actions?match_id=${matchId}&email=mentee@test.com`)
     assert.ok(data.actions.some(a => a.action_type === 'FEEDBACK'))
   })
@@ -285,9 +294,13 @@ describe('POST /api/feedback', () => {
 describe('GET /api/feedback', () => {
   it('returns only the requesting user\'s own feedback', async () => {
     const matchId = await getMatchId()
+    await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'First', rating: 5 })
+    await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'Second' })
+    await post('/api/feedback', { match_id: matchId, email: 'mentor@test.com', text: 'Good mentee.' })
+
     const { status, data } = await get(`/api/feedback?match_id=${matchId}&email=mentee@test.com`)
     assert.equal(status, 200)
-    assert.ok(data.feedbacks.length >= 2)
+    assert.equal(data.feedbacks.length, 2)
     for (const fb of data.feedbacks) {
       assert.equal(fb.submitter_email, 'mentee@test.com')
     }
@@ -295,6 +308,9 @@ describe('GET /api/feedback', () => {
 
   it('does not show partner feedback to the other user', async () => {
     const matchId = await getMatchId()
+    await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'Mentee view' })
+    await post('/api/feedback', { match_id: matchId, email: 'mentor@test.com', text: 'Good mentee.' })
+
     const { status, data } = await get(`/api/feedback?match_id=${matchId}&email=mentor@test.com`)
     assert.equal(status, 200)
     assert.equal(data.feedbacks.length, 1)

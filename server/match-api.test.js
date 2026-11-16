@@ -1,6 +1,6 @@
 process.env.ADMIN_EMAILS = 'admin@test.com'
 
-import { describe, it, before, after } from 'node:test'
+import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { pool, setupDb, resetDb } from './test-db.js'
@@ -11,59 +11,74 @@ import adminRouter from './admin-api.js'
 
 let server, baseUrl
 
+// Test data lives at module level so every test can rebuild it from scratch.
+const PROFILES = [
+  {
+    email: 'mentor1@test.com', name: 'Mentor One', role: 'mentor',
+    shared: {
+      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+      city: 'San Francisco', country: 'US', locations_open_to: ['San Francisco', 'Remote'],
+      preferred_name: 'M1', pronouns: 'they/them',
+      links: { linkedin: 'https://linkedin.com/test' },
+    },
+    mentorPayload: {
+      top_strengths: ['Topic A', 'Topic B'], general_topics: ['Topic C'],
+      motivation: 'Helping people.', max_capacity: 2,
+    },
+  },
+  {
+    email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
+    shared: {
+      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+      city: 'Washington', country: 'US',
+    },
+    mentorPayload: {
+      top_strengths: ['Topic X'], general_topics: [],
+      motivation: 'Policy work.', max_capacity: 1,
+    },
+  },
+  {
+    email: 'mentee1@test.com', name: 'Mentee One', role: 'mentee',
+    shared: {
+      career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
+      w_horiz: 3, w_vert: 3, w_sector: 3,
+      city: 'San Francisco', country: 'US',
+    },
+    menteePayload: {
+      top_topics: ['Topic A', 'Topic C'], statement_of_intent: 'Transition to climate.',
+    },
+  },
+  {
+    email: 'mentee2@test.com', name: 'Mentee Two', role: 'mentee',
+    shared: {
+      career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
+      w_horiz: 1, w_vert: 5, w_sector: 3,
+      city: 'Washington', country: 'US',
+    },
+    menteePayload: {
+      top_topics: ['Topic X'], statement_of_intent: 'Policy career.',
+    },
+  },
+]
+
 before(async () => {
   await setupDb()
+  const app = express()
+  app.use(express.json())
+  app.use('/api/matches', matchRouter)
+  app.use('/api/admin', adminRouter)
+  app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
 
-  const profiles = [
-    {
-      email: 'mentor1@test.com', name: 'Mentor One', role: 'mentor',
-      shared: {
-        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        city: 'San Francisco', country: 'US', locations_open_to: ['San Francisco', 'Remote'],
-        preferred_name: 'M1', pronouns: 'they/them',
-        links: { linkedin: 'https://linkedin.com/test' },
-      },
-      mentorPayload: {
-        top_strengths: ['Topic A', 'Topic B'], general_topics: ['Topic C'],
-        motivation: 'Helping people.', max_capacity: 2,
-      },
-    },
-    {
-      email: 'mentor2@test.com', name: 'Mentor Two', role: 'mentor',
-      shared: {
-        career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-        city: 'Washington', country: 'US',
-      },
-      mentorPayload: {
-        top_strengths: ['Topic X'], general_topics: [],
-        motivation: 'Policy work.', max_capacity: 1,
-      },
-    },
-    {
-      email: 'mentee1@test.com', name: 'Mentee One', role: 'mentee',
-      shared: {
-        career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
-        w_horiz: 3, w_vert: 3, w_sector: 3,
-        city: 'San Francisco', country: 'US',
-      },
-      menteePayload: {
-        top_topics: ['Topic A', 'Topic C'], statement_of_intent: 'Transition to climate.',
-      },
-    },
-    {
-      email: 'mentee2@test.com', name: 'Mentee Two', role: 'mentee',
-      shared: {
-        career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
-        w_horiz: 1, w_vert: 5, w_sector: 3,
-        city: 'Washington', country: 'US',
-      },
-      menteePayload: {
-        top_topics: ['Topic X'], statement_of_intent: 'Policy career.',
-      },
-    },
-  ]
+  await new Promise(resolve => { server = app.listen(0, resolve) })
+  baseUrl = `http://localhost:${server.address().port}`
+})
 
-  for (const p of profiles) {
+// Every test starts from the same known state: seeded profiles and no runs. Each group
+// below builds the state it needs (a run, an active match, ...) with the helpers, so tests
+// pass in any order and on their own.
+beforeEach(async () => {
+  await resetDb()
+  for (const p of PROFILES) {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload)
        VALUES ($1, $2, $3, $4)
@@ -87,15 +102,6 @@ before(async () => {
       )
     }
   }
-
-  const app = express()
-  app.use(express.json())
-  app.use('/api/matches', matchRouter)
-  app.use('/api/admin', adminRouter)
-  app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
-
-  await new Promise(resolve => { server = app.listen(0, resolve) })
-  baseUrl = `http://localhost:${server.address().port}`
 })
 
 after(async () => {
@@ -121,6 +127,35 @@ async function get(path, headers = {}) {
 }
 
 const admin = { 'x-user-email': 'admin@test.com' }
+
+// Request matches for a mentee; returns the new run's id.
+async function createRun(mentee = 'mentee1@test.com') {
+  const { status, data } = await post('/api/matches/run', { email: mentee })
+  assert.equal(status, 200)
+  assert.ok(data.run, 'expected a run to be created')
+  return data.run.run_id
+}
+
+async function candidateIds(runId) {
+  const result = await pool.query(
+    `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank`,
+    [runId],
+  )
+  return result.rows.map(r => r.match_id)
+}
+
+// Request matches and have the admin approve only the top one, which activates it.
+async function activate(mentee = 'mentee1@test.com') {
+  const runId = await createRun(mentee)
+  const ids = await candidateIds(runId)
+  const { status, data } = await post(`/api/admin/runs/${runId}/review`, { approved: [ids[0]] }, admin)
+  assert.equal(status, 200)
+  assert.equal(data.run_status, 'ACTIVE')
+  return { runId, matchId: ids[0] }
+}
+
+// Any request for the mentee's current run applies the lazy expiry of finished matches.
+const expire = () => get('/api/matches/run/current?email=mentee1@test.com')
 
 // ── POST /api/matches/run ──────────────────────────────────────────
 
@@ -154,6 +189,7 @@ describe('POST /api/matches/run', () => {
   })
 
   it('stores candidates and stored matches in DB', async () => {
+    await createRun()
     const result = await pool.query(
       `SELECT rank, status, mentor_email FROM matches
        WHERE mentee_email = 'mentee1@test.com' ORDER BY rank`,
@@ -165,6 +201,7 @@ describe('POST /api/matches/run', () => {
   })
 
   it('stores computation payload with score breakdown', async () => {
+    await createRun()
     const result = await pool.query(
       `SELECT computation_payload FROM matches
        WHERE mentee_email = 'mentee1@test.com' AND rank = 1`,
@@ -181,6 +218,7 @@ describe('POST /api/matches/run', () => {
   })
 
   it('returns 400 when mentee already has an active run', async () => {
+    await createRun()
     const { status, data } = await post('/api/matches/run', { email: 'mentee1@test.com' })
     assert.equal(status, 400)
     assert.ok(data.error.includes('already'))
@@ -201,6 +239,7 @@ describe('GET /api/matches/run/current', () => {
   })
 
   it('returns PENDING_REVIEW run before admin review', async () => {
+    await createRun()
     const { data } = await get('/api/matches/run/current?email=mentee1@test.com')
     assert.ok(data.run)
     assert.equal(data.run.status, 'PENDING_REVIEW')
@@ -210,25 +249,8 @@ describe('GET /api/matches/run/current', () => {
 // ── After admin review (auto-activate with 1 approved) ────────────
 
 describe('After admin batch review', () => {
-  before(async () => {
-    const runResult = await pool.query(
-      `SELECT run_id FROM match_runs WHERE mentee_email = 'mentee1@test.com' AND status = 'PENDING_REVIEW'`,
-    )
-    const runId = runResult.rows[0].run_id
-
-    const candidates = await pool.query(
-      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank LIMIT 1`,
-      [runId],
-    )
-    const topMatchId = candidates.rows[0].match_id
-
-    const { status, data } = await post(
-      `/api/admin/runs/${runId}/review`,
-      { approved: [topMatchId] },
-      admin,
-    )
-    assert.equal(status, 200)
-    assert.equal(data.run_status, 'ACTIVE')
+  beforeEach(async () => {
+    await activate()
   })
 
   it('GET /api/matches returns ACTIVE matches scoped by role', async () => {
@@ -269,9 +291,8 @@ describe('After admin batch review', () => {
 describe('GET /api/matches/:match_id', () => {
   let matchId
 
-  before(async () => {
-    const { data } = await get('/api/matches?email=mentee1@test.com&role=mentee')
-    matchId = data.matches[0].match_id
+  beforeEach(async () => {
+    ;({ matchId } = await activate())
   })
 
   it('returns 400 when email is missing', async () => {
@@ -344,7 +365,8 @@ describe('GET /api/matches edge cases', () => {
 // ── Lazy expiration ───────────────────────────────────────────────
 
 describe('Lazy expiration', () => {
-  before(async () => {
+  beforeEach(async () => {
+    await activate()
     await pool.query(
       `UPDATE matches SET activated_at = now() - interval '31 days',
               end_date = now() - interval '1 day'
@@ -358,6 +380,7 @@ describe('Lazy expiration', () => {
   })
 
   it('match status is now FINISHED in DB', async () => {
+    await expire()
     const result = await pool.query(
       `SELECT status FROM matches WHERE mentee_email = 'mentee1@test.com' AND mentor_email = 'mentor1@test.com'`,
     )
@@ -365,6 +388,7 @@ describe('Lazy expiration', () => {
   })
 
   it('match_run status is now FINISHED in DB', async () => {
+    await expire()
     const result = await pool.query(
       `SELECT status FROM match_runs WHERE mentee_email = 'mentee1@test.com' ORDER BY created_at DESC LIMIT 1`,
     )
@@ -372,6 +396,7 @@ describe('Lazy expiration', () => {
   })
 
   it('GET /api/matches/past returns the finished match', async () => {
+    await expire()
     const { status, data } = await get('/api/matches/past?email=mentee1@test.com')
     assert.equal(status, 200)
     assert.ok(data.matches.length >= 1)
@@ -381,6 +406,7 @@ describe('Lazy expiration', () => {
   })
 
   it('mentor also sees finished match in past', async () => {
+    await expire()
     const { data } = await get('/api/matches/past?email=mentor1@test.com')
     assert.ok(data.matches.length >= 1)
     assert.equal(data.matches[0].your_role, 'mentor')
@@ -399,16 +425,9 @@ describe('Lazy expiration', () => {
 describe('POST /api/matches/:match_id/select', () => {
   let approvedIds
 
-  before(async () => {
-    const { data: runData } = await post('/api/matches/run', { email: 'mentee2@test.com' })
-    const runId = runData.run.run_id
-
-    const candidates = await pool.query(
-      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank`,
-      [runId],
-    )
-    approvedIds = candidates.rows.map(r => r.match_id)
-
+  beforeEach(async () => {
+    const runId = await createRun('mentee2@test.com')
+    approvedIds = await candidateIds(runId)
     await post(`/api/admin/runs/${runId}/review`, { approved: approvedIds }, admin)
   })
 
@@ -429,7 +448,8 @@ describe('POST /api/matches/:match_id/select', () => {
   })
 
   it('other approved matches become REJECTED', async () => {
-    if (approvedIds.length < 2) return
+    assert.ok(approvedIds.length >= 2, 'need two approved matches for this test')
+    await post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' })
     const result = await pool.query(
       'SELECT status FROM matches WHERE match_id = $1',
       [approvedIds[1]],
@@ -438,6 +458,7 @@ describe('POST /api/matches/:match_id/select', () => {
   })
 
   it('returns 400 when selecting already-active match', async () => {
+    await post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' })
     const { status, data } = await post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' })
     assert.equal(status, 400)
     assert.ok(data.error.includes('ACTIVE'))
@@ -447,7 +468,7 @@ describe('POST /api/matches/:match_id/select', () => {
 // ── Dual-role user isolation ──────────────────────────────────────
 
 describe('Dual-role user sees only role-appropriate matches', () => {
-  before(async () => {
+  beforeEach(async () => {
     await pool.query(
       `INSERT INTO user_profiles (email, name, role, payload)
        VALUES ('dual@test.com', 'Dual User', 'both', '{"career_areas":["Engineering"],"climate_areas":["Energy"],"sectors":["Private"],"location":"SF, CA","w_horiz":3,"w_vert":3,"w_sector":3}')
@@ -527,21 +548,9 @@ describe('Dual-role user sees only role-appropriate matches', () => {
 // ── No mentors available ───────────────────────────────────────────
 
 describe('No mentors available', () => {
-  before(async () => {
+  beforeEach(async () => {
     await pool.query(
       `UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '0')`,
-    )
-    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee2@test.com'`)
-  })
-
-  after(async () => {
-    await pool.query(
-      `UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '2')
-       WHERE email = 'mentor1@test.com'`,
-    )
-    await pool.query(
-      `UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '1')
-       WHERE email = 'mentor2@test.com'`,
     )
   })
 
@@ -561,22 +570,14 @@ describe('Profile approval gating', () => {
     const { status, data } = await post('/api/matches/run', { email: 'mentee2@test.com' })
     assert.equal(status, 400)
     assert.ok(data.error.includes('under review'))
-    await pool.query(`UPDATE mentee_applications SET status = 'APPROVED' WHERE email = 'mentee2@test.com'`)
   })
 
   it('excludes PENDING mentors from matching pool', async () => {
-    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee2@test.com'`)
-    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee2@test.com'`)
-    await pool.query(`UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '2') WHERE email = 'mentor1@test.com'`)
-    await pool.query(`UPDATE mentor_applications SET payload = jsonb_set(payload, '{max_capacity}', '1') WHERE email = 'mentor2@test.com'`)
-
     await pool.query(`UPDATE mentor_applications SET status = 'PENDING' WHERE email = 'mentor1@test.com'`)
 
     const { status, data } = await post('/api/matches/run', { email: 'mentee2@test.com' })
     assert.equal(status, 200)
     assert.ok(data.run)
     assert.equal(data.total_scored, 1)
-
-    await pool.query(`UPDATE mentor_applications SET status = 'APPROVED' WHERE email = 'mentor1@test.com'`)
   })
 })
