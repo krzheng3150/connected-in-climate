@@ -5,6 +5,7 @@ import { rankMentors } from './matching.js'
 import { isMentor, isMentee } from './roles.js'
 import { notifyAdminsNewRun, notifyMatchActive, notifyMenteeMatchesReady } from './email.js'
 import { createMatchResources } from './resources.js'
+import { partnerView } from './partner-view.js'
 import { AUTO_APPROVE_MATCHES, AUTO_APPROVE_MATCH_COUNT, MENTORSHIP_DURATION_DAYS, requiresReview } from './flags.js'
 
 const router = Router()
@@ -157,6 +158,20 @@ router.post('/run', async (req, res, next) => {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
+
+      // Serialize runs per mentee and re-check under the lock. The check at the top of
+      // this handler is only a fast path: two concurrent requests (a retry, a second
+      // tab) can both pass it, and would otherwise each create a run.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`match_run:${mentee.email}`])
+      const concurrentRun = await client.query(
+        `SELECT 1 FROM match_runs
+         WHERE mentee_email = $1 AND status IN ('PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE')`,
+        [mentee.email],
+      )
+      if (concurrentRun.rows.length > 0) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: 'You already have matches in progress.' })
+      }
 
       const runResult = await client.query(
         `INSERT INTO match_runs (mentee_email, status, top_candidates, total_scored, code_commit)
@@ -322,7 +337,7 @@ router.get('/run/current', async (req, res, next) => {
         match_id: row.match_id,
         mentor_email: row.mentor_email,
         mentor_name: row.mentor_name,
-        mentor_payload: row.mentor_payload,
+        mentor_payload: partnerView(row.mentor_payload),
         mentee_email: row.mentee_email,
         mentee_name: row.mentee_name,
         status: row.status,
@@ -401,7 +416,7 @@ router.get('/', async (req, res, next) => {
       your_role: role,
       partner_email: row.partner_email,
       partner_name: row.partner_name,
-      partner_payload: row.partner_payload,
+      partner_payload: partnerView(row.partner_payload),
       status: row.status,
       final_score: parseFloat(row.final_score),
       created_at: row.created_at,
@@ -450,7 +465,7 @@ router.get('/past', async (req, res, next) => {
         your_role: isMentee ? 'mentee' : 'mentor',
         partner_email: isMentee ? row.mentor_email : row.mentee_email,
         partner_name: isMentee ? row.mentor_name : row.mentee_name,
-        partner_payload: isMentee ? row.mentor_payload : row.mentee_payload,
+        partner_payload: partnerView(isMentee ? row.mentor_payload : row.mentee_payload),
         status: row.status,
         final_score: parseFloat(row.final_score),
         created_at: row.created_at,
@@ -516,33 +531,9 @@ router.get('/:match_id', async (req, res, next) => {
       end_date: row.end_date,
       your_role: isMenteeViewer ? 'mentee' : 'mentor',
       partner: {
+        ...partnerView(partnerPayload),
         email: isMenteeViewer ? row.mentor_email : row.mentee_email,
         name: isMenteeViewer ? row.mentor_name : row.mentee_name,
-        preferred_name: partnerPayload?.preferred_name,
-        pronouns: partnerPayload?.pronouns,
-        photo_url: partnerPayload?.photo_url,
-        location: partnerPayload?.location,
-        career_level: partnerPayload?.career_level,
-        education_level: partnerPayload?.education_level,
-        years_experience: partnerPayload?.years_experience,
-        years_climate_experience: partnerPayload?.years_climate_experience,
-        management_experience: partnerPayload?.management_experience,
-        business_experience: partnerPayload?.business_experience,
-        international_experience: partnerPayload?.international_experience,
-        nonprofit_board_experience: partnerPayload?.nonprofit_board_experience,
-        top_strengths: partnerPayload?.top_strengths,
-        general_topics: partnerPayload?.general_topics,
-        top_topics: partnerPayload?.top_topics,
-        certifications: partnerPayload?.certifications,
-        interests_hobbies: partnerPayload?.interests_hobbies,
-        fun_fact: partnerPayload?.fun_fact,
-        links: partnerPayload?.links,
-        career_areas: partnerPayload?.career_areas,
-        climate_areas: partnerPayload?.climate_areas,
-        sectors: partnerPayload?.sectors,
-        motivation: partnerPayload?.motivation,
-        statement_of_intent: partnerPayload?.statement_of_intent,
-        scheduling_link: partnerPayload?.scheduling_link,
       },
       resources_folder_url: row.resources_folder_url,
     })

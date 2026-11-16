@@ -1,6 +1,6 @@
 process.env.ADMIN_EMAILS = 'admin@test.com'
 
-import { describe, it, before, after } from 'node:test'
+import { describe, it, before, after, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import { pool, setupDb, resetDb } from './test-db.js'
@@ -55,13 +55,6 @@ const SHARED = {
 
 before(async () => {
   await setupDb()
-  for (const m of MENTORS) {
-    await insertProfile(m, 'mentor', SHARED, { top_strengths: ['Topic A'], general_topics: [], motivation: 'Help.', max_capacity: 3 })
-  }
-  for (const e of MENTEES) {
-    await insertProfile(e, 'mentee', { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 }, { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
-  }
-
   const app = express()
   app.use(express.json())
   app.use('/api/matches', matchRouter)
@@ -69,6 +62,18 @@ before(async () => {
   app.use((err, _req, res, _next) => { res.status(500).json({ error: err.message }) })
   await new Promise(resolve => { server = app.listen(0, resolve) })
   baseUrl = `http://localhost:${server.address().port}`
+})
+
+// Every test starts from the same known state (mentors, two mentees, no runs) and builds
+// anything else itself, so tests pass in any order and on their own.
+beforeEach(async () => {
+  await resetDb()
+  for (const m of MENTORS) {
+    await insertProfile(m, 'mentor', SHARED, { top_strengths: ['Topic A'], general_topics: [], motivation: 'Help.', max_capacity: 3 })
+  }
+  for (const e of MENTEES) {
+    await insertProfile(e, 'mentee', { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 }, { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
+  }
 })
 
 after(async () => {
@@ -90,13 +95,13 @@ describe('POST /api/admin/runs/:run_id/reset', () => {
   })
 
   it('rejects a malformed block list', async () => {
-    const run = await latestRun('e1@test.com')
+    const run = await newRun('e1@test.com')
     const { status } = await post(`/api/admin/runs/${run.run_id}/reset`, { block_mentor_emails: 'm1@test.com' }, admin)
     assert.equal(status, 400)
   })
 
   it('rejects blocking a mentor who is not in the run', async () => {
-    const run = await latestRun('e1@test.com')
+    const run = await newRun('e1@test.com')
     const { status, data } = await post(`/api/admin/runs/${run.run_id}/reset`, { block_mentor_emails: ['stranger@test.com'] }, admin)
     assert.equal(status, 400)
     assert.match(data.error, /not a mentor in this run/)
@@ -104,7 +109,7 @@ describe('POST /api/admin/runs/:run_id/reset', () => {
   })
 
   it('cancels the run and closes open matches without blocking or re-running', async () => {
-    const run = await latestRun('e1@test.com')
+    const run = await newRun('e1@test.com')
     const other = await newRun('e2@test.com')
     const runsBefore = (await pool.query('SELECT count(*)::int AS n FROM match_runs WHERE mentee_email = $1', ['e1@test.com'])).rows[0].n
 
@@ -134,20 +139,23 @@ describe('POST /api/admin/runs/:run_id/reset', () => {
   })
 
   it('refuses to reset an already cancelled run', async () => {
-    const run = await latestRun('e1@test.com')
+    const run = await newRun('e1@test.com')
+    assert.equal((await post(`/api/admin/runs/${run.run_id}/reset`, {}, admin)).status, 200)
     const { status, data } = await post(`/api/admin/runs/${run.run_id}/reset`, {}, admin)
     assert.equal(status, 400)
     assert.match(data.error, /CANCELLED/)
   })
 
   it('lets the mentee request new matches after a reset', async () => {
+    const first = await newRun('e1@test.com')
+    assert.equal((await post(`/api/admin/runs/${first.run_id}/reset`, {}, admin)).status, 200)
     const { status } = await post('/api/matches/run', { email: 'e1@test.com' })
     assert.equal(status, 200)
     assert.notEqual((await latestRun('e1@test.com')).status, 'CANCELLED')
   })
 
   it('blocks selected mentors only, and they are excluded from the next run', async () => {
-    const run = await latestRun('e1@test.com')
+    const run = await newRun('e1@test.com')
     const { status, data } = await post(
       `/api/admin/runs/${run.run_id}/reset`,
       { reason: 'Conflict', block_mentor_emails: ['M1@test.com'] },
@@ -167,7 +175,7 @@ describe('POST /api/admin/runs/:run_id/reset', () => {
   })
 
   it('does not create a duplicate block when the pair is already blocked', async () => {
-    const run = await latestRun('e1@test.com')
+    const run = await newRun('e1@test.com')
     // Simulate a pre-existing block on a mentor that is in this run
     await pool.query(
       `INSERT INTO rejections (mentor_email, mentee_email, created_by) VALUES ('m2@test.com', 'e1@test.com', 'admin@test.com')`,
@@ -214,7 +222,7 @@ async function forceState(runId, runStatus) {
 describe('reset across run statuses', () => {
   const STATUSES = ['PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE']
 
-  before(async () => {
+  beforeEach(async () => {
     for (const [i] of STATUSES.entries()) {
       await insertProfile(`s${i}@test.com`, 'mentee',
         { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
@@ -289,15 +297,19 @@ describe('reject audit trail', () => {
 
 describe('GET /api/admin/matches run_status', () => {
   it('includes the run status on each match', async () => {
+    const old = await newRun('e1@test.com')
+    assert.equal((await post(`/api/admin/runs/${old.run_id}/reset`, {}, admin)).status, 200)
+    const current = await newRun('e1@test.com')
+
     const res = await fetch(`${baseUrl}/api/admin/matches?email=e1@test.com`, { headers: admin })
     const { matches } = await res.json()
     assert.ok(matches.length > 0)
     const valid = ['PENDING_REVIEW', 'AWAITING_MENTEE', 'ACTIVE', 'CANCELLED', 'FINISHED']
     assert.ok(matches.every(m => valid.includes(m.run_status)))
-    assert.ok(matches.some(m => m.run_status === 'CANCELLED'))
+    assert.ok(matches.filter(m => m.run_id === old.run_id).every(m => m.run_status === 'CANCELLED'))
 
-    const current = await latestRun('e1@test.com')
     const forCurrent = matches.filter(m => m.run_id === current.run_id)
+    assert.ok(forCurrent.length > 0)
     assert.ok(forCurrent.every(m => m.run_status === current.status))
   })
 })
@@ -358,9 +370,9 @@ describe('block list duplicates', () => {
   })
 
   it('deleting a block removes legacy duplicates too', async () => {
-    const [{ id }] = (await pool.query(
-      `SELECT id FROM rejections WHERE mentor_email = 'dupm@test.com' AND mentee_email = 'dupe@test.com'`,
-    )).rows
+    const created = await post('/api/admin/blocks', { mentor_email: 'dupm@test.com', mentee_email: 'dupe@test.com' }, admin)
+    assert.equal(created.status, 201)
+    const id = created.data.block_id
     // simulate a pre-existing duplicate
     await pool.query(`INSERT INTO rejections (mentor_email, mentee_email, created_by) VALUES ('dupm@test.com', 'dupe@test.com', 'admin@test.com')`)
     assert.equal(await count(), 2)
@@ -435,4 +447,66 @@ describe('lazy match expiry is atomic', () => {
       assert.equal((await latestRun(mentee)).status, 'FINISHED')
     })
   }
+})
+
+describe('concurrent run requests', () => {
+  // Make the run insert slow so every concurrent request passes the early
+  // "existing run?" check before the first one commits. Without a lock, each would then
+  // create its own run.
+  async function slowRunInserts() {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION test_slow_run_insert() RETURNS trigger AS $$
+      BEGIN PERFORM pg_sleep(0.4); RETURN NEW; END $$ LANGUAGE plpgsql`)
+    await pool.query(`CREATE TRIGGER test_slow_run_insert BEFORE INSERT ON match_runs FOR EACH ROW EXECUTE FUNCTION test_slow_run_insert()`)
+  }
+  async function normalRunInserts() {
+    await pool.query('DROP TRIGGER IF EXISTS test_slow_run_insert ON match_runs')
+    await pool.query('DROP FUNCTION IF EXISTS test_slow_run_insert()')
+  }
+
+  it('creates exactly one run when the same mentee requests matches at once', async () => {
+    await insertProfile('race@test.com', 'mentee',
+      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
+      { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
+
+    await slowRunInserts()
+    let results
+    try {
+      results = await Promise.all(
+        Array.from({ length: 4 }, () => post('/api/matches/run', { email: 'race@test.com' })),
+      )
+    } finally {
+      await normalRunInserts()
+    }
+
+    // Exactly one request creates a run. The rest are rejected as "already in progress"
+    // or find no free mentors; neither creates anything.
+    const created = results.filter(r => r.status === 200 && r.data.run)
+    assert.equal(created.length, 1, `expected one created run, got ${JSON.stringify(results.map(r => [r.status, r.data.run?.status ?? null]))}`)
+    for (const r of results.filter(x => x !== created[0])) {
+      assert.ok(
+        (r.status === 400 && /already have matches in progress/.test(r.data.error))
+          || (r.status === 200 && r.data.run === null),
+        `unexpected response ${r.status} ${JSON.stringify(r.data)}`,
+      )
+    }
+
+    const runs = await pool.query(`SELECT count(*)::int AS n FROM match_runs WHERE mentee_email = 'race@test.com'`)
+    assert.equal(runs.rows[0].n, 1)
+    // only one set of candidate matches exists, so no mentor is stranded by an orphan run
+    const runId = (await latestRun('race@test.com')).run_id
+    const stray = await pool.query(`SELECT count(*)::int AS n FROM matches WHERE mentee_email = 'race@test.com' AND run_id <> $1`, [runId])
+    assert.equal(stray.rows[0].n, 0)
+  })
+
+  it('still allows a new run after the previous one is reset', async () => {
+    await insertProfile('race@test.com', 'mentee',
+      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
+      { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
+    const run = await newRun('race@test.com')
+    const reset = await post(`/api/admin/runs/${run.run_id}/reset`, {}, admin)
+    assert.equal(reset.status, 200)
+    const again = await post('/api/matches/run', { email: 'race@test.com' })
+    assert.equal(again.status, 200)
+  })
 })
