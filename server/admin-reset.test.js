@@ -333,3 +333,106 @@ describe('reset is atomic', () => {
     assert.equal(logged.rows[0].n, 0)
   })
 })
+
+
+describe('block list duplicates', () => {
+  async function getJson(path) {
+    const res = await fetch(`${baseUrl}${path}`, { headers: admin })
+    return res.json()
+  }
+  async function del(path) {
+    const res = await fetch(`${baseUrl}${path}`, { method: 'DELETE', headers: admin })
+    return { status: res.status, data: await res.json() }
+  }
+  const count = async () => (await pool.query(
+    `SELECT count(*)::int AS n FROM rejections WHERE mentor_email = 'dupm@test.com' AND mentee_email = 'dupe@test.com'`,
+  )).rows[0].n
+
+  it('rejects a second block for the same pair (case-insensitive)', async () => {
+    const first = await post('/api/admin/blocks', { mentor_email: 'dupm@test.com', mentee_email: 'dupe@test.com' }, admin)
+    assert.equal(first.status, 201)
+    const second = await post('/api/admin/blocks', { mentor_email: 'DupM@test.com', mentee_email: 'dupe@TEST.com' }, admin)
+    assert.equal(second.status, 409)
+    assert.equal(second.data.block_id, first.data.block_id)
+    assert.equal(await count(), 1)
+  })
+
+  it('deleting a block removes legacy duplicates too', async () => {
+    const [{ id }] = (await pool.query(
+      `SELECT id FROM rejections WHERE mentor_email = 'dupm@test.com' AND mentee_email = 'dupe@test.com'`,
+    )).rows
+    // simulate a pre-existing duplicate
+    await pool.query(`INSERT INTO rejections (mentor_email, mentee_email, created_by) VALUES ('dupm@test.com', 'dupe@test.com', 'admin@test.com')`)
+    assert.equal(await count(), 2)
+    const { status } = await del(`/api/admin/blocks/${id}`)
+    assert.equal(status, 200)
+    assert.equal(await count(), 0)
+    const { blocks } = await getJson('/api/admin/blocks')
+    assert.ok(!blocks.some(b => b.mentor_email === 'dupm@test.com' && b.mentee_email === 'dupe@test.com'))
+  })
+
+  it('reject with block reuses an existing block instead of duplicating it', async () => {
+    await insertProfile('rj@test.com', 'mentee',
+      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
+      { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
+    const run = await newRun('rj@test.com')
+    await forceState(run.run_id, 'ACTIVE')
+    const m = (await pool.query(`SELECT match_id, mentor_email FROM matches WHERE run_id = $1 AND status = 'ACTIVE'`, [run.run_id])).rows[0]
+    await pool.query(`INSERT INTO rejections (mentor_email, mentee_email, created_by) VALUES ($1, 'rj@test.com', 'admin@test.com')`, [m.mentor_email])
+
+    const { status, data } = await post(`/api/admin/matches/${m.match_id}/reject`, { block: true, reason: 'x' }, admin)
+    assert.equal(status, 200)
+    assert.equal(data.block_created, false)
+    assert.equal(data.already_blocked, true)
+    const n = (await pool.query(`SELECT count(*)::int AS n FROM rejections WHERE mentor_email = $1 AND mentee_email = 'rj@test.com'`, [m.mentor_email])).rows[0].n
+    assert.equal(n, 1)
+  })
+})
+
+describe('lazy match expiry is atomic', () => {
+  async function installFailingRunTrigger() {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION test_fail_run_finish() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.status = 'FINISHED' THEN RAISE EXCEPTION 'forced failure'; END IF;
+        RETURN NEW;
+      END $$ LANGUAGE plpgsql`)
+    await pool.query(`CREATE TRIGGER test_fail_run_finish BEFORE UPDATE ON match_runs FOR EACH ROW EXECUTE FUNCTION test_fail_run_finish()`)
+  }
+  async function removeTrigger() {
+    await pool.query('DROP TRIGGER IF EXISTS test_fail_run_finish ON match_runs')
+    await pool.query('DROP FUNCTION IF EXISTS test_fail_run_finish()')
+  }
+
+  for (const [label, url] of [
+    ['run/current', email => `/api/matches/run/current?email=${email}`],
+    ['matches list', email => `/api/matches?email=${email}&role=mentee`],
+  ]) {
+    it(`${label}: if finishing the run fails, matches are not left FINISHED`, async () => {
+      const mentee = label === 'run/current' ? 'xp1@test.com' : 'xp2@test.com'
+      await insertProfile(mentee, 'mentee',
+        { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
+        { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
+      const run = await newRun(mentee)
+      await forceState(run.run_id, 'ACTIVE')
+      await pool.query(`UPDATE matches SET end_date = now() - interval '1 day' WHERE run_id = $1 AND status = 'ACTIVE'`, [run.run_id])
+
+      await installFailingRunTrigger()
+      try {
+        const res = await fetch(`${baseUrl}${url(mentee)}`)
+        assert.equal(res.status, 500)
+      } finally {
+        await removeTrigger()
+      }
+      // Nothing half-applied: match still ACTIVE, run still ACTIVE
+      const m = await pool.query(`SELECT status FROM matches WHERE run_id = $1 AND status IN ('ACTIVE','FINISHED')`, [run.run_id])
+      assert.deepEqual(m.rows.map(r => r.status), ['ACTIVE'])
+      assert.equal((await latestRun(mentee)).status, 'ACTIVE')
+
+      // With the failure gone, expiry completes consistently
+      const ok = await fetch(`${baseUrl}${url(mentee)}`)
+      assert.equal(ok.status, 200)
+      assert.equal((await latestRun(mentee)).status, 'FINISHED')
+    })
+  }
+})

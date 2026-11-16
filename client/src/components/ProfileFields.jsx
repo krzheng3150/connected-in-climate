@@ -25,6 +25,12 @@ const LABEL_LOOKUP = {
   country: 'countries',
 }
 
+// Always renders 0-5 stars, even if a stored rating is out of range.
+export function starString(rating) {
+  const n = Math.max(0, Math.min(5, Math.round(Number(rating)) || 0))
+  return '★'.repeat(n) + '☆'.repeat(5 - n)
+}
+
 export function lbl(field, id) {
   const lookupKey = LABEL_LOOKUP[field] || field
   return LABELS[lookupKey]?.[id] ?? id
@@ -71,7 +77,7 @@ function humanize(key) {
   return key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
-function fieldName(key) {
+export function fieldName(key) {
   return FIELD_NAMES[key] || humanize(key)
 }
 

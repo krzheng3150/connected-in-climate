@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { lbl, ProfileDetail } from '../components/ProfileFields.jsx'
+import { lbl, fieldName, ProfileDetail, starString } from '../components/ProfileFields.jsx'
 import ConfirmationModal from '../components/ConfirmationModal.jsx'
 import NavBar from '../components/NavBar.jsx'
 
@@ -846,7 +846,7 @@ function AdminMatchCard({ match: m, headers }) {
         const data = await res.json()
         setStatus('REJECTED')
         setRejecting(false)
-        setActionMsg(`Rejected${data.block_created ? ' + blocked' : ''}`)
+        setActionMsg(`Rejected${data.block_created || data.already_blocked ? ' + blocked' : ''}`)
       } else {
         const data = await res.json()
         setActionMsg(data.error || 'Failed to reject')
@@ -949,6 +949,8 @@ function ScoreBreakdown({ payload }) {
   if (!s) return <pre className="admin-json">{JSON.stringify(payload, null, 2)}</pre>
 
   const pct = (v) => v != null ? Math.round(v * 100) + '%' : 'N/A'
+  // Geo scoring is always on. Matches computed before that change carry an explicit enabled:false.
+  const geoOn = !!s.geo && s.geo.enabled !== false
 
   return (
     <div className="admin-scores">
@@ -970,7 +972,7 @@ function ScoreBreakdown({ payload }) {
         <div className="admin-score-detail">
           {s.topic.details.map((d, i) => (
             <div key={i}>
-              #{d.rank} {d.topic}: {d.matched_in === 'none'
+              #{d.rank} {lbl('topics', d.topic)}: {d.matched_in === 'none'
                 ? 'no match'
                 : `${d.matched_in} → ${d.score}`}
               {' '}(discounted: {d.discounted})
@@ -990,10 +992,10 @@ function ScoreBreakdown({ payload }) {
 
       <div className="admin-score-row">
         <span>Geo</span>
-        <span>{s.geo.enabled ? pct(s.geo.score) : 'off'}</span>
+        <span>{geoOn ? pct(s.geo.score) : 'off'}</span>
         <span className="admin-weight">w={s.weights_used.geo ?? '—'}</span>
       </div>
-      {s.geo.enabled && (
+      {geoOn && (
         <div className="admin-score-detail">
           {s.geo.reason}
           {s.geo.mentee_location && ` · Mentee: ${s.geo.mentee_location}`}
@@ -1009,7 +1011,7 @@ function ScoreBreakdown({ payload }) {
       {s.experience?.details.length > 0 && (
         <div className="admin-score-detail">
           {s.experience.details.map((d, i) => (
-            <div key={i}>{d.topic} → {d.field}: {d.matched ? '✓' : '✗'} ({d.mentor_value ?? 'missing'})</div>
+            <div key={i}>{lbl('topics', d.topic)} → {fieldName(d.field)}: {d.matched ? '✓' : '✗'} ({d.mentor_value != null ? lbl(d.field, d.mentor_value) : 'missing'})</div>
           ))}
         </div>
       )}
@@ -1110,7 +1112,7 @@ function FeedbackTab({ headers }) {
             <div key={fb.feedback_id} className="admin-card">
               <div className="admin-card-header">
                 <strong>{fb.submitter_email}</strong>
-                {fb.rating && <span className="feedback-rating">{'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}</span>}
+                {fb.rating && <span className="feedback-rating">{starString(fb.rating)}</span>}
               </div>
               <div className="admin-card-meta">
                 <span>Match: {fb.mentee_email} → {fb.mentor_email}</span>

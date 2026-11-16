@@ -6,7 +6,7 @@ import express from 'express'
 import { pool, setupDb, resetDb } from './test-db.js'
 import matchRouter from './match-api.js'
 import adminRouter from './admin-api.js'
-import { _testGetSent, _testClear, notifyAdminsNewApplication, notifyApplicantApproved } from './email.js'
+import { _testGetSent, _testClear, notifyAdminsNewApplication, notifyApplicantApproved, notifyAdminsNewRun, notifyMatchActive, notifyMenteeMatchesReady, escapeHtml } from './email.js'
 
 let server, baseUrl
 
@@ -322,5 +322,56 @@ describe('Email: no notification on cancelled review', () => {
 
     const sent = _testGetSent()
     assert.equal(sent.length, 0)
+  })
+})
+
+
+// ── HTML escaping of user-provided values ─────────────────────────
+
+describe('Email: HTML escaping', () => {
+  beforeEach(() => _testClear())
+  const EVIL = '<img src=x onerror=alert(1)> & "q"'
+
+  it('escapeHtml neutralizes markup characters', () => {
+    assert.equal(escapeHtml(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;')
+    assert.equal(escapeHtml(null), '')
+  })
+
+  function assertSafe(html) {
+    assert.ok(!html.includes('<img'), 'raw tag must not appear')
+    assert.ok(html.includes('&lt;img'), 'escaped tag should appear')
+  }
+
+  it('escapes names in the admin new-application email', () => {
+    notifyAdminsNewApplication(['a@test.com'], EVIL, 'x@test.com', 'mentee')
+    assertSafe(_testGetSent()[0].html)
+  })
+
+  it('escapes the name in the applicant-approved email', () => {
+    notifyApplicantApproved('x@test.com', EVIL)
+    assertSafe(_testGetSent()[0].html)
+  })
+
+  it('escapes mentee name/email in the new-run admin email', () => {
+    notifyAdminsNewRun(['a@test.com'], EVIL, 'x@test.com')
+    assertSafe(_testGetSent()[0].html)
+  })
+
+  it('escapes both names in the match-active emails', () => {
+    notifyMatchActive('mentor@test.com', EVIL, 'mentee@test.com', EVIL)
+    const sent = _testGetSent()
+    assert.equal(sent.length, 2)
+    for (const m of sent) assertSafe(m.html)
+  })
+
+  it('escapes the name in the matches-ready email', () => {
+    notifyMenteeMatchesReady('x@test.com', EVIL, 2)
+    assertSafe(_testGetSent()[0].html)
+  })
+
+  it('keeps the sent log bounded', () => {
+    for (let i = 0; i < 350; i++) notifyApplicantApproved(`u${i}@test.com`, 'Name')
+    assert.ok(_testGetSent().length <= 200)
+    assert.equal(_testGetSent().at(-1).to, 'u349@test.com')
   })
 })

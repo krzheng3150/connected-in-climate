@@ -219,6 +219,44 @@ describe('POST /api/feedback', () => {
     assert.ok(data.created_at)
   })
 
+  for (const bad of [0, 6, -1, 3.5, 'abc', 100000]) {
+    it(`rejects rating ${JSON.stringify(bad)}`, async () => {
+      const matchId = await getMatchId()
+      const { status, data } = await post('/api/feedback', {
+        match_id: matchId, email: 'mentee@test.com', text: 'x', rating: bad,
+      })
+      assert.equal(status, 400)
+      assert.match(data.error, /rating/)
+    })
+  }
+
+  it('accepts a numeric-string rating and an omitted rating', async () => {
+    const matchId = await getMatchId()
+    const a = await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'x', rating: '4' })
+    const b = await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'x' })
+    assert.equal(a.status, 201)
+    assert.equal(b.status, 201)
+    const stored = await pool.query(`SELECT rating FROM feedbacks WHERE feedback_id = $1`, [a.data.feedback_id])
+    assert.equal(stored.rows[0].rating, 4)
+  })
+
+  it('rejects feedback on a non-active match, but allows FINISHED', async () => {
+    const matchId = await getMatchId()
+    try {
+      for (const st of ['CANDIDATE', 'STORED', 'REJECTED', 'APPROVED']) {
+        await pool.query(`UPDATE matches SET status = $2 WHERE match_id = $1`, [matchId, st])
+        const { status, data } = await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'x' })
+        assert.equal(status, 400, st)
+        assert.match(data.error, /not accepted/)
+      }
+      await pool.query(`UPDATE matches SET status = 'FINISHED' WHERE match_id = $1`, [matchId])
+      const ok = await post('/api/feedback', { match_id: matchId, email: 'mentee@test.com', text: 'after the end' })
+      assert.equal(ok.status, 201)
+    } finally {
+      await pool.query(`UPDATE matches SET status = 'ACTIVE' WHERE match_id = $1`, [matchId])
+    }
+  })
+
   it('also logs a FEEDBACK action', async () => {
     const matchId = await getMatchId()
     const { data } = await get(`/api/actions?match_id=${matchId}&email=mentee@test.com`)

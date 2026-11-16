@@ -5,12 +5,25 @@ const SEND_EMAIL = process.env.SEND_EMAIL === '1' || process.env.SEND_EMAIL === 
 const FROM = process.env.EMAIL_FROM || 'Connected in Climate <noreply@climateactionforge.com>'
 const APP_URL = process.env.APP_URL || 'https://connected-in-climate-n42zu.ondigitalocean.app'
 
+// Recent-send log, used by tests. Bounded so it can't grow without limit in production.
+const MAX_SENT_LOG = 200
 const sent = []
 export function _testGetSent() { return sent }
 export function _testClear() { sent.length = 0 }
 
+// User-provided values (names, emails) must be escaped before going into HTML.
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 async function send(to, subject, html) {
-  sent.push({ to, subject })
+  sent.push({ to, subject, html })
+  if (sent.length > MAX_SENT_LOG) sent.shift()
   if (!resend || !SEND_EMAIL) {
     console.log(`[email] skipped (sending disabled): to=${to} subject="${subject}"`)
     return
@@ -39,7 +52,7 @@ function wrap(body) {
 export function notifyAdminsNewApplication(adminEmails, name, email, role) {
   const subject = `New application: ${name} (${role})`
   const html = wrap(`
-    <p><strong>${name}</strong> (${email}) has submitted a <strong>${role}</strong> application and is waiting for approval.</p>
+    <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) has submitted a <strong>${escapeHtml(role)}</strong> application and is waiting for approval.</p>
     <p><a href="${APP_URL}/admin" style="color: #2d6a4f;">Review applications →</a></p>
   `)
   for (const addr of adminEmails) {
@@ -52,7 +65,7 @@ export function notifyApplicantApproved(email, name) {
     email,
     'Your Connected in Climate application has been approved!',
     wrap(`
-      <p>Hi ${name},</p>
+      <p>Hi ${escapeHtml(name)},</p>
       <p>Great news — your application has been approved! You can now log in and get started.</p>
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">Go to your dashboard →</a></p>
     `),
@@ -62,7 +75,7 @@ export function notifyApplicantApproved(email, name) {
 export function notifyAdminsNewRun(adminEmails, menteeName, menteeEmail) {
   const subject = `New match run: ${menteeName} is pending review`
   const html = wrap(`
-    <p><strong>${menteeName}</strong> (${menteeEmail}) has submitted a match request and is waiting for admin review.</p>
+    <p><strong>${escapeHtml(menteeName)}</strong> (${escapeHtml(menteeEmail)}) has submitted a match request and is waiting for admin review.</p>
     <p><a href="${APP_URL}/admin" style="color: #2d6a4f;">Review pending matches →</a></p>
   `)
   for (const email of adminEmails) {
@@ -75,7 +88,7 @@ export function notifyMatchActive(mentorEmail, mentorName, menteeEmail, menteeNa
     mentorEmail,
     `You've been matched with ${menteeName}!`,
     wrap(`
-      <p>Great news! You've been matched with <strong>${menteeName}</strong> as their mentor.</p>
+      <p>Great news! You've been matched with <strong>${escapeHtml(menteeName)}</strong> as their mentor.</p>
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">View your match →</a></p>
     `),
   )
@@ -83,7 +96,7 @@ export function notifyMatchActive(mentorEmail, mentorName, menteeEmail, menteeNa
     menteeEmail,
     `Your match with ${mentorName} is confirmed!`,
     wrap(`
-      <p>Great news! You've been matched with <strong>${mentorName}</strong> as your mentor.</p>
+      <p>Great news! You've been matched with <strong>${escapeHtml(mentorName)}</strong> as your mentor.</p>
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">View your match →</a></p>
     `),
   )
@@ -94,7 +107,7 @@ export function notifyMenteeMatchesReady(menteeEmail, menteeName, approvedCount)
     menteeEmail,
     `Your mentor matches are ready — pick your favorite!`,
     wrap(`
-      <p>Hi ${menteeName},</p>
+      <p>Hi ${escapeHtml(menteeName)},</p>
       <p>The admin team has approved <strong>${approvedCount} mentor${approvedCount > 1 ? 's' : ''}</strong> for you. Log in to review them and pick the one you'd like to work with.</p>
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">Choose your mentor →</a></p>
     `),

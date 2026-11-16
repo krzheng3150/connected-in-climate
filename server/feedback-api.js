@@ -14,6 +14,13 @@ router.post('/', async (req, res, next) => {
     if (!email) return res.status(400).json({ error: 'email is required' })
     if (!text || !text.trim()) return res.status(400).json({ error: 'text is required' })
 
+    // rating is optional; when given it must be a whole number from 1 to 5
+    const hasRating = rating !== undefined && rating !== null && rating !== ''
+    const ratingNum = hasRating ? Number(rating) : null
+    if (hasRating && (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5)) {
+      return res.status(400).json({ error: 'rating must be a whole number from 1 to 5' })
+    }
+
     const match = await pool.query(
       'SELECT mentor_email, mentee_email, status FROM matches WHERE match_id = $1',
       [match_id],
@@ -27,12 +34,17 @@ router.post('/', async (req, res, next) => {
     if (row.mentor_email !== normalEmail && row.mentee_email !== normalEmail) {
       return res.status(403).json({ error: 'not authorized for this match' })
     }
+    // Feedback is about a mentorship that has started. FINISHED is allowed because
+    // matches are expired lazily and feedback right after the end date is legitimate.
+    if (!['ACTIVE', 'FINISHED'].includes(row.status)) {
+      return res.status(400).json({ error: `feedback is not accepted for a ${row.status} match` })
+    }
 
     const result = await pool.query(
       `INSERT INTO feedbacks (match_id, submitter_email, text, rating, payload)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING feedback_id, created_at`,
-      [match_id, normalEmail, text.trim(), rating ?? null, payload ? JSON.stringify(payload) : null],
+      [match_id, normalEmail, text.trim(), ratingNum, payload ? JSON.stringify(payload) : null],
     )
 
     await pool.query(

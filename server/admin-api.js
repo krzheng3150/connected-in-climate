@@ -479,18 +479,29 @@ router.post('/matches/:match_id/reject', async (req, res, next) => {
       )
 
       let blockId = null
+      let alreadyBlocked = false
       if (block) {
-        const blockResult = await client.query(
-          `INSERT INTO rejections (mentor_email, mentee_email, match_id, reason, created_by)
-           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [row.mentor_email, row.mentee_email, match_id, reason || null, req.adminEmail],
+        const existingBlock = await client.query(
+          `SELECT id FROM rejections
+           WHERE lower(mentor_email) = lower($1) AND lower(mentee_email) = lower($2) LIMIT 1`,
+          [row.mentor_email, row.mentee_email],
         )
-        blockId = blockResult.rows[0].id
+        if (existingBlock.rows.length > 0) {
+          alreadyBlocked = true
+          blockId = existingBlock.rows[0].id
+        } else {
+          const blockResult = await client.query(
+            `INSERT INTO rejections (mentor_email, mentee_email, match_id, reason, created_by)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [row.mentor_email, row.mentee_email, match_id, reason || null, req.adminEmail],
+          )
+          blockId = blockResult.rows[0].id
+        }
       }
 
       await client.query('COMMIT')
       console.log(`[admin] reject: match_id=${match_id} admin=${req.adminEmail} block=${!!block}`)
-      res.json({ status: 'REJECTED', block_created: !!block, block_id: blockId })
+      res.json({ status: 'REJECTED', block_created: !!block && !alreadyBlocked, already_blocked: alreadyBlocked, block_id: blockId })
     } catch (err) {
       await client.query('ROLLBACK')
       throw err
@@ -635,10 +646,23 @@ router.post('/blocks', async (req, res, next) => {
       return res.status(400).json({ error: 'mentor_email and mentee_email are required' })
     }
 
+    const mentorKey = mentor_email.toLowerCase().trim()
+    const menteeKey = mentee_email.toLowerCase().trim()
+
+    // One block per pair: a duplicate would survive deleting the first, leaving the pair blocked.
+    const existing = await pool.query(
+      `SELECT id FROM rejections
+       WHERE lower(mentor_email) = $1 AND lower(mentee_email) = $2 LIMIT 1`,
+      [mentorKey, menteeKey],
+    )
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'This pair is already blocked.', block_id: existing.rows[0].id })
+    }
+
     const result = await pool.query(
       `INSERT INTO rejections (mentor_email, mentee_email, reason, created_by)
        VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-      [mentor_email.toLowerCase().trim(), mentee_email.toLowerCase().trim(), reason || null, req.adminEmail],
+      [mentorKey, menteeKey, reason || null, req.adminEmail],
     )
 
     console.log(`[admin] block created: mentor=${mentor_email} mentee=${mentee_email} by=${req.adminEmail}`)
@@ -655,14 +679,20 @@ router.post('/blocks', async (req, res, next) => {
 
 router.delete('/blocks/:id', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'DELETE FROM rejections WHERE id = $1 RETURNING id',
+    const target = await pool.query(
+      'SELECT mentor_email, mentee_email FROM rejections WHERE id = $1',
       [req.params.id],
     )
-    if (result.rows.length === 0) {
+    if (target.rows.length === 0) {
       return res.status(404).json({ error: 'block not found' })
     }
-    console.log(`[admin] block deleted: id=${req.params.id} by=${req.adminEmail}`)
+    // Remove every row for the pair, so legacy duplicates can't keep it blocked.
+    const result = await pool.query(
+      `DELETE FROM rejections
+       WHERE lower(mentor_email) = lower($1) AND lower(mentee_email) = lower($2) RETURNING id`,
+      [target.rows[0].mentor_email, target.rows[0].mentee_email],
+    )
+    console.log(`[admin] block deleted: id=${req.params.id} rows=${result.rows.length} by=${req.adminEmail}`)
     res.json({ deleted: true })
   } catch (err) {
     next(err)

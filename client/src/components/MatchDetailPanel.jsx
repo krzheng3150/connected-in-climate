@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { lbl, ProfileDetail } from './ProfileFields.jsx'
+import { lbl, ProfileDetail, starString } from './ProfileFields.jsx'
 import BookCallButton from './BookCallButton.jsx'
 
 export default function MatchDetailPanel({ matchId, onClose }) {
@@ -210,7 +210,7 @@ export default function MatchDetailPanel({ matchId, onClose }) {
                 <div key={fb.feedback_id} className="feedback-item">
                   <div className="feedback-item-header">
                     <span className="feedback-author">You</span>
-                    {fb.rating && <span className="feedback-rating">{'★'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}</span>}
+                    {fb.rating && <span className="feedback-rating">{starString(fb.rating)}</span>}
                     <span className="feedback-date">
                       {new Date(fb.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>

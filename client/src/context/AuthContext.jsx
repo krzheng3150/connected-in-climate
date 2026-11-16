@@ -92,7 +92,7 @@ export function AuthProvider({ children }) {
 
   const loggedIn = !AUTH_ENABLED ? (!!testEmail || isSignedIn) : isSignedIn
   const user = profile
-  const hasProfile = profile?.has_profile !== false
+  const hasProfile = profile?.has_profile === true
 
   return (
     <AuthContext.Provider value={{ user, hasProfile, loading, error, isSignedIn: loggedIn, refreshProfile: fetchProfile, testEmail, testLogin, testLogout }}>

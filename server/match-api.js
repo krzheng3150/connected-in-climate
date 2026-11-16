@@ -9,6 +9,22 @@ import { AUTO_APPROVE_MATCHES, AUTO_APPROVE_MATCH_COUNT, MENTORSHIP_DURATION_DAY
 
 const router = Router()
 
+// Run several statements atomically on one connection.
+async function inTransaction(fn) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const out = await fn(client)
+    await client.query('COMMIT')
+    return out
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 const TOP_CANDIDATES = 5
 
 // ── Code commit tracking ───────────────────────────────────────────
@@ -125,7 +141,7 @@ router.post('/run', async (req, res, next) => {
       reliability_multiplier: 1.0,
       menteeEmbedding: mentee.embedding,
     })
-    console.log(`[match] scored ${results.length} mentors (${filtered.total_eligible} eligible) in ${Date.now() - matchStart}ms`)
+    console.log(`[match] scored ${results.length} mentors (${filtered.length} filtered out) in ${Date.now() - matchStart}ms`)
 
     if (results.length === 0) {
       return res.json({ run: null, message: 'No mentors available right now', filtered })
@@ -276,8 +292,10 @@ router.get('/run/current', async (req, res, next) => {
         [run.run_id],
       )
       if (expired.rows.length > 0) {
-        await pool.query(`UPDATE matches SET status = 'FINISHED' WHERE run_id = $1 AND status = 'ACTIVE'`, [run.run_id])
-        await pool.query(`UPDATE match_runs SET status = 'FINISHED' WHERE run_id = $1`, [run.run_id])
+        await inTransaction(async (db) => {
+          await db.query(`UPDATE matches SET status = 'FINISHED' WHERE run_id = $1 AND status = 'ACTIVE'`, [run.run_id])
+          await db.query(`UPDATE match_runs SET status = 'FINISHED' WHERE run_id = $1`, [run.run_id])
+        })
         return res.json({ run: null })
       }
     }
@@ -347,20 +365,22 @@ router.get('/', async (req, res, next) => {
     const partnerAppTable = role === 'mentor' ? 'mentee_applications' : 'mentor_applications'
 
     // Lazy-expire any active matches past their end date
-    await pool.query(
-      `UPDATE matches SET status = 'FINISHED'
-       WHERE ${myCol} = $1
-         AND status = 'ACTIVE' AND end_date IS NOT NULL AND end_date < now()`,
-      [normalEmail],
-    )
-    await pool.query(
-      `UPDATE match_runs SET status = 'FINISHED'
-       WHERE run_id IN (
-         SELECT DISTINCT run_id FROM matches
-         WHERE ${myCol} = $1 AND status = 'FINISHED'
-       ) AND status = 'ACTIVE'`,
-      [normalEmail],
-    )
+    await inTransaction(async (db) => {
+      await db.query(
+        `UPDATE matches SET status = 'FINISHED'
+         WHERE ${myCol} = $1
+           AND status = 'ACTIVE' AND end_date IS NOT NULL AND end_date < now()`,
+        [normalEmail],
+      )
+      await db.query(
+        `UPDATE match_runs SET status = 'FINISHED'
+         WHERE run_id IN (
+           SELECT DISTINCT run_id FROM matches
+           WHERE ${myCol} = $1 AND status = 'FINISHED'
+         ) AND status = 'ACTIVE'`,
+        [normalEmail],
+      )
+    })
 
     const result = await pool.query(
       `SELECT m.match_id, m.status, m.final_score, m.rank,
