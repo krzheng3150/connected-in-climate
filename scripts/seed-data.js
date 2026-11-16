@@ -237,7 +237,6 @@ function buildMentorPayload(idx) {
     business_experience: pick(BUSINESS, s + 9),
     international_experience: pick(INTERNATIONAL, s + 10),
     nonprofit_board_experience: pick(NONPROFIT_BOARD, s + 11),
-    geo_match_preference: s % 3 !== 0,
     interests_hobbies: pickN(HOBBIES, 2 + (s % 2), s + 12),
     fun_fact: pick(FUN_FACTS, s + 13),
   }
@@ -286,7 +285,6 @@ function buildMenteePayload(idx) {
     w_horiz: wH,
     w_vert: wV,
     w_sector: wS,
-    geo_match_preference: s % 4 !== 0,
     interests_hobbies: pickN(HOBBIES, 2, s + 9),
     fun_fact: pick(FUN_FACTS, s + 10),
   }
@@ -344,9 +342,7 @@ function addLocations(payload, city, country, idx) {
   const extra = pick(LOCATIONS_OPEN.filter(l => l !== cityLabel), idx + 50)
   if (idx % 4 === 0) open.push(extra)
   payload.locations_open_to = open
-  if (payload.geo_match_preference) {
-    payload.geo_match_distance_km = pick([50, 80, 100, 150, 200, 300], idx)
-  }
+  payload.geo_match_distance_km = pick([50, 80, 100, 150, 200, 300], idx)
 }
 
 function addLinks(payload, name, idx) {

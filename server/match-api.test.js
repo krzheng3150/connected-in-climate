@@ -44,7 +44,7 @@ before(async () => {
       shared: {
         career_areas: ['Engineering'], climate_areas: ['Energy'], sectors: ['Private'],
         w_horiz: 3, w_vert: 3, w_sector: 3,
-        city: 'San Francisco', country: 'US', geo_match_preference: true,
+        city: 'San Francisco', country: 'US',
       },
       menteePayload: {
         top_topics: ['Topic A', 'Topic C'], statement_of_intent: 'Transition to climate.',
@@ -55,7 +55,7 @@ before(async () => {
       shared: {
         career_areas: ['Strategy'], climate_areas: ['Policy'], sectors: ['Government'],
         w_horiz: 1, w_vert: 5, w_sector: 3,
-        city: 'Washington', country: 'US', geo_match_preference: false,
+        city: 'Washington', country: 'US',
       },
       menteePayload: {
         top_topics: ['Topic X'], statement_of_intent: 'Policy career.',

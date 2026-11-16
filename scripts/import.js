@@ -47,8 +47,6 @@ const INT_FIELDS = new Set([
   'max_capacity', 'w_horiz', 'w_vert', 'w_sector', 'geo_match_distance_km',
 ])
 
-const BOOL_FIELDS = new Set(['geo_match_preference'])
-
 const LINKS_PREFIX = 'links_'
 
 function usage() {
@@ -67,7 +65,6 @@ CSV format:
     top_strengths, general_topics, top_topics, certifications,
     interests_hobbies, locations_open_to.
   - Integer fields: max_capacity, w_horiz, w_vert, w_sector, geo_match_distance_km.
-  - Boolean fields: geo_match_preference (true/false/yes/no/1/0).
   - Link columns: any column starting with "links_" (e.g. links_linkedin,
     links_phone) is collected into a "links" object.
   - Free-text fields: statement_of_intent, motivation, fun_fact, etc.
@@ -127,13 +124,6 @@ function parseCSV(text) {
 }
 
 // ── Parse a boolean from CSV string ─────────────────────────────────
-
-function parseBool(val) {
-  const s = String(val).toLowerCase().trim()
-  if (['true', 'yes', '1'].includes(s)) return true
-  if (['false', 'no', '0', ''].includes(s)) return false
-  return null
-}
 
 function unknownValueMsg(columnName, value, registryField) {
   const field = registryField || columnName
@@ -197,10 +187,6 @@ function parseRow(raw) {
       const n = Number(val)
       if (Number.isNaN(n)) { errors.push(`${key} must be a number, got "${val}"`); continue }
       payload[key] = n
-    } else if (BOOL_FIELDS.has(key)) {
-      const b = parseBool(val)
-      if (b === null) { errors.push(`${key} must be true/false, got "${val}"`); continue }
-      payload[key] = b
     } else {
       payload[key] = String(val)
     }

@@ -25,7 +25,6 @@ function makeMentee(overrides = {}) {
       top_topics: ['Topic A', 'Topic B', 'Topic C'],
       statement_of_intent: 'I want to transition into climate tech.',
       city: 'San Francisco', country: 'US',
-      geo_match_preference: true,
       w_horiz: 3, w_vert: 3, w_sector: 3,
       ...overrides.payload,
     },
@@ -464,17 +463,9 @@ describe('Phase 4: scoreSemantic', () => {
 // ── Phase 4b: Geographic Proximity ─────────────────────────────────
 
 describe('Phase 4b: scoreGeo', () => {
-  it('returns 0 with enabled=false when geo disabled', () => {
-    const mentee = makeMentee({ payload: { geo_match_preference: false } })
-    const mentor = makeMentor()
-    const result = scoreGeo(mentee, mentor)
-    assert.equal(result.enabled, false)
-    assert.equal(result.score, 0)
-  })
-
   it('scores exact city match as 1.0', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: 'San Francisco', country: 'US',
+      city: 'San Francisco', country: 'US',
     }})
     const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = scoreGeo(mentee, mentor)
@@ -484,7 +475,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('scores same country as 0.5', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: 'Oakland', country: 'US',
+      city: 'Oakland', country: 'US',
     }})
     const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = scoreGeo(mentee, mentor)
@@ -494,7 +485,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('scores remote mentor as 0.25', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: 'New York', country: 'US',
+      city: 'New York', country: 'US',
     }})
     const mentor = makeMentor({ payload: {
       city: 'London', country: 'GB',
@@ -507,7 +498,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('scores different locations as 0', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: 'New York', country: 'US',
+      city: 'New York', country: 'US',
     }})
     const mentor = makeMentor({ payload: {
       city: 'London', country: 'GB',
@@ -520,7 +511,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('handles missing mentee location', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: '', country: '',
+      city: '', country: '',
     }})
     const mentor = makeMentor()
     const result = scoreGeo(mentee, mentor)
@@ -530,7 +521,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('is case-insensitive for city', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: 'san francisco', country: 'US',
+      city: 'san francisco', country: 'US',
     }})
     const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = scoreGeo(mentee, mentor)
@@ -539,7 +530,7 @@ describe('Phase 4b: scoreGeo', () => {
 
   it('handles missing mentor location', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: true, city: 'San Francisco', country: 'US',
+      city: 'San Francisco', country: 'US',
     }})
     const mentor = makeMentor({ payload: { city: '', country: '' } })
     const result = scoreGeo(mentee, mentor)
@@ -667,8 +658,8 @@ describe('Phase 5: scoreExperienceSignals', () => {
 // ── Phase 6: Final Score Synthesis ─────────────────────────────────
 
 describe('Phase 6: computeMatch', () => {
-  it('uses geo weights when geo enabled', () => {
-    const mentee = makeMentee({ payload: { geo_match_preference: true, city: 'San Francisco', country: 'US' } })
+  it('always applies geo weights', () => {
+    const mentee = makeMentee({ payload: { city: 'San Francisco', country: 'US' } })
     const mentor = makeMentor({ payload: { city: 'San Francisco', country: 'US' } })
     const result = computeMatch(mentee, mentor)
     assert.equal(result.scores.weights_used.categorical, 0.35)
@@ -677,31 +668,22 @@ describe('Phase 6: computeMatch', () => {
     assert.equal(result.scores.weights_used.experience, 0.10)
   })
 
-  it('uses non-geo weights when geo disabled', () => {
-    const mentee = makeMentee({ payload: { geo_match_preference: false } })
-    const mentor = makeMentor()
-    const result = computeMatch(mentee, mentor)
-    assert.equal(result.scores.weights_used.categorical, 0.40)
-    assert.equal(result.scores.weights_used.topic, 0.30)
-    assert.equal(result.scores.weights_used.geo, null)
-    assert.equal(result.scores.weights_used.experience, 0.15)
-  })
-
   it('final score is weighted sum', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: false,
       career_areas: ['A'], climate_areas: ['X'], sectors: ['S'],
       top_topics: ['T1'],
       w_horiz: 1, w_vert: 1, w_sector: 1,
+      city: 'San Francisco', country: 'US',
     }})
     const mentor = makeMentor({ payload: {
       career_areas: ['A'], climate_areas: ['X'], sectors: ['S'],
       top_strengths: ['T1'], general_topics: [],
+      city: 'San Francisco', country: 'US',
     }})
-    // categorical = 1.0, topic = 1.0, semantic = 0 (null), experience = 0 (no mapped topics)
-    // 0.40 * 1.0 + 0.30 * 1.0 + 0.15 * 0 + 0.15 * 0 = 0.70
+    // categorical = 1.0, topic = 1.0, semantic = 0 (null), geo = 1.0 (exact city), experience = 0
+    // 0.35 * 1.0 + 0.25 * 1.0 + 0.15 * 0 + 0.15 * 1.0 + 0.10 * 0 = 0.75
     const result = computeMatch(mentee, mentor)
-    approxEqual(result.scores.final, 0.70)
+    approxEqual(result.scores.final, 0.75)
   })
 
   it('includes snapshots with all profile data', () => {
@@ -715,7 +697,7 @@ describe('Phase 6: computeMatch', () => {
   })
 
   it('null embedding scores as 0 and is noted in weights', () => {
-    const mentee = makeMentee({ payload: { geo_match_preference: false } })
+    const mentee = makeMentee()
     const mentor = makeMentor()
     const result = computeMatch(mentee, mentor)
     assert.equal(result.scores.semantic.cosine_similarity, null)
@@ -739,7 +721,6 @@ describe('Phase 6: computeMatch', () => {
 
   it('applies reliability_multiplier to final score', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: false,
       career_areas: ['A'], climate_areas: ['X'], sectors: ['S'],
       top_topics: ['T1'], w_horiz: 1, w_vert: 1, w_sector: 1,
     }})
@@ -755,7 +736,6 @@ describe('Phase 6: computeMatch', () => {
 
   it('embeddings contribute to final score when present', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: false,
       career_areas: ['A'], climate_areas: ['X'], sectors: ['S'],
       top_topics: ['T1'], w_horiz: 1, w_vert: 1, w_sector: 1,
     }})
@@ -780,7 +760,6 @@ describe('Phase 6: computeMatch', () => {
 describe('rankMentors', () => {
   it('ranks mentors by final score descending', () => {
     const mentee = makeMentee({ payload: {
-      geo_match_preference: false,
       career_areas: ['A'], climate_areas: ['X'], sectors: ['S'],
       top_topics: ['T1'], w_horiz: 1, w_vert: 1, w_sector: 1,
     }})
@@ -867,7 +846,6 @@ describe('Integration: sample profiles', () => {
       top_topics: ['Translating non-climate experience', 'Job search strategy', 'Networking'],
       statement_of_intent: '6 years building high-throughput distributed ledger systems.',
       city: 'San Francisco', country: 'US',
-      geo_match_preference: true,
       w_horiz: 5, w_vert: 1, w_sector: 2,
     },
     embedding: null,
@@ -882,7 +860,6 @@ describe('Integration: sample profiles', () => {
       top_topics: ['Navigating career transition', 'International work', 'Climate Policy'],
       statement_of_intent: '4 years as a policy analyst at a DC think tank.',
       city: 'Washington', country: 'US',
-      geo_match_preference: true,
       w_horiz: 2, w_vert: 5, w_sector: 3,
     },
     embedding: null,

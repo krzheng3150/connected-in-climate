@@ -169,11 +169,6 @@ function formatLocation(payload) {
 }
 
 export function scoreGeo(mentee, mentor) {
-  const enabled = mentee.payload?.geo_match_preference === true
-  if (!enabled) {
-    return { enabled: false, score: 0 }
-  }
-
   const menteeCountry = (mentee.payload?.country ?? '').toUpperCase()
   const mentorCountry = (mentor.payload?.country ?? '').toUpperCase()
   const menteeCity = (mentee.payload?.city ?? '').toLowerCase().trim()
@@ -183,7 +178,6 @@ export function scoreGeo(mentee, mentor) {
 
   if (!menteeCountry || !mentorCountry) {
     return {
-      enabled: true,
       mentee_location: menteeLoc || null,
       mentor_location: mentorLoc || null,
       reason: 'missing_location',
@@ -193,7 +187,6 @@ export function scoreGeo(mentee, mentor) {
 
   if (menteeCountry === mentorCountry && menteeCity && mentorCity && menteeCity === mentorCity) {
     return {
-      enabled: true,
       mentee_location: menteeLoc,
       mentor_location: mentorLoc,
       reason: 'exact_city_match',
@@ -203,7 +196,6 @@ export function scoreGeo(mentee, mentor) {
 
   if (menteeCountry === mentorCountry) {
     return {
-      enabled: true,
       mentee_location: menteeLoc,
       mentor_location: mentorLoc,
       reason: 'same_country',
@@ -214,7 +206,6 @@ export function scoreGeo(mentee, mentor) {
   const mentorOpen = (mentor.payload?.locations_open_to ?? []).map(v => (v ?? '').toLowerCase().trim())
   if (mentorOpen.includes('remote')) {
     return {
-      enabled: true,
       mentee_location: menteeLoc,
       mentor_location: mentorLoc,
       reason: 'mentor_open_to_remote',
@@ -223,7 +214,6 @@ export function scoreGeo(mentee, mentor) {
   }
 
   return {
-    enabled: true,
     mentee_location: menteeLoc,
     mentor_location: mentorLoc,
     reason: 'no_geo_match',
@@ -257,8 +247,7 @@ export function scoreExperienceSignals(mentee, mentor) {
 
 // ── Phase 6: Final Score Synthesis ─────────────────────────────────
 
-const WEIGHTS_GEO = { categorical: 0.35, topic: 0.25, semantic: 0.15, geo: 0.15, experience: 0.10 }
-const WEIGHTS_NO_GEO = { categorical: 0.40, topic: 0.30, semantic: 0.15, geo: 0, experience: 0.15 }
+const WEIGHTS = { categorical: 0.35, topic: 0.25, semantic: 0.15, geo: 0.15, experience: 0.10 }
 
 function buildSnapshot(profile) {
   return { email: profile.email, name: profile.name, role: profile.role, ...profile.payload }
@@ -274,9 +263,6 @@ export function computeMatch(mentee, mentor, opts = {}) {
   const geo = scoreGeo(mentee, mentor)
   const experience = scoreExperienceSignals(mentee, mentor)
 
-  const geoEnabled = geo.enabled
-  const w = geoEnabled ? { ...WEIGHTS_GEO } : { ...WEIGHTS_NO_GEO }
-
   const semanticVal = semantic.cosine_similarity ?? 0
   const geoVal = geo.score ?? 0
   const expVal = experience.score ?? 0
@@ -284,11 +270,11 @@ export function computeMatch(mentee, mentor, opts = {}) {
   const reliability = opts.reliability_multiplier ?? 1.0
 
   const final = reliability * (
-    w.categorical * categorical.combined +
-    w.topic * topic.combined +
-    w.semantic * semanticVal +
-    w.geo * geoVal +
-    w.experience * expVal
+    WEIGHTS.categorical * categorical.combined +
+    WEIGHTS.topic * topic.combined +
+    WEIGHTS.semantic * semanticVal +
+    WEIGHTS.geo * geoVal +
+    WEIGHTS.experience * expVal
   )
 
   return {
@@ -302,11 +288,11 @@ export function computeMatch(mentee, mentor, opts = {}) {
       geo,
       experience,
       weights_used: {
-        categorical: w.categorical,
-        topic: w.topic,
-        semantic: semantic.cosine_similarity === null ? `${w.semantic} (no data, scored as 0)` : w.semantic,
-        geo: geoEnabled ? w.geo : null,
-        experience: w.experience,
+        categorical: WEIGHTS.categorical,
+        topic: WEIGHTS.topic,
+        semantic: semantic.cosine_similarity === null ? `${WEIGHTS.semantic} (no data, scored as 0)` : WEIGHTS.semantic,
+        geo: WEIGHTS.geo,
+        experience: WEIGHTS.experience,
       },
       reliability_multiplier: reliability,
       final: round(final),

@@ -59,7 +59,7 @@ before(async () => {
     await insertProfile(m, 'mentor', SHARED, { top_strengths: ['Topic A'], general_topics: [], motivation: 'Help.', max_capacity: 3 })
   }
   for (const e of MENTEES) {
-    await insertProfile(e, 'mentee', { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1, geo_match_preference: false }, { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
+    await insertProfile(e, 'mentee', { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 }, { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
   }
 
   const app = express()
@@ -217,7 +217,7 @@ describe('reset across run statuses', () => {
   before(async () => {
     for (const [i] of STATUSES.entries()) {
       await insertProfile(`s${i}@test.com`, 'mentee',
-        { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1, geo_match_preference: false },
+        { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
         { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
     }
   })
@@ -243,7 +243,7 @@ describe('reset across run statuses', () => {
 
   it('leaves STORED (below-cutoff) matches untouched', async () => {
     await insertProfile('stored@test.com', 'mentee',
-      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1, geo_match_preference: false },
+      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
       { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
     const run = await newRun('stored@test.com')
     await forceState(run.run_id, 'PENDING_REVIEW')
@@ -265,7 +265,7 @@ describe('reset across run statuses', () => {
 describe('reject audit trail', () => {
   it('logs an action for each sibling match closed alongside the rejected one', async () => {
     await insertProfile('audit@test.com', 'mentee',
-      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1, geo_match_preference: false },
+      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
       { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
     const run = await newRun('audit@test.com')
     await forceState(run.run_id, 'AWAITING_MENTEE')
@@ -305,7 +305,7 @@ describe('GET /api/admin/matches run_status', () => {
 describe('reset is atomic', () => {
   it('rolls everything back if a block insert fails', async () => {
     await insertProfile('atomic@test.com', 'mentee',
-      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1, geo_match_preference: false },
+      { ...SHARED, w_horiz: 1, w_vert: 1, w_sector: 1 },
       { top_topics: ['Topic A'], statement_of_intent: 'Transition.' })
     const run = await newRun('atomic@test.com')
     await forceState(run.run_id, 'PENDING_REVIEW')
