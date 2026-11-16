@@ -63,6 +63,9 @@ const ARRAY_FREE_TEXT_FIELDS = new Set([
   'certifications', 'interests_hobbies', 'locations_open_to',
 ])
 
+const MIN_CAPACITY = 1
+const MAX_CAPACITY = 10
+
 const MAX_TEXT_LENGTH = {
   statement_of_intent: 2000,
   motivation: 2000,
@@ -78,7 +81,8 @@ const MAX_TEXT_LENGTH = {
   commitment_name: 200,
 }
 
-// ── TF-IDF (same algorithm as import.js) ─────────────────────────
+// ── Embeddings: per-document term frequency, hashed into fixed buckets ──
+// No corpus-wide IDF, so a profile's embedding never depends on other profiles.
 
 function tokenize(text) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1)
@@ -157,6 +161,16 @@ function validateFields(body) {
   const links = {}
 
   for (const [key, val] of Object.entries(fields)) {
+    // Checked before the empty-value skip so that 0 is rejected, not silently dropped.
+    if (key === 'max_capacity' && val !== '' && val != null) {
+      const n = Number(val)
+      if (!Number.isInteger(n) || n < MIN_CAPACITY || n > MAX_CAPACITY) {
+        errors.push({ field: key, message: `max_capacity must be a whole number from ${MIN_CAPACITY} to ${MAX_CAPACITY}.` })
+      } else {
+        allPayload[key] = n
+      }
+      continue
+    }
     if (!val || (Array.isArray(val) && val.length === 0)) continue
 
     if (key === 'links' && typeof val === 'object' && !Array.isArray(val)) {
@@ -205,11 +219,16 @@ function validateFields(body) {
   if (Object.keys(links).length) allPayload.links = links
 
   const rolePayloadFields = role === 'mentor' ? MENTOR_PAYLOAD_FIELDS : MENTEE_PAYLOAD_FIELDS
+  const otherRoleFields = role === 'mentor' ? MENTEE_PAYLOAD_FIELDS : MENTOR_PAYLOAD_FIELDS
   const sharedPayload = {}
   const rolePayload = {}
   for (const [key, val] of Object.entries(allPayload)) {
     if (rolePayloadFields.has(key)) {
       rolePayload[key] = val
+    } else if (otherRoleFields.has(key)) {
+      // Belongs to the other role's application (the form resends the merged
+      // payload for users with both roles); never store it as shared.
+      continue
     } else {
       sharedPayload[key] = val
     }
@@ -336,10 +355,22 @@ router.patch('/', async (req, res, next) => {
     try {
       await client.query('BEGIN')
 
+      // Keep shared keys the form doesn't manage (e.g. matching weights, geo
+      // preferences). Form-managed keys are replaced, so clearing a field works.
+      // Role-specific keys never belong in the shared payload, so they are dropped.
+      const current = await client.query(
+        'SELECT payload FROM user_profiles WHERE email = $1 FOR UPDATE',
+        [email],
+      )
+      const preserved = Object.fromEntries(
+        Object.entries(current.rows[0]?.payload ?? {}).filter(([k]) =>
+          !SHARED_PAYLOAD_FIELDS.has(k) && !MENTOR_PAYLOAD_FIELDS.has(k) && !MENTEE_PAYLOAD_FIELDS.has(k)),
+      )
+
       await client.query(
         `UPDATE user_profiles SET name = $2, payload = $3, updated_at = now()
          WHERE email = $1`,
-        [email, name, JSON.stringify(sharedPayload)],
+        [email, name, JSON.stringify({ ...preserved, ...sharedPayload })],
       )
 
       await client.query(

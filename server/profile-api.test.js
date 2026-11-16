@@ -451,3 +451,91 @@ describe('PATCH /api/profiles', () => {
     assert.ok(after.rows[0].updated_at > before.rows[0].updated_at)
   })
 })
+
+// ── max_capacity, role-field isolation, PATCH preservation ─────────
+
+describe('max_capacity', () => {
+  it('stores max_capacity in the mentor application payload', async () => {
+    const { status } = await post({ ...VALID_MENTOR, max_capacity: 4 })
+    assert.equal(status, 201)
+    const app = await getMentorApp('new@test.com')
+    assert.equal(app.payload.max_capacity, 4)
+    assert.equal((await getProfile('new@test.com')).payload.max_capacity, undefined)
+  })
+
+  it('accepts a numeric string and stores a number', async () => {
+    await post({ ...VALID_MENTOR, max_capacity: '3' })
+    assert.strictEqual((await getMentorApp('new@test.com')).payload.max_capacity, 3)
+  })
+
+  for (const bad of [0, 11, -1, 2.5, 'lots']) {
+    it(`rejects max_capacity=${JSON.stringify(bad)}`, async () => {
+      const { status, data } = await post({ ...VALID_MENTOR, max_capacity: bad })
+      assert.equal(status, 400)
+      assert.ok(data.errors.some(e => e.field === 'max_capacity'))
+    })
+  }
+
+  it('updates max_capacity on PATCH', async () => {
+    await post({ ...VALID_MENTOR, max_capacity: 1 })
+    await patch({ ...VALID_MENTOR, max_capacity: 5 })
+    assert.equal((await getMentorApp('new@test.com')).payload.max_capacity, 5)
+  })
+
+  it('does not store max_capacity for a mentee application', async () => {
+    await post({ ...VALID_MENTEE, max_capacity: 3 })
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.max_capacity, undefined)
+    const app = await getMenteeApp('new@test.com')
+    assert.equal(app.payload.max_capacity, undefined)
+  })
+})
+
+describe('PATCH payload handling', () => {
+  it('keeps shared keys the form does not manage (e.g. matching weights)', async () => {
+    await post(VALID_MENTEE)
+    await pool.query(
+      `UPDATE user_profiles SET payload = payload || '{"w_horiz":5,"w_vert":2}' WHERE email = 'new@test.com'`,
+    )
+    await patch({ ...VALID_MENTEE, fun_fact: 'Updated.' })
+    const profile = await getProfile('new@test.com')
+    assert.equal(profile.payload.w_horiz, 5)
+    assert.equal(profile.payload.w_vert, 2)
+    assert.equal(profile.payload.fun_fact, 'Updated.')
+  })
+
+  it('still lets a user clear a form-managed field', async () => {
+    await post({ ...VALID_MENTEE, organization: 'ClimateOrg' })
+    assert.equal((await getProfile('new@test.com')).payload.organization, 'ClimateOrg')
+    await patch({ ...VALID_MENTEE, organization: '' })
+    assert.equal((await getProfile('new@test.com')).payload.organization, undefined)
+  })
+
+  it('does not copy mentee-only fields into the shared payload when a "both" user edits as mentor', async () => {
+    await post({ ...VALID_MENTEE, top_topics: ['job_search'] })
+    await post(VALID_MENTOR)
+    const shared = (await getProfile('new@test.com')).payload
+    const mentee = (await getMenteeApp('new@test.com')).payload
+    const mentor = (await getMentorApp('new@test.com')).payload
+    // The form resends the merged payload
+    await patch({ ...shared, ...mentor, ...mentee, name: 'Both User', role: 'mentor' })
+
+    const after = (await getProfile('new@test.com')).payload
+    assert.equal(after.statement_of_intent, undefined)
+    assert.equal(after.top_topics, undefined)
+    // mentee application is untouched
+    const menteeAfter = (await getMenteeApp('new@test.com')).payload
+    assert.equal(menteeAfter.statement_of_intent, VALID_MENTEE.statement_of_intent)
+  })
+
+  it('removes role-specific keys that were previously polluted into the shared payload', async () => {
+    await post(VALID_MENTEE)
+    await pool.query(
+      `UPDATE user_profiles SET payload = payload || '{"statement_of_intent":"stale","top_topics":["x"]}' WHERE email = 'new@test.com'`,
+    )
+    await patch({ ...VALID_MENTEE })
+    const shared = (await getProfile('new@test.com')).payload
+    assert.equal(shared.statement_of_intent, undefined)
+    assert.equal(shared.top_topics, undefined)
+  })
+})

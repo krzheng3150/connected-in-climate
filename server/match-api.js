@@ -199,6 +199,27 @@ router.post('/run', async (req, res, next) => {
         notifyMenteeMatchesReady(mentee.email, menteeProfile.name, approveCount)
       }
 
+      // A single auto-approved match activates immediately, so create its shared
+      // Drive folder now (same as the select and admin-review paths).
+      if (shouldAutoApprove && runStatus === 'ACTIVE') {
+        const activeMatch = finalResults[0]
+        const activeId = (await pool.query(
+          `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'ACTIVE'`,
+          [runId],
+        )).rows[0]?.match_id
+        createMatchResources({
+          mentorEmail: activeMatch.mentor_snapshot.email,
+          mentorName: activeMatch.mentor_snapshot.name,
+          menteeEmail: mentee.email,
+          menteeName: menteeProfile.name,
+          matchDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        }).then(async (folderUrl) => {
+          if (folderUrl && activeId) {
+            await pool.query('UPDATE matches SET resources_folder_url = $1 WHERE match_id = $2', [folderUrl, activeId])
+          }
+        }).catch(err => console.error('[resources] creation failed:', err.message))
+      }
+
       const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean)
       if (!shouldAutoApprove && adminEmails.length > 0) {
         notifyAdminsNewRun(adminEmails, menteeProfile.name, mentee.email)
