@@ -573,12 +573,22 @@ router.post('/:match_id/select', async (req, res, next) => {
     try {
       await client.query('BEGIN')
 
-      await client.query(
+      // The status check above is only a fast path. Two requests (a second tab, a retry)
+      // can both pass it, so lock the run and activate only if the match is still
+      // APPROVED. Otherwise a second request could re-activate a match that the first
+      // one just rejected, leaving two ACTIVE matches in one run.
+      await client.query('SELECT run_id FROM match_runs WHERE run_id = $1 FOR UPDATE', [row.run_id])
+      const activated = await client.query(
         `UPDATE matches SET status = 'ACTIVE', activated_at = now(),
                 end_date = now() + make_interval(days => $2)
-         WHERE match_id = $1`,
+         WHERE match_id = $1 AND status = 'APPROVED'
+         RETURNING match_id`,
         [match_id, MENTORSHIP_DURATION_DAYS],
       )
+      if (activated.rows.length === 0) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: 'This match is no longer available to select.' })
+      }
 
       await client.query(
         `UPDATE matches SET status = 'REJECTED'

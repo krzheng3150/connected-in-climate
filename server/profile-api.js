@@ -257,6 +257,13 @@ router.post('/', async (req, res, next) => {
       return res.status(409).json({ error: `You already have a ${role} application.` })
     }
 
+    // Country drives location scoring (15% of a match), so it is required when the shared
+    // profile is created. A second application reuses the existing profile's country.
+    const hasSharedProfile = (await pool.query('SELECT 1 FROM user_profiles WHERE email = $1', [email])).rows.length > 0
+    if (!hasSharedProfile && !sharedPayload.country) {
+      return res.status(400).json({ errors: [{ field: 'country', message: 'Country is required.' }] })
+    }
+
     const autoApprove = ((role === 'mentor' && AUTO_APPROVE_MENTOR) || (role === 'mentee' && AUTO_APPROVE_MENTEE)) && !requiresReview(email)
     const appStatus = autoApprove ? 'APPROVED' : 'PENDING'
     const embedding = buildEmbedding(role, rolePayload)
@@ -347,6 +354,9 @@ router.patch('/', async (req, res, next) => {
     )
     if (existingApp.rows.length === 0) {
       return res.status(404).json({ error: `No ${role} application found.` })
+    }
+    if (!sharedPayload.country) {
+      return res.status(400).json({ errors: [{ field: 'country', message: 'Country is required.' }] })
     }
 
     const embedding = buildEmbedding(role, rolePayload)

@@ -171,6 +171,28 @@ describe('GET /api/profiles/me: payload merge precedence', () => {
   })
 })
 
+describe('GET /api/profiles/me: per-role payloads', () => {
+  it('returns each application\'s own payload so the edit form can prefill the role being edited', async () => {
+    await seed('both@test.com', {
+      shared: { city: 'Boston' },
+      mentor: { payload: { motivation: 'Help.', commitment_name: 'from mentor' } },
+      mentee: { payload: { statement_of_intent: 'Learn.', commitment_name: 'from mentee' } },
+    })
+    const { data } = await me('both@test.com')
+    assert.deepEqual(data.mentor_payload, { motivation: 'Help.', commitment_name: 'from mentor' })
+    assert.deepEqual(data.mentee_payload, { statement_of_intent: 'Learn.', commitment_name: 'from mentee' })
+    // the merged payload is unchanged
+    assert.equal(data.payload.commitment_name, 'from mentee')
+  })
+
+  it('is null for a role the user has not applied for', async () => {
+    await seed('solo@test.com', { mentee: { payload: { statement_of_intent: 'Learn.' } } })
+    const { data } = await me('solo@test.com')
+    assert.equal(data.mentor_payload, null)
+    assert.deepEqual(data.mentee_payload, { statement_of_intent: 'Learn.' })
+  })
+})
+
 describe('health check and unknown API routes', () => {
   it('GET /api/health is open and reports ok', async () => {
     const res = await fetch(`${baseUrl}/api/health`)

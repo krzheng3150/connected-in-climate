@@ -174,6 +174,15 @@ describe('POST /api/admin/runs/:run_id/reset', () => {
     assert.ok(emails.includes('m2@test.com') || emails.includes('m3@test.com'))
   })
 
+  it('treats an existing block as the same pair even if its email differs in case', async () => {
+    const run = await newRun('e1@test.com')
+    await pool.query(`INSERT INTO rejections (mentor_email, mentee_email, created_by) VALUES ('M2@Test.COM', 'E1@test.com', 'admin@test.com')`)
+    const { status, data } = await post(`/api/admin/runs/${run.run_id}/reset`, { block_mentor_emails: ['m2@test.com'] }, admin)
+    assert.equal(status, 200)
+    assert.equal(data.blocks_created, 0)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM rejections')).rows[0].n, 1)
+  })
+
   it('does not create a duplicate block when the pair is already blocked', async () => {
     const run = await newRun('e1@test.com')
     // Simulate a pre-existing block on a mentor that is in this run

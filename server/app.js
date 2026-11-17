@@ -100,6 +100,10 @@ app.get('/api/profiles/me', async (req, res, next) => {
       is_mentee: isMentee,
       preferred_name: row.payload?.preferred_name || null,
       payload: mergedPayload,
+      // Each application's own payload, so an edit form can prefill the role being edited
+      // (fields such as commitment_name exist in both and the merge above favors the mentee's).
+      mentor_payload: mentorApp?.payload ?? null,
+      mentee_payload: menteeApp?.payload ?? null,
       is_admin: isAdmin,
       has_profile: true,
       mentor_status: mentorApp?.status || null,

@@ -177,7 +177,8 @@ export default function MatchDetailPanel({ matchId, onClose }) {
         </p>
       )}
 
-      {match.status === 'ACTIVE' && (
+      {/* Feedback is accepted for ACTIVE and FINISHED matches (the API enforces the same). */}
+      {['ACTIVE', 'FINISHED'].includes(match.status) && (
         <div className="feedback-section">
           <h3>Feedback</h3>
           <form className="feedback-form" onSubmit={handleFeedbackSubmit}>

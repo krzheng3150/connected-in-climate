@@ -68,7 +68,13 @@ export default function Dashboard() {
       <main className="page-body">
         {editing && (
           <ApplicationForm
-            existingProfile={{ name: user.name, role: view, payload: user.payload }}
+            existingProfile={{
+              name: user.name,
+              role: view,
+              // The role being edited wins, so a dual-role user's mentor form is not
+              // prefilled with their mentee answers (and saved back over the mentor's).
+              payload: { ...user.payload, ...(view === 'mentor' ? user.mentor_payload : user.mentee_payload) },
+            }}
             onCancel={() => setEditing(false)}
           />
         )}

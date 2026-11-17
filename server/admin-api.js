@@ -572,7 +572,7 @@ router.post('/runs/:run_id/reset', async (req, res, next) => {
       let blocksCreated = 0
       for (const email of toBlock) {
         const exists = await client.query(
-          'SELECT 1 FROM rejections WHERE mentor_email = $1 AND mentee_email = $2',
+          'SELECT 1 FROM rejections WHERE lower(mentor_email) = lower($1) AND lower(mentee_email) = lower($2)',
           [email, mentee_email],
         )
         if (exists.rows.length > 0) continue

@@ -108,6 +108,37 @@ describe('Phase 1: filterEligible', () => {
     assert.ok(filtered[0].reasons.includes('active_match_exists'))
   })
 
+  it('excludes a mentor the mentee has already completed a mentorship with', () => {
+    const mentee = makeMentee()
+    const mentor = makeMentor()
+    const matches = [
+      { mentee_email: 'mentee@example.com', mentor_email: 'mentor@example.com', status: 'FINISHED' },
+    ]
+    const { eligible, filtered } = filterEligible(mentee, [mentor], matches, [])
+    assert.equal(eligible.length, 0)
+    assert.deepEqual(filtered[0].reasons, ['previously_matched'])
+  })
+
+  it('a finished mentorship only excludes that mentee, not others', () => {
+    const otherMentee = makeMentee({ email: 'other@example.com' })
+    const mentor = makeMentor()
+    const matches = [
+      { mentee_email: 'mentee@example.com', mentor_email: 'mentor@example.com', status: 'FINISHED' },
+    ]
+    const { eligible } = filterEligible(otherMentee, [mentor], matches, [])
+    assert.equal(eligible.length, 1)
+  })
+
+  it('a finished mentorship does not use up the mentor\'s capacity for other mentees', () => {
+    const otherMentee = makeMentee({ email: 'other@example.com' })
+    const mentor = makeMentor({ payload: { ...makeMentor().payload, max_capacity: 1 } })
+    const matches = [
+      { mentee_email: 'mentee@example.com', mentor_email: 'mentor@example.com', status: 'FINISHED' },
+    ]
+    const { eligible } = filterEligible(otherMentee, [mentor], matches, [])
+    assert.equal(eligible.length, 1)
+  })
+
   it('ignores non-ACTIVE matches', () => {
     const mentee = makeMentee()
     const mentor = makeMentor()

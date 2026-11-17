@@ -131,7 +131,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
 
   const STEP_FIELDS = {
     0: ['role'],
-    1: ['name', 'career_level', 'city'],
+    1: ['name', 'career_level', 'city', 'country'],
     2: ['climate_areas', 'career_areas'],
     3: ['statement_of_intent', 'motivation'],
   }
@@ -295,7 +295,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
             : isSecondApp
               ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
               : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
-          <button className="btn-primary" disabled={!isSecondApp && (!form.name?.trim() || !form.career_level || !form.city?.trim())} onClick={() => setStep(2)}>Next</button>
+          <button className="btn-primary" disabled={!isSecondApp && (!form.name?.trim() || !form.career_level || !form.city?.trim() || !form.country)} onClick={() => setStep(2)}>Next</button>
         </div>
       </div>
     )

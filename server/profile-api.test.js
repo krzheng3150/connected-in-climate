@@ -76,6 +76,7 @@ const VALID_MENTEE = {
   role: 'mentee',
   statement_of_intent: 'I want to learn about climate policy.',
   career_level: 'entry',
+  country: 'US',
   climate_areas: ['ai_climate'],
   career_areas: ['consulting'],
 }
@@ -85,6 +86,7 @@ const VALID_MENTOR = {
   role: 'mentor',
   motivation: 'I want to share my climate finance experience.',
   career_level: 'lead',
+  country: 'US',
   climate_areas: ['ai_climate'],
   career_areas: ['consulting'],
 }
@@ -537,5 +539,52 @@ describe('PATCH payload handling', () => {
     const shared = (await getProfile('new@test.com')).payload
     assert.equal(shared.statement_of_intent, undefined)
     assert.equal(shared.top_topics, undefined)
+  })
+})
+
+// ── Country is required ────────────────────────────────────────────
+
+describe('country is required', () => {
+  const { country: _omit, ...WITHOUT_COUNTRY } = VALID_MENTEE
+
+  it('rejects a new profile with no country', async () => {
+    const { status, data } = await post(WITHOUT_COUNTRY)
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'country'))
+    assert.equal(await getProfile('new@test.com'), null, 'nothing should be created')
+  })
+
+  it('rejects a blank country', async () => {
+    const { status, data } = await post({ ...VALID_MENTEE, country: '' })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'country'))
+  })
+
+  it('rejects an unknown country code', async () => {
+    const { status, data } = await post({ ...VALID_MENTEE, country: 'ZZ' })
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'country'))
+  })
+
+  it('a second application reuses the existing profile and does not need a country', async () => {
+    assert.equal((await post(VALID_MENTEE)).status, 201)
+    const { country: _c, city: _ci, ...secondApp } = VALID_MENTOR
+    const { status } = await post(secondApp)
+    assert.equal(status, 201)
+    assert.equal((await getProfile('new@test.com')).payload.country, 'US')
+  })
+
+  it('an edit cannot remove the country', async () => {
+    await post(VALID_MENTEE)
+    const { status, data } = await patch(WITHOUT_COUNTRY)
+    assert.equal(status, 400)
+    assert.ok(data.errors.some(e => e.field === 'country'))
+    assert.equal((await getProfile('new@test.com')).payload.country, 'US')
+  })
+
+  it('an edit can change the country', async () => {
+    await post(VALID_MENTEE)
+    assert.equal((await patch({ ...VALID_MENTEE, country: 'CA' })).status, 200)
+    assert.equal((await getProfile('new@test.com')).payload.country, 'CA')
   })
 })

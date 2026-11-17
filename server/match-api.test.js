@@ -420,6 +420,40 @@ describe('Lazy expiration', () => {
   })
 })
 
+// ── A finished mentorship is not repeated ─────────────────────────
+
+describe('Re-matching after a finished mentorship', () => {
+  it('does not offer the same mentor again', async () => {
+    const { matchId } = await activate()
+    const finished = (await pool.query('SELECT mentor_email FROM matches WHERE match_id = $1', [matchId])).rows[0].mentor_email
+    await pool.query(
+      `UPDATE matches SET activated_at = now() - interval '31 days', end_date = now() - interval '1 day' WHERE match_id = $1`,
+      [matchId],
+    )
+    await expire()
+
+    const { status, data } = await post('/api/matches/run', { email: 'mentee1@test.com' })
+    assert.equal(status, 200)
+    assert.equal(data.total_scored, 1, 'only the other mentor should be left')
+    const offered = (await pool.query('SELECT mentor_email FROM matches WHERE run_id = $1', [data.run.run_id])).rows.map(r => r.mentor_email)
+    assert.ok(!offered.includes(finished), 'the finished mentor must not be offered again')
+  })
+
+  it('still lets a different mentee be matched with that mentor', async () => {
+    const { matchId } = await activate()
+    const finished = (await pool.query('SELECT mentor_email FROM matches WHERE match_id = $1', [matchId])).rows[0].mentor_email
+    await pool.query(
+      `UPDATE matches SET activated_at = now() - interval '31 days', end_date = now() - interval '1 day' WHERE match_id = $1`,
+      [matchId],
+    )
+    await expire()
+
+    const runId = await createRun('mentee2@test.com')
+    const offered = (await pool.query('SELECT mentor_email FROM matches WHERE run_id = $1', [runId])).rows.map(r => r.mentor_email)
+    assert.ok(offered.includes(finished))
+  })
+})
+
 // ── Mentee selection flow ──────────────────────────────────────────
 
 describe('POST /api/matches/:match_id/select', () => {
@@ -455,6 +489,61 @@ describe('POST /api/matches/:match_id/select', () => {
       [approvedIds[1]],
     )
     assert.equal(result.rows[0].status, 'REJECTED')
+  })
+
+  // Make activation slow so that both requests pass the pre-transaction status check
+  // before either commits; without locking, each would then activate its own match.
+  async function slowActivation() {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION test_slow_activation() RETURNS trigger AS $$
+      BEGIN PERFORM pg_sleep(0.4); RETURN NEW; END $$ LANGUAGE plpgsql`)
+    await pool.query(`CREATE TRIGGER test_slow_activation BEFORE UPDATE ON matches FOR EACH ROW WHEN (NEW.status = 'ACTIVE') EXECUTE FUNCTION test_slow_activation()`)
+  }
+  async function normalActivation() {
+    await pool.query('DROP TRIGGER IF EXISTS test_slow_activation ON matches')
+    await pool.query('DROP FUNCTION IF EXISTS test_slow_activation()')
+  }
+  const activeIn = async runId =>
+    (await pool.query(`SELECT match_id FROM matches WHERE run_id = $1 AND status = 'ACTIVE'`, [runId])).rows
+
+  it('two simultaneous selections of different mentors activate exactly one', async () => {
+    assert.ok(approvedIds.length >= 2, 'need two approved matches')
+    const runId = (await pool.query('SELECT run_id FROM matches WHERE match_id = $1', [approvedIds[0]])).rows[0].run_id
+
+    await slowActivation()
+    let results
+    try {
+      results = await Promise.all([
+        post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' }),
+        post(`/api/matches/${approvedIds[1]}/select`, { email: 'mentee2@test.com' }),
+      ])
+    } finally {
+      await normalActivation()
+    }
+
+    assert.deepEqual(results.map(r => r.status).sort(), [200, 400])
+    assert.match(results.find(r => r.status === 400).data.error, /no longer available/)
+    assert.equal((await activeIn(runId)).length, 1, 'a run must never have two ACTIVE matches')
+    const rejected = await pool.query(`SELECT count(*)::int AS n FROM matches WHERE run_id = $1 AND status = 'REJECTED'`, [runId])
+    assert.equal(rejected.rows[0].n, approvedIds.length - 1)
+  })
+
+  it('selecting the same match twice at once succeeds once', async () => {
+    const runId = (await pool.query('SELECT run_id FROM matches WHERE match_id = $1', [approvedIds[0]])).rows[0].run_id
+    await slowActivation()
+    let results
+    try {
+      results = await Promise.all([
+        post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' }),
+        post(`/api/matches/${approvedIds[0]}/select`, { email: 'mentee2@test.com' }),
+      ])
+    } finally {
+      await normalActivation()
+    }
+    assert.deepEqual(results.map(r => r.status).sort(), [200, 400])
+    assert.equal((await activeIn(runId)).length, 1)
+    const selects = await pool.query(`SELECT count(*)::int AS n FROM match_actions WHERE match_id = $1 AND action_type = 'SELECT'`, [approvedIds[0]])
+    assert.equal(selects.rows[0].n, 1, 'the selection must be recorded once')
   })
 
   it('returns 400 when selecting already-active match', async () => {

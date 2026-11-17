@@ -25,6 +25,13 @@ export function filterEligible(mentee, mentors, activeMatches, blockList) {
       .filter(m => m.mentee_email === menteeEmail && IN_PROGRESS_STATUSES.has(m.status))
       .map(m => m.mentor_email),
   )
+  // A mentee is never matched again with a mentor they have already completed a
+  // mentorship with. (Matches in other states are covered above.)
+  const previousPartners = new Set(
+    activeMatches
+      .filter(m => m.mentee_email === menteeEmail && m.status === 'FINISHED')
+      .map(m => m.mentor_email),
+  )
   const blocked = new Set(
     blockList
       .filter(b => b.mentee_email === menteeEmail || b.mentor_email === menteeEmail)
@@ -39,6 +46,7 @@ export function filterEligible(mentee, mentors, activeMatches, blockList) {
     if (mentor.email === menteeEmail) reasons.push('self_match')
     if (!isMentor(mentor.role)) reasons.push('not_mentor')
     if (inProgressPartners.has(mentor.email)) reasons.push('active_match_exists')
+    if (previousPartners.has(mentor.email)) reasons.push('previously_matched')
     if (blocked.has(mentor.email)) reasons.push('blocked')
 
     const capacity = mentor.payload?.max_capacity ?? DEFAULT_MAX_CAPACITY
