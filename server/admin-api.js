@@ -128,11 +128,8 @@ router.get('/profiles', async (req, res, next) => {
     res.json({
       profile: {
         ...row,
-        payload: {
-          ...row.payload,
-          ...(mentorApp?.payload || {}),
-          ...(menteeApp?.payload || {}),
-        },
+        mentor_payload: mentorApp?.payload || null,
+        mentee_payload: menteeApp?.payload || null,
         mentor_status: mentorApp?.status || null,
         mentee_status: menteeApp?.status || null,
       },

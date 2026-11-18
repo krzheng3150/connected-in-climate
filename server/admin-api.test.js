@@ -165,12 +165,14 @@ describe('Admin auth', () => {
 // ── GET /api/admin/profiles ────────────────────────────────────────
 
 describe('GET /api/admin/profiles', () => {
-  it('returns profile by email', async () => {
+  it('returns profile by email with per-role payloads', async () => {
     const { status, data } = await get('/api/admin/profiles?email=mentor@test.com', admin)
     assert.equal(status, 200)
     assert.equal(data.profile.name, 'Mentor')
     assert.equal(data.profile.role, 'mentor')
-    assert.ok(data.profile.payload.career_areas)
+    assert.ok(data.profile.payload.career_areas, 'shared fields in payload')
+    assert.equal(data.profile.mentor_payload.motivation, 'Policy.', 'mentor fields separate')
+    assert.equal(data.profile.mentee_payload, null)
   })
 
   it('returns 404 for unknown email', async () => {

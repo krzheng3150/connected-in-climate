@@ -782,6 +782,7 @@ function ResetRunControl({ run, headers, onDone, onMessage }) {
 
 function ProfileCard({ profile }) {
   const joinDate = new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const hasPerRole = profile.mentor_payload || profile.mentee_payload
 
   return (
     <div className="admin-card">
@@ -794,6 +795,18 @@ function ProfileCard({ profile }) {
         <span>Joined {joinDate}</span>
       </div>
       <ProfileDetail payload={profile.payload} />
+      {hasPerRole && profile.mentor_payload && (
+        <>
+          <h4 style={{ margin: '1rem 0 0.25rem' }}>Mentor Application</h4>
+          <ProfileDetail payload={profile.mentor_payload} role="mentor" />
+        </>
+      )}
+      {hasPerRole && profile.mentee_payload && (
+        <>
+          <h4 style={{ margin: '1rem 0 0.25rem' }}>Mentee Application</h4>
+          <ProfileDetail payload={profile.mentee_payload} role="mentee" />
+        </>
+      )}
     </div>
   )
 }
