@@ -1,4 +1,5 @@
 import { COUNTRIES } from '../../../shared/countries.js'
+import { MENTOR_PAYLOAD_FIELDS, MENTEE_PAYLOAD_FIELDS, ORGANIZER_FIELDS } from '../../../shared/fields.js'
 
 export const LABELS = {
   countries: COUNTRIES,
@@ -99,9 +100,15 @@ const FIELD_ORDER = [
   'scheduling_link', 'links',
 ]
 
-export function ProfileDetail({ payload, exclude = [] }) {
+export function ProfileDetail({ payload, role, exclude = [] }) {
   if (!payload) return null
-  const excludeSet = new Set([...exclude, 'locations_open_to'])
+  const otherRoleFields = role === 'mentor' ? MENTEE_PAYLOAD_FIELDS
+    : role === 'mentee' ? MENTOR_PAYLOAD_FIELDS : null
+  const excludeSet = new Set([
+    ...exclude,
+    ...ORGANIZER_FIELDS,
+    ...(otherRoleFields || []),
+  ])
 
   const allKeys = Object.keys(payload)
   const ordered = []

@@ -131,7 +131,7 @@ export default function MatchDetailPanel({ matchId, onClose }) {
 
       <ProfileDetail
         payload={p}
-        exclude={['preferred_name', 'pronouns', 'city', 'country', 'timezone', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url', 'scheduling_link']}
+        exclude={['preferred_name', 'pronouns', 'city', 'country', 'timezone', 'career_level', 'education_level', 'years_experience', 'links', 'photo_url', 'scheduling_link', 'max_capacity']}
       />
 
       <div className="partner-section">

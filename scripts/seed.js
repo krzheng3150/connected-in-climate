@@ -63,17 +63,7 @@ function computeEmbeddings(texts) {
 
 // ── DB operations ──────────────────────────────────────────────────
 
-const MENTOR_PAYLOAD_FIELDS = new Set([
-  'motivation', 'eq_response', 'scheduling_link', 'commitment_name',
-  'management_experience', 'business_experience', 'international_experience',
-  'nonprofit_board_experience', 'freelance_experience',
-  'top_strengths', 'general_topics', 'max_capacity',
-])
-
-const MENTEE_PAYLOAD_FIELDS = new Set([
-  'statement_of_intent', 'relevant_projects', 'commitment_name',
-  'employment_situation', 'top_topics',
-])
+import { MENTOR_PAYLOAD_FIELDS, MENTEE_PAYLOAD_FIELDS } from '../shared/fields.js'
 
 function splitPayload(payload, role) {
   const shared = {}

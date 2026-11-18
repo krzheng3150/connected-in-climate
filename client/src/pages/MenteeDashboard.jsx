@@ -125,7 +125,7 @@ export default function MenteeDashboard() {
               <p style={{ marginBottom: '0.75rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
                 The algorithm will use your profile to find the best mentor match. Please review your submission:
               </p>
-              <ProfileDetail payload={user.payload} exclude={['max_capacity', 'w_horiz', 'w_vert', 'w_sector']} />
+              <ProfileDetail payload={user.payload} role="mentee" />
             </ConfirmationModal>
           )}
         </>
@@ -204,7 +204,7 @@ export default function MenteeDashboard() {
           {confirmSelect.mentor_payload && (
             <>
               <div style={{ fontSize: '0.875rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>Mentor profile:</div>
-              <ProfileDetail payload={confirmSelect.mentor_payload} exclude={['max_capacity', 'w_horiz', 'w_vert', 'w_sector']} />
+              <ProfileDetail payload={confirmSelect.mentor_payload} role="mentor" />
             </>
           )}
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '1rem', fontSize: '0.875rem', cursor: 'pointer' }}>

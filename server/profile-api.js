@@ -12,27 +12,9 @@ const router = Router()
 const EMBEDDING_DIMENSIONS = 1536
 
 // Fields that live in user_profiles.payload (shared identity)
-const SHARED_PAYLOAD_FIELDS = new Set([
-  'preferred_name', 'name_pronunciation', 'pronouns', 'city', 'country', 'organization', 'timezone', 'fun_fact',
-  'career_level', 'education_level', 'years_experience', 'years_climate_experience',
-  'career_areas', 'climate_areas', 'sectors',
-  'certifications', 'interests_hobbies', 'locations_open_to',
-  'additional_info', 'links',
-])
-
-// Fields that live in mentor_applications.payload
-const MENTOR_PAYLOAD_FIELDS = new Set([
-  'motivation', 'eq_response', 'scheduling_link', 'commitment_name',
-  'management_experience', 'business_experience', 'international_experience',
-  'nonprofit_board_experience', 'freelance_experience',
-  'top_strengths', 'general_topics', 'max_capacity',
-])
-
-// Fields that live in mentee_applications.payload
-const MENTEE_PAYLOAD_FIELDS = new Set([
-  'statement_of_intent', 'relevant_projects', 'commitment_name',
-  'employment_situation', 'top_topics',
-])
+import {
+  SHARED_PAYLOAD_FIELDS, MENTOR_PAYLOAD_FIELDS, MENTEE_PAYLOAD_FIELDS,
+} from '../shared/fields.js'
 
 const ENUM_SINGLE_FIELDS = new Set([
   'education_level', 'career_level', 'years_experience', 'years_climate_experience',
