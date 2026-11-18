@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { LABELS } from './ProfileFields.jsx'
 import { DEFAULT_MAX_CAPACITY } from '../../../shared/constants.js'
 import HowItWorksPanel from './HowItWorksPanel.jsx'
+import { stepComplete } from './form-validation.js'
 
 const ROLE_OPTIONS = [
   { id: 'mentee', label: 'Mentee', desc: 'I\'m looking for a mentor in climate.' },
@@ -295,7 +296,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
             : isSecondApp
               ? <button className="btn-secondary" onClick={onCancel}>Cancel</button>
               : <button className="btn-secondary" onClick={() => setStep(0)}>Back</button>}
-          <button className="btn-primary" disabled={!isSecondApp && (!form.name?.trim() || !form.career_level || !form.city?.trim() || !form.country)} onClick={() => setStep(2)}>Next</button>
+          <button className="btn-primary" disabled={!stepComplete(1, form, { isSecondApp })} onClick={() => setStep(2)}>Next</button>
         </div>
       </div>
     )
@@ -322,7 +323,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
         {errorsForStep(2).map((msg, i) => <p key={i} className="form-error">{msg}</p>)}
         <div className="form-actions">
           <button className="btn-secondary" onClick={() => setStep(1)}>Back</button>
-          <button className="btn-primary" disabled={!form.climate_areas?.length || !form.career_areas?.length} onClick={() => setStep(3)}>Next</button>
+          <button className="btn-primary" disabled={!stepComplete(2, form, {})} onClick={() => setStep(3)}>Next</button>
         </div>
       </div>
     )
@@ -427,7 +428,7 @@ export default function ApplicationForm({ existingProfile, forRole, onCancel }) 
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions">
         <button className="btn-secondary" onClick={() => setStep(2)}>Back</button>
-        <button className="btn-primary" disabled={submitting} onClick={handleSubmit}>
+        <button className="btn-primary" disabled={submitting || !stepComplete(3, form, { isMentor, isMentee })} onClick={handleSubmit}>
           {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Submit Application'}
         </button>
       </div>
