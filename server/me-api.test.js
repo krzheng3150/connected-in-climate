@@ -104,7 +104,6 @@ describe('GET /api/profiles/me: shape by situation', () => {
     assert.equal(data.is_mentee, false)
     assert.equal(data.mentor_status, 'APPROVED')
     assert.equal(data.mentee_status, null)
-    assert.equal(data.status, 'APPROVED')
     assert.equal(data.name, 'Mia Mentor')
     assert.equal(data.preferred_name, 'Mia')
     assert.deepEqual(data.payload, { preferred_name: 'Mia', city: 'Boston', motivation: 'Help.', max_capacity: 3 })
@@ -116,7 +115,6 @@ describe('GET /api/profiles/me: shape by situation', () => {
     assert.equal(data.role, 'mentor')
     assert.equal(data.is_mentor, false)
     assert.equal(data.mentor_status, 'PENDING')
-    assert.equal(data.status, 'PENDING')
   })
 
   it('an approved mentee', async () => {
@@ -143,7 +141,7 @@ describe('GET /api/profiles/me: shape by situation', () => {
     assert.equal(data.payload.statement_of_intent, 'Learn.')
   })
 
-  it('status is APPROVED once either application is approved', async () => {
+  it('per-role status for a dual-role user with one pending', async () => {
     await seed('half@test.com', {
       mentor: { status: 'PENDING' },
       mentee: { status: 'APPROVED' },
@@ -151,7 +149,8 @@ describe('GET /api/profiles/me: shape by situation', () => {
     const { data } = await me('half@test.com')
     assert.equal(data.is_mentee, true)
     assert.equal(data.is_mentor, false)
-    assert.equal(data.status, 'APPROVED')
+    assert.equal(data.mentee_status, 'APPROVED')
+    assert.equal(data.mentor_status, 'PENDING')
   })
 })
 

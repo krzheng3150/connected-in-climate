@@ -108,7 +108,6 @@ app.get('/api/profiles/me', async (req, res, next) => {
       has_profile: true,
       mentor_status: mentorApp?.status || null,
       mentee_status: menteeApp?.status || null,
-      status: isMentor || isMentee ? 'APPROVED' : (mentorApp?.status || menteeApp?.status || 'PENDING'),
     })
   } catch (err) {
     next(err)
