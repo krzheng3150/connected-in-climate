@@ -28,20 +28,13 @@ field_name: {
 ```
 IDs are snake_case, stable, and used in storage/matching. Labels are display-only.
 
-### 2. `scripts/import.js`
-
-Add the field to the `buildPayload()` function so CSV import picks it up. Match the field type:
-- Single enum: `normalize('field_name', row.field_name)`
-- Multi enum: `normalizeArray('field_name', splitMulti(row.field_name))`
-- Free text: `row.field_name?.trim() || undefined`
-
-### 3. `client/src/components/ProfileFields.jsx`
+### 2. `client/src/components/ProfileFields.jsx`
 
 - `LABELS`: add the `field_name: { id: 'Label', ... }` mapping (for enum fields)
 - `FIELD_NAMES`: add `field_name: 'Display Name'` (for profile rendering)
 - `FIELD_ORDER`: add `'field_name'` in the desired display position
 
-### 4. `client/src/components/ApplicationForm.jsx`
+### 3. `client/src/components/ApplicationForm.jsx`
 
 Add the field to the appropriate step and role group:
 
@@ -56,7 +49,7 @@ Add the field to the appropriate step and role group:
 - **Step 3** (free text):
   - Add a `<textarea>` or `<input>` in the Step 3 JSX
 
-### 5. `server/profile-api.js`
+### 4. `server/profile-api.js`
 
 Add the field name to the correct set:
 - `ENUM_SINGLE_FIELDS` — single-select enum
@@ -65,10 +58,6 @@ Add the field name to the correct set:
 - `ARRAY_FREE_TEXT_FIELDS` — array free text
 
 If the field uses a shared registry key (like `top_strengths` → `topics`), also add it to `ENUM_FIELD_MAP`.
-
-### 6. `scripts/sample-profiles.csv`
-
-Add the column with sample values for at least 2-3 rows. Use IDs for enum fields, not labels.
 
 ## After all files
 

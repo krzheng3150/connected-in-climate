@@ -157,11 +157,6 @@ pg_dump "$OLD_DATABASE_URL" --no-owner --no-acl -t user_profiles > profiles.sql
 psql "$NEW_DATABASE_URL" < profiles.sql
 ```
 
-Or re-import from a CSV / JSON file:
-```bash
-DATABASE_URL="$NEW_DATABASE_URL" node --env-file=.env scripts/import.js <source>
-```
-
 ## Step 11: Deploy and Verify
 
 Push to `main` (or re-run the workflow). The deploy workflow will:

@@ -60,10 +60,7 @@ async function setup() {
   console.log('Waiting for Postgres...')
   await waitForPostgres()
 
-  console.log('Importing sample data...')
-  run('node --env-file=.env scripts/import.js scripts/sample-profiles.csv')
-
-  console.log('Seeding match lifecycle data...')
+  console.log('Seeding profiles and match lifecycle data...')
   run('node --env-file=.env scripts/seed.js')
 
   console.log('Building client (test mode)...')

@@ -50,7 +50,7 @@ Mentee cannot re-run matching while any run is PENDING_REVIEW, AWAITING_MENTEE, 
 
 ## Profile field propagation
 
-New field → `server/field-registry.js` → `scripts/import.js` → `client/src/components/ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `client/src/components/ApplicationForm.jsx` → `server/profile-api.js` (field set) → `scripts/sample-profiles.csv`
+New field → `server/field-registry.js` → `client/src/components/ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `client/src/components/ApplicationForm.jsx` → `server/profile-api.js` (field set)
 
 ## Milestones
 

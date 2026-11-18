@@ -5,7 +5,7 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 - AI primer (algorithm, decisions, field propagation): `docs/primer.md`
 - Full design doc: `docs/design.md` | [Google Doc](https://docs.google.com/document/d/1n1yqMimYnSUDaC_lV49F4yo33U1V3lm_/edit)
 - Commands: see `scripts` in `package.json`
-- Test data: `scripts/sample-profiles.csv`
+- Test data: `scripts/seed.js` + `scripts/seed-data.js`
 
 ## Key files
 
@@ -14,7 +14,6 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 | Profile field options | `server/field-registry.js` |
 | Matching algorithm | `server/matching.js` |
 | UI labels & profile rendering | `client/src/components/ProfileFields.jsx` |
-| Data import | `scripts/import.js` |
 | Auth (shared helper) | `server/auth.js` |
 | Admin backend | `server/admin-api.js` |
 | Application form (frontend) | `client/src/components/ApplicationForm.jsx` |
@@ -36,10 +35,9 @@ Mentor/mentee matchmaking platform for climate tech professionals. React (Vite) 
 - **Matches are immutable snapshots.** Never mutate a `computation_payload`. Profile changes only affect future match runs.
 - **Block list ≠ rejection.** The `rejections` table is a block list (prevents future matching). Rejecting a match does NOT auto-block — admin decides separately.
 - **Auth via Clerk.** Social login (Google, LinkedIn, Microsoft) on the frontend (`@clerk/react`), session verification on the backend (`@clerk/express`). `server/auth.js` exports `getAuthEmail(req)` — extracts verified email from the Clerk session, falls back to `x-user-email` header in non-production (for tests). Admin routes still gated by `ADMIN_EMAILS` env var.
-- **Self-service profile creation.** Users without a profile see a multi-step application form (`ApplicationForm.jsx`). `POST /api/profiles` creates (first app creates user_profiles + application row; second app reuses user_profiles, adds the other application). `PATCH /api/profiles` updates the application matching the submitted role. Validation reuses `field-registry.js` normalize/normalizeArray. Existing users can edit their profile or add a second role from the dashboard. Profiles can also be bulk-imported via Google Sheets.
-- **Profile field propagation.** New field → `field-registry.js` → `import.js` (add to MENTOR/MENTEE_PAYLOAD_FIELDS if role-specific) → `ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `ApplicationForm.jsx` (add to the appropriate step) → `profile-api.js` (add to SHARED/MENTOR/MENTEE_PAYLOAD_FIELDS) → `sample-profiles.csv`.
-- **CSV/JSON import.** `import.js` bulk-imports profiles from a local CSV or JSON file (used by `npm run go`, the demo, and tests). Multi-select fields accept pipes, newlines, or semicolons. Both labels and IDs resolve via `normalize()`. There is no Google Sheet import.
-- **TF-IDF embeddings.** Computed locally at import time and at profile creation/edit time (no OpenAI API calls). Stored per-application in `mentor_applications.embedding` (from motivation) and `mentee_applications.embedding` (from statement_of_intent). `profile-api.js` recomputes the embedding on every save.
+- **Self-service profile creation.** Users without a profile see a multi-step application form (`ApplicationForm.jsx`). `POST /api/profiles` creates (first app creates user_profiles + application row; second app reuses user_profiles, adds the other application). `PATCH /api/profiles` updates the application matching the submitted role. Validation reuses `field-registry.js` normalize/normalizeArray. Existing users can edit their profile or add a second role from the dashboard.
+- **Profile field propagation.** New field → `field-registry.js` → `ProfileFields.jsx` (LABELS + FIELD_NAMES + FIELD_ORDER) → `ApplicationForm.jsx` (add to the appropriate step) → `profile-api.js` (add to SHARED/MENTOR/MENTEE_PAYLOAD_FIELDS).
+- **TF-IDF embeddings.** Computed locally at profile creation/edit time (no OpenAI API calls). Stored per-application in `mentor_applications.embedding` (from motivation) and `mentee_applications.embedding` (from statement_of_intent). `profile-api.js` recomputes the embedding on every save.
 - **Deploy secrets via GH Actions.** Secrets (`CLERK_SECRET_KEY`, `RESEND_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`) are stored as GitHub Actions secrets and injected into the app spec at deploy time by the workflow. They are NOT set manually in the DO console. The health check (`/api/health`) is mounted above `clerkMiddleware()` so deploys aren't blocked by Clerk misconfiguration. When adding or removing a secret, update all three: `README.md` (secrets table), `.do/app.yaml` (env vars), `.github/workflows/deploy.yml` (inject step).
 
 ## Keeping this file current
