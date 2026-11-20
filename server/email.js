@@ -83,7 +83,7 @@ export function notifyAdminsNewRun(adminEmails, menteeName, menteeEmail) {
   }
 }
 
-export function notifyMatchActive(mentorEmail, mentorName, menteeEmail, menteeName) {
+export function notifyMatchActive(mentorEmail, mentorName, menteeEmail, menteeName, { note } = {}) {
   send(
     mentorEmail,
     `You've been matched with ${menteeName}!`,
@@ -92,23 +92,31 @@ export function notifyMatchActive(mentorEmail, mentorName, menteeEmail, menteeNa
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">View your match →</a></p>
     `),
   )
+  const noteHtml = note?.trim()
+    ? `<p style="color: #555;">Note from the Connected in Climate team:</p><p style="font-style: italic; color: #555;">${escapeHtml(note.trim())}</p>`
+    : ''
   send(
     menteeEmail,
     `Your match with ${mentorName} is confirmed!`,
     wrap(`
       <p>Great news! You've been matched with <strong>${escapeHtml(mentorName)}</strong> as your mentor.</p>
+      ${noteHtml}
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">View your match →</a></p>
     `),
   )
 }
 
-export function notifyMenteeMatchesReady(menteeEmail, menteeName, approvedCount) {
+export function notifyMenteeMatchesReady(menteeEmail, menteeName, approvedCount, { note } = {}) {
+  const noteHtml = note?.trim()
+    ? `<p style="color: #555;">Note from the Connected in Climate team:</p><p style="font-style: italic; color: #555;">${escapeHtml(note.trim())}</p>`
+    : ''
   send(
     menteeEmail,
     `Your mentor matches are ready — pick your favorite!`,
     wrap(`
       <p>Hi ${escapeHtml(menteeName)},</p>
       <p>The admin team has approved <strong>${approvedCount} mentor${approvedCount > 1 ? 's' : ''}</strong> for you. Log in to review them and pick the one you'd like to work with.</p>
+      ${noteHtml}
       <p><a href="${APP_URL}/dashboard" style="color: #2d6a4f;">Choose your mentor →</a></p>
     `),
   )

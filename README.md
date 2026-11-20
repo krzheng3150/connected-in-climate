@@ -38,6 +38,22 @@ npm run demo             # E2E Playwright demo (headed, with slowmo)
 npm run demo:headless    # E2E Playwright demo (headless)
 ```
 
+### Sending test emails
+
+Send any email template to a real inbox to verify rendering:
+
+```sh
+SEND_EMAIL=1 node --env-file=.env scripts/test-email.js <template> <to> [--note "..."]
+```
+
+Templates: `matches-ready`, `match-active`, `app-approved`, `new-application`, `new-run`
+
+Examples:
+```sh
+SEND_EMAIL=1 node --env-file=.env scripts/test-email.js matches-ready you@example.com --note "Strong policy overlap"
+SEND_EMAIL=1 node --env-file=.env scripts/test-email.js app-approved you@example.com
+```
+
 ## Deploying
 
 Pushing to `main` triggers the deploy workflow (`.github/workflows/deploy.yml`), which:

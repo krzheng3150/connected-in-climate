@@ -326,6 +326,170 @@ describe('Email: no notification on cancelled review', () => {
 })
 
 
+// ── Admin review note in emails ──────────────────────────────────
+
+describe('Email: admin note in auto-activate (1 approved)', () => {
+  beforeEach(() => _testClear())
+
+  it('includes italicized note in mentee email when note is provided', async () => {
+    // Cancel all existing runs for mentee1 so we can create a fresh one
+    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee1@test.com'`)
+    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee1@test.com'`)
+
+    _testClear()
+    await post('/api/matches/run', { email: 'mentee1@test.com' })
+    _testClear()
+
+    const runResult = await pool.query(
+      `SELECT run_id FROM match_runs WHERE mentee_email = 'mentee1@test.com' AND status = 'PENDING_REVIEW'`,
+    )
+    const runId = runResult.rows[0].run_id
+    const candidates = await pool.query(
+      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank LIMIT 1`,
+      [runId],
+    )
+
+    const { status } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: [candidates.rows[0].match_id], note: 'Strong overlap in renewable energy' },
+      admin,
+    )
+    assert.equal(status, 200)
+
+    const sent = _testGetSent()
+    const menteeEmail = sent.find(s => s.to === 'mentee1@test.com')
+    assert.ok(menteeEmail, 'mentee should receive an email')
+    assert.ok(menteeEmail.html.includes('font-style: italic'), 'note should be italicized')
+    assert.ok(menteeEmail.html.includes('Strong overlap in renewable energy'), 'note text should appear')
+
+    const mentorEmail = sent.find(s => s.to !== 'mentee1@test.com')
+    assert.ok(mentorEmail, 'mentor should receive an email')
+    assert.ok(!mentorEmail.html.includes('Strong overlap in renewable energy'), 'mentor should NOT see the note')
+  })
+
+  it('omits note section when note is empty', async () => {
+    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee1@test.com'`)
+    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee1@test.com'`)
+
+    _testClear()
+    await post('/api/matches/run', { email: 'mentee1@test.com' })
+    _testClear()
+
+    const runResult = await pool.query(
+      `SELECT run_id FROM match_runs WHERE mentee_email = 'mentee1@test.com' AND status = 'PENDING_REVIEW'`,
+    )
+    const runId = runResult.rows[0].run_id
+    const candidates = await pool.query(
+      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank LIMIT 1`,
+      [runId],
+    )
+
+    const { status } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: [candidates.rows[0].match_id], note: '' },
+      admin,
+    )
+    assert.equal(status, 200)
+
+    const sent = _testGetSent()
+    const menteeEmail = sent.find(s => s.to === 'mentee1@test.com')
+    assert.ok(menteeEmail)
+    assert.ok(!menteeEmail.html.includes('font-style: italic'), 'no italic note when note is empty')
+  })
+
+  it('omits note section when note is not provided', async () => {
+    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee1@test.com'`)
+    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee1@test.com'`)
+
+    _testClear()
+    await post('/api/matches/run', { email: 'mentee1@test.com' })
+    _testClear()
+
+    const runResult = await pool.query(
+      `SELECT run_id FROM match_runs WHERE mentee_email = 'mentee1@test.com' AND status = 'PENDING_REVIEW'`,
+    )
+    const runId = runResult.rows[0].run_id
+    const candidates = await pool.query(
+      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank LIMIT 1`,
+      [runId],
+    )
+
+    const { status } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: [candidates.rows[0].match_id] },
+      admin,
+    )
+    assert.equal(status, 200)
+
+    const sent = _testGetSent()
+    const menteeEmail = sent.find(s => s.to === 'mentee1@test.com')
+    assert.ok(menteeEmail)
+    assert.ok(!menteeEmail.html.includes('font-style: italic'), 'no italic note when note is undefined')
+  })
+})
+
+describe('Email: admin note in multi-approve (AWAITING_MENTEE)', () => {
+  beforeEach(() => _testClear())
+
+  it('includes italicized note in mentee email when multiple approved with note', async () => {
+    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee2@test.com'`)
+    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee2@test.com'`)
+
+    _testClear()
+    const { data: runData } = await post('/api/matches/run', { email: 'mentee2@test.com' })
+    const runId = runData.run.run_id
+
+    const candidates = await pool.query(
+      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank`,
+      [runId],
+    )
+    const allIds = candidates.rows.map(r => r.match_id)
+    assert.ok(allIds.length >= 2, 'need at least 2 candidates')
+
+    _testClear()
+    const { status, data } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: allIds, note: 'Both mentors have deep policy expertise' },
+      admin,
+    )
+    assert.equal(status, 200)
+    assert.equal(data.run_status, 'AWAITING_MENTEE')
+
+    const sent = _testGetSent()
+    assert.equal(sent.length, 1)
+    assert.equal(sent[0].to, 'mentee2@test.com')
+    assert.ok(sent[0].html.includes('font-style: italic'), 'note should be italicized')
+    assert.ok(sent[0].html.includes('Both mentors have deep policy expertise'), 'note text should appear')
+  })
+
+  it('omits note section when multiple approved without note', async () => {
+    await pool.query(`UPDATE match_runs SET status = 'CANCELLED' WHERE mentee_email = 'mentee2@test.com'`)
+    await pool.query(`UPDATE matches SET status = 'REJECTED' WHERE mentee_email = 'mentee2@test.com'`)
+
+    _testClear()
+    const { data: runData } = await post('/api/matches/run', { email: 'mentee2@test.com' })
+    const runId = runData.run.run_id
+
+    const candidates = await pool.query(
+      `SELECT match_id FROM matches WHERE run_id = $1 AND status = 'CANDIDATE' ORDER BY rank`,
+      [runId],
+    )
+    const allIds = candidates.rows.map(r => r.match_id)
+
+    _testClear()
+    const { status } = await post(
+      `/api/admin/runs/${runId}/review`,
+      { approved: allIds },
+      admin,
+    )
+    assert.equal(status, 200)
+
+    const sent = _testGetSent()
+    assert.equal(sent.length, 1)
+    assert.ok(!sent[0].html.includes('font-style: italic'), 'no italic note when note is undefined')
+  })
+})
+
 // ── HTML escaping of user-provided values ─────────────────────────
 
 describe('Email: HTML escaping', () => {

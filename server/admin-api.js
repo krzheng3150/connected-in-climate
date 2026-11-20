@@ -206,7 +206,7 @@ router.get('/pending', async (_req, res, next) => {
 router.post('/runs/:run_id/review', async (req, res, next) => {
   try {
     const { run_id } = req.params
-    const { approved } = req.body
+    const { approved, note } = req.body
 
     if (!Array.isArray(approved)) {
       return res.status(400).json({ error: 'approved must be an array of match_ids' })
@@ -289,7 +289,7 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
         )
         if (matchRow.rows.length > 0) {
           const { mentor_email, mentor_name, mentee_name } = matchRow.rows[0]
-          notifyMatchActive(mentor_email, mentor_name, menteeEmail, mentee_name)
+          notifyMatchActive(mentor_email, mentor_name, menteeEmail, mentee_name, { note })
 
           createMatchResources({
             mentorEmail: mentor_email,
@@ -309,7 +309,7 @@ router.post('/runs/:run_id/review', async (req, res, next) => {
           [menteeEmail],
         )
         const menteeName = menteeRow.rows[0]?.name || menteeEmail
-        notifyMenteeMatchesReady(menteeEmail, menteeName, approvedSet.size)
+        notifyMenteeMatchesReady(menteeEmail, menteeName, approvedSet.size, { note })
       }
 
       console.log(`[admin] review: run_id=${run_id} admin=${req.adminEmail} approved=${approvedSet.size} rejected=${candidateIds.size - approvedSet.size} status=${runStatus}`)

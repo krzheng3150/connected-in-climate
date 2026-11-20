@@ -329,6 +329,7 @@ function RunReviewCard({ run, headers, onUpdate }) {
   const [expandedScores, setExpandedScores] = useState(new Set())
   const [expandedProfiles, setExpandedProfiles] = useState(new Set())
   const [showConfirm, setShowConfirm] = useState(false)
+  const [note, setNote] = useState('')
 
   function toggleCandidate(matchId) {
     setSelected(prev => {
@@ -364,7 +365,7 @@ function RunReviewCard({ run, headers, onUpdate }) {
       const res = await fetch(`/api/admin/runs/${run.run_id}/review`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ approved: [...selected] }),
+        body: JSON.stringify({ approved: [...selected], note: note.trim() || undefined }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -469,6 +470,21 @@ function RunReviewCard({ run, headers, onUpdate }) {
               <p style={{ color: 'var(--accent)', fontSize: '0.875rem' }}>
                 One candidate approved — match will auto-activate.
               </p>
+            )}
+            {approved.length > 0 && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.875rem' }}>Note to mentee (optional)</label>
+                <p style={{ fontSize: '0.8rem', margin: '0.25rem 0 0.5rem', opacity: 0.75 }}>
+                  Explain why these mentors were selected. This will appear in the email sent to the mentee.
+                </p>
+                <textarea
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. These mentors were chosen because of their strong overlap in renewable energy policy…"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
             )}
           </ConfirmationModal>
         )
