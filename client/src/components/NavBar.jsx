@@ -19,6 +19,12 @@ export default function NavBar() {
   }
 
   return (
+    <>
+    {!AUTH_ENABLED && (
+      <div className="beta-banner">
+        <strong>Beta Testing</strong> — This is a prototype, not a live service. Feel free to explore, but nothing here is real yet.
+      </div>
+    )}
     <header className="page-header">
       <span className="nav-brand">Connected in Climate</span>
       <div className="user-info">
@@ -36,5 +42,6 @@ export default function NavBar() {
         )}
       </div>
     </header>
+    </>
   )
 }
