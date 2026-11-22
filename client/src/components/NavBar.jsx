@@ -22,7 +22,7 @@ export default function NavBar() {
     <>
     {!AUTH_ENABLED && (
       <div className="beta-banner">
-        <strong>Welcome to our Beta Test!</strong> You're exploring an early preview and everything is all part of the test. Thank you for exploring and giving us feedback!
+        <strong>Welcome to our Alpha Test!</strong> You're exploring an early preview and everything is all part of the test. Thank you for exploring and giving us feedback!
       </div>
     )}
     <header className="page-header">
