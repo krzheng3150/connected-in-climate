@@ -2,6 +2,7 @@ import NavBar from '../components/NavBar.jsx'
 import carlyPhoto from '../assets/team/carly-cohen.jpg'
 import minaPhoto from '../assets/team/mina-johnson.webp'
 import kevinPhoto from '../assets/team/kevin-zheng.jpg'
+import avidehPhoto from '../assets/team/avideh-mayville.jpg'
 
 const TEAM = [
   {
@@ -24,6 +25,13 @@ const TEAM = [
     photo: kevinPhoto,
     linkedin: 'https://www.linkedin.com/in/kevin-zheng-1b66a770/',
     bio: 'Kevin is a software engineer with over a decade of experience working across a multitude of tech stacks on projects spanning a diverse set of business problems. Kevin prides on being an end-to-end owner that wears multiple hats to quickly build scalable software for any business problem.\n\nAfter years of working in non-climate tech companies, Kevin realized software is the golden opportunity for an individual to make a wide-scale influence to the battle against climate change. He is actively pivoting to a climate tech career, bringing his sense of ownership, neverending curiosity, and ability to quickly understand any business and tech domain to tackle climate problems with simple and scalable software.',
+  },
+  {
+    name: 'Avideh Mayville',
+    title: 'Program Development',
+    photo: avidehPhoto,
+    linkedin: 'https://www.linkedin.com/in/avideh-k-mayville-phd/',
+    bio: `Avi is a social sector leader and manager with fifteen years of experience developing programs, people, and organizations. With a background in conflict resolution and a Ph.D in Sociology, Avi has built programs and developed operational infrastructure for organizations focused on peacebuilding, veteran reintegration, and energy system transformation.\n\nHaving developed and participated in numerous mentoring and professional development programs herself, she is passionate about creating the connections and networks that leverage individual\u2019s strengths and create social impact.`,
   },
 ]
 
