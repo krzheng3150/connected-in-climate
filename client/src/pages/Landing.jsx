@@ -70,10 +70,6 @@ export default function Landing() {
         <p className="tagline">Human connections to land climate jobs</p>
       </div>
 
-      <blockquote className="landing-quote">
-        &ldquo;Somewhere, someone is looking for exactly what you have to offer.&rdquo;
-      </blockquote>
-
       <p className="landing-intro">
         Connected in Climate is a mentorship program built on authentic connections designed to help
         those navigating the climate sector build their network and find their next opportunity.
@@ -148,6 +144,10 @@ export default function Landing() {
           />
         </div>
       )}
+
+      <div className="landing-quote-banner">
+        &ldquo;Somewhere, someone is looking for exactly what you have to offer.&rdquo;
+      </div>
     </div>
   )
 }
